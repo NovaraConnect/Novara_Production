@@ -6,6 +6,7 @@ import contactsRouter from "./contacts";
 import settingsRouter from "./settings";
 import notificationsRouter from "./notifications";
 import feedbackRouter from "./feedback";
+import featuresRouter from "./features";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(contactsRouter);
 router.use(settingsRouter);
 router.use(notificationsRouter);
 router.use(feedbackRouter);
+router.use(featuresRouter);
 
 export default router;

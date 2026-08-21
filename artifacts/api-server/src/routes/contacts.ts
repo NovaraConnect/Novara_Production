@@ -10,6 +10,7 @@ import {
   type PriorityLevel,
 } from "../lib/priority";
 import { recalculateContactsForUser } from "../lib/recalculate";
+import { isAiEnrichEnabled, inferContactFacets } from "../lib/enrich";
 
 const router = Router();
 
@@ -428,6 +429,83 @@ router.post("/contacts/import", requireAuth, async (req: Request, res: Response)
   }
 
   res.json({ imported, skipped });
+});
+
+// POST /api/contacts/:id/enrich  — OPTIONAL AI enrichment.
+// Infers industry/function from the contact's company + role and fills any
+// blank fields, then recomputes the AI-suggested priority. Returns 503 when
+// the feature is disabled (no ANTHROPIC_API_KEY). Never required for any core
+// flow — this is an explicit, after-the-fact action on a single contact.
+router.post("/contacts/:id/enrich", requireAuth, async (req: Request, res: Response) => {
+  if (!isAiEnrichEnabled()) {
+    res.status(503).json({
+      error: "AI enrichment is not enabled for this deployment.",
+      feature: "ai_enrich",
+      enabled: false,
+    });
+    return;
+  }
+
+  const userId = (req as AuthedRequest).userId;
+  const { id } = req.params;
+  try {
+    const { rows: [row] } = await pool.query(
+      "SELECT * FROM contacts WHERE id = $1 AND user_id = $2",
+      [id, userId],
+    );
+    if (!row) {
+      res.status(404).json({ error: "Contact not found" });
+      return;
+    }
+
+    let inferred;
+    try {
+      inferred = await inferContactFacets({ company: row.company, role: row.role });
+    } catch (err) {
+      res.status(502).json({
+        error: "AI enrichment failed",
+        detail: err instanceof Error ? err.message : String(err),
+      });
+      return;
+    }
+
+    // Only fill fields the user left blank — never overwrite their own values.
+    const fillIndustry = !String(row.industry ?? "").trim() && inferred.industry
+      ? inferred.industry
+      : null;
+    const fillFunction = !String(row.function ?? "").trim() && inferred.function
+      ? inferred.function
+      : null;
+
+    if (fillIndustry || fillFunction) {
+      await pool.query(
+        `UPDATE contacts
+            SET industry = COALESCE($1, industry),
+                function = COALESCE($2, function),
+                updated_at = NOW()
+          WHERE id = $3 AND user_id = $4`,
+        [fillIndustry, fillFunction, id, userId],
+      );
+      // Reuse the canonical, idempotent recompute so priority/cadence reflect
+      // the new fields (honours manual overrides).
+      await recalculateContactsForUser(userId);
+    }
+
+    const { rows: [updated] } = await pool.query(
+      "SELECT * FROM contacts WHERE id = $1 AND user_id = $2",
+      [id, userId],
+    );
+    res.json({
+      enriched: Boolean(fillIndustry || fillFunction),
+      inferred,
+      contact: dbToContact(updated),
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Failed to enrich contact",
+      detail: err instanceof Error ? err.message : String(err),
+    });
+  }
 });
 
 export default router;

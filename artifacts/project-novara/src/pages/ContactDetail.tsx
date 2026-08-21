@@ -6,7 +6,7 @@ import { ImportanceBadge } from "@/components/ImportanceBadge";
 import {
   ArrowLeft, Edit2, Trash2, Linkedin, MapPin, AlignLeft, CalendarDays,
   CheckCircle2, Bell, CalendarPlus, ExternalLink, Newspaper, Loader2, RefreshCw,
-  Mail, Phone, TrendingUp, TrendingDown, Briefcase, Tag,
+  Mail, Phone, TrendingUp, TrendingDown, Briefcase, Tag, Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +17,11 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/react";
+import { enrichContact } from "@/lib/api";
+import { useFeatures } from "@/hooks/useFeatures";
+import { CONTACTS_KEY } from "@/hooks/useContacts";
 import { downloadIcs, googleCalendarUrl } from "@/lib/calendar";
 import { requestNotificationPermission, sendNotification, isDigestEnabled, setDigestEnabled, scheduleDigestCheck } from "@/lib/webNotifications";
 import { useCompanyNews } from "@/hooks/useCompanyNews";
@@ -28,10 +33,35 @@ export default function ContactDetail() {
   const [match, params] = useRoute("/contacts/:id");
   const [, setLocation] = useLocation();
   const { contacts, markContacted, removeContact } = useContacts();
+  const { aiEnrich } = useFeatures();
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+  const [enriching, setEnriching] = useState(false);
   const { settings } = useSettings();
   const [notifEnabled, setNotifEnabled] = useState(false);
 
   const contact = match && params?.id ? contacts.find(c => c.id === params.id) ?? null : null;
+
+  const handleEnrich = async () => {
+    if (!contact) return;
+    setEnriching(true);
+    try {
+      const result = await enrichContact(getToken, contact.id);
+      await queryClient.invalidateQueries({ queryKey: CONTACTS_KEY });
+      if (result.enriched) {
+        const bits = [result.inferred.industry, result.inferred.function]
+          .filter(Boolean)
+          .join(" · ");
+        toast.success(bits ? `Match improved — ${bits}` : "Match improved");
+      } else {
+        toast.info("Nothing to add — industry and function are already set.");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Enrichment failed");
+    } finally {
+      setEnriching(false);
+    }
+  };
 
   useEffect(() => {
     setNotifEnabled(Notification?.permission === "granted");
@@ -213,6 +243,25 @@ export default function ContactDetail() {
                   <span>Reduced from <strong>{basePriority}</strong> — limited career goal alignment</span>
                 </>
               )}
+            </div>
+          )}
+          {aiEnrich && (
+            <div className="mt-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleEnrich}
+                disabled={enriching}
+                className="h-9 rounded-lg text-xs font-medium"
+                data-testid="button-enrich-ai"
+              >
+                {enriching ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                Improve match with AI
+              </Button>
             </div>
           )}
         </div>

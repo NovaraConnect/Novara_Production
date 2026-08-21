@@ -203,3 +203,50 @@ export async function submitFeedback(
   }
   return res.json();
 }
+
+// ── Feature flags ────────────────────────────────────────────────────────────
+
+export interface Features {
+  /** Whether optional AI contact enrichment is available in this deployment. */
+  aiEnrich: boolean;
+}
+
+/** Non-secret capability flags. Defaults everything off if the call fails, so
+ *  the UI degrades gracefully (features stay hidden) rather than erroring. */
+export async function fetchFeatures(getToken: GetAuthToken): Promise<Features> {
+  try {
+    const res = await apiFetch(getToken, "/api/features");
+    if (!res.ok) return { aiEnrich: false };
+    return await res.json();
+  } catch {
+    return { aiEnrich: false };
+  }
+}
+
+// ── Optional AI enrichment ───────────────────────────────────────────────────
+
+export interface EnrichResult {
+  enriched: boolean;
+  inferred: { industry: string | null; function: string | null };
+  contact: Contact;
+}
+
+/** Improve a contact's match by inferring industry/function from company+role.
+ *  Throws a descriptive error when the feature is disabled (HTTP 503) so the
+ *  caller can surface it — never required for any core flow. */
+export async function enrichContact(
+  getToken: GetAuthToken,
+  id: string,
+): Promise<EnrichResult> {
+  const res = await apiFetch(getToken, `/api/contacts/${id}/enrich`, {
+    method: "POST",
+  });
+  if (res.status === 503) {
+    throw new Error("AI enrichment isn't enabled for this deployment.");
+  }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? "Enrichment failed");
+  }
+  return res.json();
+}
