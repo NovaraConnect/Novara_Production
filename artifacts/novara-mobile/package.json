@@ -61,8 +61,10 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
+    "@clerk/clerk-expo": "^2.20.0",
     "@expo-google-fonts/plus-jakarta-sans": "^0.4.2",
     "expo-calendar": "^15.0.8",
-    "expo-notifications": "^0.32.17"
+    "expo-notifications": "^0.32.17",
+    "expo-secure-store": "~15.0.8"
   }
 }

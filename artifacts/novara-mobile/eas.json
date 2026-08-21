@@ -7,22 +7,29 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "ios": { "simulator": true },
+      "ios": {
+        "simulator": true
+      },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "http://localhost:3000"
+        "EXPO_PUBLIC_API_BASE_URL": "http://localhost:3000",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_REPLACE_WITH_DEV_CLERK_KEY"
       }
     },
     "preview": {
       "distribution": "internal",
-      "ios": { "simulator": false },
+      "ios": {
+        "simulator": false
+      },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://api.novaraconnect.group"
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.novaraconnect.group",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_REPLACE_WITH_PRODUCTION_CLERK_KEY"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://api.novaraconnect.group"
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.novaraconnect.group",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_REPLACE_WITH_PRODUCTION_CLERK_KEY"
       }
     }
   },

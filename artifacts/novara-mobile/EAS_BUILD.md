@@ -23,6 +23,7 @@ exactly what you must fill in before building.
 | `eas.json` → submit.production.ios | `appleTeamId` | 10-char Team ID | developer.apple.com → Membership |
 | `app.config.js` → extra.eas | `projectId` | EAS project UUID | written automatically by `eas init` |
 | `eas.json` build env (preview/production) | `EXPO_PUBLIC_API_BASE_URL` | real production API origin | set once the prod backend/domain exists (e.g. `https://api.novaraconnect.group`, or the Render `*.onrender.com` URL initially) |
+| `eas.json` build env (all profiles) | `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key (`pk_test_`/`pk_live_`) | Clerk Dashboard → API keys (production instance for release builds) |
 
 ## Prerequisites (your actions — cannot be automated here)
 1. Apple Developer Program membership (active).
@@ -41,20 +42,21 @@ pnpm run eas:submit:ios
 ```
 EAS provisions iOS signing credentials and the APNs key interactively on first run.
 
-## ⚠️ Pre-submission blocker (must resolve first)
-The current Expo app does **not** implement Clerk authentication. `lib/api.ts` calls
-the backend with **no `Authorization` header**, and contacts are kept in local
-device storage (`lib/storage.ts`), not the authenticated backend. Two consequences:
-1. The hardened backend gates `/api/linkedin/import` and `/api/company-news` behind
-   `requireAuth`, so those mobile features will get **401** until the app signs in.
-2. App Review needs a working, signed-in app + a demo account. A no-auth local-only
-   build with broken backend features is likely to be rejected.
+## Auth status (in progress)
+Clerk auth **scaffolding is now in place** (see `CLERK_AUTH_PLAN.md`): `ClerkProvider`
++ SecureStore token cache wrap the app, there are local sign-in / sign-up screens,
+auth gating (signed-out → `(auth)`, signed-in → `(tabs)`), a Sign-out control in
+Settings, and an `authedFetch` helper in `lib/api.ts`.
 
-**Decision needed before submission:** either (a) add Clerk auth (`@clerk/clerk-expo`)
-to the mobile app so it matches the web app and sends a bearer token, or (b) ship a
-deliberately scoped local-only app and remove/guard the backend-dependent features.
-This is an architecture decision, intentionally left to you — the config above is
-ready either way.
+**Still pending before submission:**
+1. Data source is still local `AsyncStorage`; the contact CRUD + one-time migration
+   to the authenticated backend (`POST /api/contacts/import`) are the next milestone.
+2. `lib/api.ts` `importFromLinkedIn` / `getCompanyNews` still call the now-auth-gated
+   endpoints without a token — convert them to `authedFetch` when wiring data.
+3. Set `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` (placeholders are in `eas.json`).
+4. Configure the app's redirect scheme (`novara://`) in the Clerk instance if OAuth
+   is used (email/password needs no redirect).
+5. App Review needs a working demo account + fully functional signed-in app.
 
 ## Assets checklist (before store listing)
 - [x] App icon 1024×1024 (no alpha) — present

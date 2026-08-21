@@ -14,6 +14,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { useColors } from "@/hooks/useColors";
 import { useProfile } from "@/hooks/useProfile";
+import { useAuth, useUser } from "@clerk/clerk-expo";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Settings() {
   const colors = useColors();
@@ -21,6 +23,25 @@ export default function Settings() {
   const topPaddingWeb = Platform.OS === "web" ? 67 : 0;
 
   const { profile, loading, update } = useProfile();
+
+  const { signOut } = useAuth();
+  const { user } = useUser();
+  const queryClient = useQueryClient();
+
+  const handleSignOut = () => {
+    Alert.alert("Sign out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign out",
+        style: "destructive",
+        onPress: async () => {
+          await signOut();
+          queryClient.clear();
+          // Root layout redirects signed-out users to (auth)/sign-in.
+        },
+      },
+    ]);
+  };
 
   const [statement, setStatement] = useState("");
   const [newTag, setNewTag] = useState("");
@@ -204,6 +225,23 @@ export default function Settings() {
           interactions, set follow-up reminders, and keep your network warm — all in one place.
         </Text>
       </View>
+
+      {/* Account */}
+      <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>ACCOUNT</Text>
+      <View style={[styles.aboutCard, { backgroundColor: colors.card, borderColor: colors.border, padding: 0 }]}>
+        {user?.primaryEmailAddress?.emailAddress ? (
+          <View style={styles.accountRow}>
+            <Ionicons name="person-circle-outline" size={22} color={colors.mutedForeground} />
+            <Text style={[styles.accountEmail, { color: colors.foreground }]} numberOfLines={1}>
+              {user.primaryEmailAddress.emailAddress}
+            </Text>
+          </View>
+        ) : null}
+        <Pressable style={styles.signOutBtn} onPress={handleSignOut}>
+          <Ionicons name="log-out-outline" size={20} color={colors.destructive} />
+          <Text style={[styles.signOutText, { color: colors.destructive }]}>Sign out</Text>
+        </Pressable>
+      </View>
     </ScrollView>
   );
 }
@@ -348,4 +386,21 @@ const styles = StyleSheet.create({
   soonText: { fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold" },
   aboutCard: { borderRadius: 20, borderWidth: 1, padding: 20 },
   aboutText: { fontSize: 14, fontFamily: "PlusJakartaSans_400Regular", lineHeight: 22 },
+  accountRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 10,
+  },
+  accountEmail: { flex: 1, fontSize: 14, fontFamily: "PlusJakartaSans_500Medium" },
+  signOutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 16,
+  },
+  signOutText: { fontSize: 15, fontFamily: "PlusJakartaSans_600SemiBold" },
 });
