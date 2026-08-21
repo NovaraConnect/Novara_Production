@@ -16,6 +16,7 @@ import { useColors } from "@/hooks/useColors";
 import { useContacts } from "@/hooks/useContacts";
 import { computeStatus } from "@/lib/utils";
 import { ContactCard } from "@/components/ContactCard";
+import { LocalImportBanner } from "@/components/LocalImportBanner";
 import { RelationshipStatus } from "@/types/contact";
 
 const STATUS_FILTERS: Array<RelationshipStatus | "All"> = ["All", "Warm", "Cooling", "Cold"];
@@ -23,7 +24,7 @@ const STATUS_FILTERS: Array<RelationshipStatus | "All"> = ["All", "Warm", "Cooli
 export default function ContactsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { contacts, loading } = useContacts();
+  const { contacts, loading, refresh } = useContacts();
   const [activeTab, setActiveTab] = useState<"connected" | "pipeline">("connected");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<RelationshipStatus | "All">("All");
@@ -201,6 +202,7 @@ export default function ContactsScreen() {
 
       {/* List */}
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}>
+        <LocalImportBanner onImported={refresh} />
         {loading ? (
           <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
         ) : filtered.length === 0 ? (
