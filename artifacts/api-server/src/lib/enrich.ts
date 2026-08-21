@@ -1,18 +1,17 @@
 // ============================================================================
-// OPTIONAL AI contact enrichment.
+// OPTIONAL, AUTOMATIC AI contact enrichment.
 //
-// Strictly opt-in. Nothing in the core app (auth, contacts, settings,
-// feedback, dashboard, build, App Store path) depends on it. The feature is
-// enabled ONLY when a provider key is present; when none is set every caller
-// sees `isAiEnrichEnabled() === false` and the route returns a graceful
-// "feature disabled" response instead of erroring.
+// Runs best-effort during contact create/edit and the career-goal recompute,
+// so a contact's suggested priority/cadence reflect the company's industry
+// (e.g. Tesla → automotive) WITHOUT any manual action. Strictly optional and
+// non-blocking: if no provider key is set, or the call fails/times out, the
+// contact is still saved with the deterministic result — nothing core depends
+// on AI.
 //
 // Provider-flexible, free-first:
-//   • GEMINI_API_KEY   → Google Gemini free tier (default; no card required)
+//   • GEMINI_API_KEY    → Google Gemini free tier (default; no card)
 //   • ANTHROPIC_API_KEY → Claude Haiku (fallback if no Gemini key)
-// Gemini is called over plain HTTPS (no SDK dependency); the Anthropic SDK is
-// imported lazily so the server starts, and every non-AI request runs, without
-// either dependency being loaded or any key being required.
+// Gemini is called over plain HTTPS; the Anthropic SDK is imported lazily.
 // ============================================================================
 
 const SYSTEM_PROMPT =
@@ -22,12 +21,11 @@ const SYSTEM_PROMPT =
   "examples: automotive, fintech, healthcare, aerospace, retail, biotech; " +
   "function examples: product, engineering, sales, marketing, finance, " +
   "operations, design, legal, recruiting. If you cannot determine a field " +
-  "with reasonable confidence, return an empty string for it.";
+  "with reasonable confidence, use an empty string for it.";
 
-// Cheap classification models — a single short call per contact.
-const GEMINI_DEFAULT_MODEL = "gemini-2.5-flash"; // free tier; override via GEMINI_MODEL
+const GEMINI_DEFAULT_MODEL = "gemini-2.0-flash"; // free tier; override via GEMINI_MODEL
 const ANTHROPIC_MODEL = "claude-haiku-4-5";
-const REQUEST_TIMEOUT_MS = 8000;
+const REQUEST_TIMEOUT_MS = 7000;
 
 type Provider = "gemini" | "anthropic";
 
@@ -37,16 +35,13 @@ function activeProvider(): Provider | null {
   return null;
 }
 
-/** True only when a provider key is configured. The single gate every AI code
- *  path checks before doing anything. */
+/** True only when a provider key is configured. */
 export function isAiEnrichEnabled(): boolean {
   return activeProvider() !== null;
 }
 
 export interface InferredFacets {
-  /** Canonical lowercase industry (e.g. "automotive"), or null if unknown. */
   industry: string | null;
-  /** Canonical lowercase business function (e.g. "product"), or null. */
   function: string | null;
 }
 
@@ -70,9 +65,9 @@ function parseFacets(text: string | null | undefined): InferredFacets {
 }
 
 /**
- * Infer a contact's industry and business function from their company + role.
- * One structured, low-token call via whichever provider is configured. Callers
- * MUST gate on isAiEnrichEnabled() first; this throws if no key is present.
+ * Infer industry + function from company/role via the configured provider.
+ * Throws on any provider/HTTP error (callers wrap in best-effort). Callers
+ * MUST gate on isAiEnrichEnabled() first.
  */
 export async function inferContactFacets(input: {
   company: string;
@@ -80,24 +75,57 @@ export async function inferContactFacets(input: {
 }): Promise<InferredFacets> {
   const provider = activeProvider();
   if (!provider) {
-    throw new Error(
-      "AI enrichment is not enabled (no GEMINI_API_KEY or ANTHROPIC_API_KEY)",
-    );
+    throw new Error("AI enrichment is not enabled (no GEMINI_API_KEY or ANTHROPIC_API_KEY)");
   }
   const company = input.company.trim();
   const role = (input.role ?? "").trim() || "(unknown)";
-  const userText = `Company: ${company}\nRole: ${role}`;
-
   return provider === "gemini"
-    ? inferViaGemini(userText)
-    : inferViaAnthropic(userText);
+    ? inferViaGemini(company, role)
+    : inferViaAnthropic(`Company: ${company}\nRole: ${role}`);
 }
 
-// ── Google Gemini (free tier) — plain HTTPS, no SDK ──────────────────────────
-async function inferViaGemini(userText: string): Promise<InferredFacets> {
+/**
+ * Best-effort enrichment of blank industry/function. NEVER throws — on any
+ * failure it returns the original fields unchanged and reports via onError.
+ * Skips the call entirely when disabled, when there's no company, or when both
+ * fields are already filled (never overwrites user-entered values).
+ */
+export async function enrichBlanksBestEffort(
+  fields: { company?: string | null; role?: string | null; industry?: string | null; function?: string | null },
+  onError?: (message: string) => void,
+): Promise<{ industry: string | null; function: string | null; changed: boolean }> {
+  const industry0 = fields.industry ?? null;
+  const function0 = fields.function ?? null;
+  const haveIndustry = String(industry0 ?? "").trim() !== "";
+  const haveFunction = String(function0 ?? "").trim() !== "";
+  const company = String(fields.company ?? "").trim();
+
+  if (!isAiEnrichEnabled() || !company || (haveIndustry && haveFunction)) {
+    return { industry: industry0, function: function0, changed: false };
+  }
+  try {
+    const inferred = await inferContactFacets({ company, role: fields.role });
+    const industry = haveIndustry ? industry0 : inferred.industry;
+    const fn = haveFunction ? function0 : inferred.function;
+    const changed = (!haveIndustry && !!inferred.industry) || (!haveFunction && !!inferred.function);
+    return { industry, function: fn, changed };
+  } catch (err) {
+    onError?.(err instanceof Error ? err.message : String(err));
+    return { industry: industry0, function: function0, changed: false };
+  }
+}
+
+// ── Google Gemini (free tier) — responseMimeType JSON, no strict schema ──────
+async function inferViaGemini(company: string, role: string): Promise<InferredFacets> {
   const apiKey = process.env["GEMINI_API_KEY"]!.trim();
   const model = process.env["GEMINI_MODEL"]?.trim() || GEMINI_DEFAULT_MODEL;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
+  const userText =
+    `Company: ${company}\nRole: ${role}\n\n` +
+    'Respond with ONLY a JSON object of exactly this shape: ' +
+    '{"industry": "<canonical lowercase industry or empty string>", ' +
+    '"function": "<canonical lowercase function or empty string>"}';
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -112,13 +140,8 @@ async function inferViaGemini(userText: string): Promise<InferredFacets> {
         contents: [{ role: "user", parts: [{ text: userText }] }],
         generationConfig: {
           responseMimeType: "application/json",
-          responseSchema: {
-            type: "OBJECT",
-            properties: { industry: { type: "STRING" }, function: { type: "STRING" } },
-            required: ["industry", "function"],
-          },
           temperature: 0,
-          maxOutputTokens: 200,
+          maxOutputTokens: 256,
         },
       }),
     });
@@ -128,7 +151,7 @@ async function inferViaGemini(userText: string): Promise<InferredFacets> {
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Gemini responded with HTTP ${res.status}: ${body.slice(0, 160)}`);
+    throw new Error(`Gemini(${model}) HTTP ${res.status}: ${body.slice(0, 200)}`);
   }
 
   const data = (await res.json()) as {
@@ -151,10 +174,7 @@ async function inferViaAnthropic(userText: string): Promise<InferredFacets> {
         type: "json_schema",
         schema: {
           type: "object",
-          properties: {
-            industry: { type: "string" },
-            function: { type: "string" },
-          },
+          properties: { industry: { type: "string" }, function: { type: "string" } },
           required: ["industry", "function"],
           additionalProperties: false,
         },

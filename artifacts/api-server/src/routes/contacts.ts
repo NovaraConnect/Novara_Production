@@ -10,7 +10,8 @@ import {
   type PriorityLevel,
 } from "../lib/priority";
 import { recalculateContactsForUser } from "../lib/recalculate";
-import { isAiEnrichEnabled, inferContactFacets } from "../lib/enrich";
+import { isAiEnrichEnabled, inferContactFacets, enrichBlanksBestEffort } from "../lib/enrich";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -92,13 +93,23 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
     );
     const profile = profileFromSettingsRow(settingsRow);
 
+    // Automatic best-effort AI enrichment — fill blank industry/function so the
+    // suggested priority reflects the company's industry. Never blocks or fails
+    // contact creation; silently keeps the given fields if AI is off or errors.
+    const enrichedCreate = await enrichBlanksBestEffort(
+      { company, role, industry, function: contactFunction },
+      (detail) => logger.warn({ detail, company }, "AI enrichment (create) failed; using deterministic fields"),
+    );
+    const industryVal = enrichedCreate.industry;
+    const functionVal = enrichedCreate.function;
+
     const basePriority = normalizePriority(importance, "Medium");
     const suggestedPriority = computeSuggestedPriority(
       {
         company: company || null,
         role: role || null,
-        industry: industry || null,
-        function: contactFunction || null,
+        industry: industryVal,
+        function: functionVal,
         interests: interestsArr,
         goalTags: goalTagsArr,
         notes: notes || null,
@@ -139,7 +150,7 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
         userId, firstName, lastName, linkedinUrl || null, email || null, phone || null,
         company, role || null, metAt || null,
         basePriority, effectivePriority, isPriorityOverride,
-        industry || null, contactFunction || null, interestsLiteral,
+        industryVal, functionVal, interestsLiteral,
         initialFollowUpDays || 7, effectiveCadence, isCadenceOverride,
         goalTagsLiteral, connectionStatus || "connected",
         notes || null,
@@ -199,11 +210,19 @@ router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
 
     const finalCompany = company !== undefined ? (company || null) : existing.company;
     const finalRole = role !== undefined ? (role ?? null) : existing.role;
-    const finalIndustry = industry !== undefined ? (industry || null) : existing.industry;
-    const finalFunction = contactFunction !== undefined ? (contactFunction || null) : existing.function;
+    let finalIndustry = industry !== undefined ? (industry || null) : existing.industry;
+    let finalFunction = contactFunction !== undefined ? (contactFunction || null) : existing.function;
     const finalInterests: string[] = Array.isArray(interests) ? interests : (existing.interests ?? []);
     const finalGoalTags: string[] = Array.isArray(goalTags) ? goalTags : (existing.goal_tags ?? []);
     const finalBasePriority = normalizePriority(importance ?? existing.base_priority, "Medium");
+
+    // Automatic best-effort AI enrichment on edit (fills blanks only).
+    const enrichedEdit = await enrichBlanksBestEffort(
+      { company: finalCompany, role: finalRole, industry: finalIndustry, function: finalFunction },
+      (detail) => logger.warn({ detail, company: finalCompany }, "AI enrichment (edit) failed; using deterministic fields"),
+    );
+    finalIndustry = enrichedEdit.industry;
+    finalFunction = enrichedEdit.function;
 
     // ── Priority: manual override wins, otherwise the fresh AI suggestion ──
     const isPriorityOverride = priorityOverride !== undefined
@@ -462,10 +481,9 @@ router.post("/contacts/:id/enrich", requireAuth, async (req: Request, res: Respo
     try {
       inferred = await inferContactFacets({ company: row.company, role: row.role });
     } catch (err) {
-      res.status(502).json({
-        error: "AI enrichment failed",
-        detail: err instanceof Error ? err.message : String(err),
-      });
+      const detail = err instanceof Error ? err.message : String(err);
+      logger.warn({ detail, contactId: id }, "AI enrichment (manual) failed");
+      res.status(502).json({ error: "AI enrichment failed", detail });
       return;
     }
 
