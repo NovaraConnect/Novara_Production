@@ -100,6 +100,12 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
       { company, role, industry, function: contactFunction },
       (detail) => logger.warn({ detail, company }, "AI enrichment (create) failed; using deterministic fields"),
     );
+    if (enrichedCreate.changed) {
+      logger.info(
+        { company, industry: enrichedCreate.industry, function: enrichedCreate.function },
+        "AI enrichment (create) applied",
+      );
+    }
     const industryVal = enrichedCreate.industry;
     const functionVal = enrichedCreate.function;
 
@@ -221,6 +227,12 @@ router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
       { company: finalCompany, role: finalRole, industry: finalIndustry, function: finalFunction },
       (detail) => logger.warn({ detail, company: finalCompany }, "AI enrichment (edit) failed; using deterministic fields"),
     );
+    if (enrichedEdit.changed) {
+      logger.info(
+        { company: finalCompany, industry: enrichedEdit.industry, function: enrichedEdit.function },
+        "AI enrichment (edit) applied",
+      );
+    }
     finalIndustry = enrichedEdit.industry;
     finalFunction = enrichedEdit.function;
 

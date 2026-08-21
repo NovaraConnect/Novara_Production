@@ -15,13 +15,17 @@
 // ============================================================================
 
 const SYSTEM_PROMPT =
-  "You classify a professional contact for a networking CRM. Given a company " +
-  "and role, infer (1) the company's primary industry and (2) the contact's " +
-  "business function. Use concise canonical lowercase labels — industry " +
-  "examples: automotive, fintech, healthcare, aerospace, retail, biotech; " +
-  "function examples: product, engineering, sales, marketing, finance, " +
-  "operations, design, legal, recruiting. If you cannot determine a field " +
-  "with reasonable confidence, use an empty string for it.";
+  "You classify a professional contact for a networking CRM so their industry " +
+  "can be matched against a user's career interests, which may be phrased in " +
+  "different words. Given a company and role, return two fields:\n" +
+  "(1) industry — the company's primary industry as 2-5 common lowercase " +
+  "keywords/synonyms covering the different ways people refer to it, " +
+  "space-separated. Examples: 'automotive cars mobility', 'beauty cosmetics " +
+  "personal care', 'fintech financial services banking', 'pharmaceutical " +
+  "biotech life sciences', 'fashion apparel retail'.\n" +
+  "(2) function — the contact's business function as 1-3 common lowercase " +
+  "keywords. Examples: 'product management', 'software engineering', 'sales'.\n" +
+  "If you cannot determine a field with reasonable confidence, use an empty string.";
 
 const GEMINI_DEFAULT_MODEL = "gemini-3.6-flash"; // free tier; override via GEMINI_MODEL
 const ANTHROPIC_MODEL = "claude-haiku-4-5";
@@ -49,7 +53,7 @@ function cleanLabel(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim().toLowerCase();
   if (!trimmed || trimmed === "unknown" || trimmed === "n/a") return null;
-  return trimmed.length <= 60 ? trimmed : null;
+  return trimmed.length <= 100 ? trimmed : null;
 }
 
 function parseFacets(text: string | null | undefined): InferredFacets {
