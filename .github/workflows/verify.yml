@@ -1,0 +1,56 @@
+name: Verify
+
+on:
+  push:
+    branches:
+      - fix/production-baseline-repair
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # pnpm 11.x requires Node >=22.13 (uses node:sqlite internally).
+          node-version: 22
+
+      - name: Install pnpm
+        run: npm install -g pnpm@11.10.0
+
+      - name: Install dependencies
+        # pnpm 11's build-script approval gate blocks postinstall scripts
+        # (@clerk/shared, esbuild, tesseract.js -- already allow-listed in
+        # pnpm-workspace.yaml's onlyBuiltDependencies) on a runner with no
+        # prior approval state, which every fresh GitHub Actions runner is.
+        # The first install surfaces the pending scripts, approve-builds
+        # records approval, then the second install completes cleanly.
+        run: |
+          pnpm install --no-frozen-lockfile || true
+          pnpm approve-builds --all
+          pnpm install --no-frozen-lockfile
+
+      - name: Frontend typecheck (project-novara)
+        run: pnpm --filter @workspace/project-novara run typecheck
+
+      - name: Backend/API typecheck (api-server)
+        run: pnpm --filter @workspace/api-server run typecheck
+
+      - name: Production build
+        run: pnpm run build
+        env:
+          # mockup-sandbox's vite.config.ts requires these for its Replit-only
+          # dev-preview plugin; it isn't a deployed service (see render.yaml),
+          # so CI just needs valid placeholder values to let the build finish.
+          PORT: "3000"
+          BASE_PATH: "/"
+          # novara-mobile's build.js needs a deployment domain to stamp
+          # into the static Expo bundle. Uses the real production mobile
+          # hostname (public, not a secret) so CI matches Render's build.
+          EXPO_PUBLIC_DOMAIN: "novara-mobile2-mobile.onrender.com"

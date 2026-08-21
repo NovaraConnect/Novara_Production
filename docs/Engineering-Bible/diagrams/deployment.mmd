@@ -1,0 +1,35 @@
+%% Novara — deployment topology
+%% See docs/Engineering-Bible/09-Deployment.md
+graph TB
+    GH["GitHub<br/>main branch"] -->|"auto-deploy on push<br/>(NOT gated by CI --<br/>see 09-Deployment.md)"| RB
+    GH -->|"auto-deploy on push"| RF
+
+    subgraph Render
+        RB["novara-mobile2<br/>Web Service (Node)<br/>plan: starter<br/>build: pnpm --filter @workspace/api-server build<br/>start: pnpm --filter @workspace/api-server start<br/>healthCheckPath: /api/healthz"]
+        RF["novara-mobile2-frontend<br/>Static Site<br/>build: pnpm --filter @workspace/project-novara build<br/>publish: artifacts/project-novara/dist/public"]
+    end
+
+    RF -->|"VITE_API_BASE_URL"| RB
+    RF -->|"VITE_CLERK_PROXY_URL"| RB
+    RB -->|"/api/__clerk proxy"| CLERK["Clerk"]
+    RF -->|"Clerk React SDK"| CLERK
+
+    RB -->|"NEON_DATABASE_URL /<br/>DATABASE_URL (see 15-Known-Issues.md #1)"| NEON[("Neon Postgres")]
+    RB -->|"GNEWS_API_KEY"| GNEWS["GNews.io"]
+    RB -->|"RESEND_API_KEY"| RESEND["Resend"]
+    RB -->|"VAPID keys"| PUSH["Browser Push Services"]
+
+    USER["End user browser"] -->|"HTTPS"| RF
+    USER -->|"HTTPS + Bearer token"| RB
+
+    subgraph Mobile["Separate distribution path"]
+        EXPO["novara-mobile<br/>Expo/Metro static bundle<br/>server/serve.js"]
+        EXPOGO["Expo Go client app<br/>(not App Store / Play Store)"]
+    end
+    EXPOGO -->|"opens direct link"| EXPO
+    EXPO -->|"HTTPS + Bearer token"| RB
+
+    NOTFOUND["No .github/workflows found<br/>in this working copy --<br/>see 09-Deployment.md caveat"]
+
+    classDef gap fill:#fee,stroke:#c00,stroke-width:1px;
+    class NOTFOUND gap

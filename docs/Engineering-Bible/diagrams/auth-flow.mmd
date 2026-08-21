@@ -1,0 +1,32 @@
+%% Novara — authentication flow (Clerk)
+%% See docs/Engineering-Bible/08-Authentication.md
+sequenceDiagram
+    participant U as User
+    participant FE as project-novara (App.tsx)
+    participant CProxy as clerkProxyMiddleware<br/>(/api/__clerk)
+    participant Clerk as Clerk Frontend/Backend API
+    participant BE as api-server routes
+
+    U->>FE: visits /sign-in
+    FE->>FE: renders Clerk <SignIn><br/>(forceRedirectUrl=/dashboard)
+    FE->>CProxy: Clerk Frontend API calls<br/>proxied via VITE_CLERK_PROXY_URL
+    CProxy->>CProxy: getClerkProxyHost(req)<br/>resolves canonical hostname
+    CProxy->>Clerk: forwarded request<br/>(Clerk-Secret-Key, Clerk-Proxy-Url headers)
+    Clerk-->>CProxy: auth challenge / session result
+    CProxy-->>FE: proxied response
+    U->>FE: submits credentials
+    Clerk-->>FE: session established, JWT issued
+    FE->>FE: routerPush("/dashboard")<br/>(wouter setLocation)
+
+    Note over FE,BE: Every subsequent API call:
+    FE->>BE: fetch with Authorization: Bearer <JWT>
+    BE->>BE: clerkMiddleware verifies JWT<br/>(publishableKeyFromHost resolves instance)
+    BE->>BE: requireAuth reads getAuth(req).userId
+    alt invalid/missing session
+        BE-->>FE: 401 Unauthorized
+    else valid session
+        BE->>BE: req.userId = verified Clerk userId<br/>(never trusts client-supplied userId)
+        BE-->>FE: 200 + data scoped to req.userId
+    end
+
+    Note over FE: ClerkQueryClientCacheInvalidator<br/>clears TanStack Query cache<br/>whenever the signed-in userId changes

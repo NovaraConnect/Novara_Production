@@ -1,0 +1,87 @@
+%% Novara — database ER diagram
+%% See docs/Engineering-Bible/03-Database.md
+%% NOTE: there are no real foreign-key constraints between these tables --
+%% every relationship below is an application-level join on the Clerk
+%% user_id string, not enforced referential integrity. Clerk itself (external,
+%% not in this database) is the true owner of "user".
+erDiagram
+    CLERK_USER ||--o{ CONTACTS : "owns (user_id, app-level only)"
+    CLERK_USER ||--|| USER_SETTINGS : "has (user_id is PK, app-level only)"
+    CLERK_USER ||--o{ PUSH_SUBSCRIPTIONS : "owns (user_id, app-level only)"
+    CLERK_USER ||--o{ FEEDBACK : "submits (user_id, app-level only)"
+
+    CLERK_USER {
+        string user_id PK "owned by Clerk, external to this DB"
+    }
+
+    CONTACTS {
+        uuid id PK
+        text user_id "app-level FK to Clerk user"
+        text first_name
+        text last_name
+        text linkedin_url
+        text email
+        text phone
+        text company
+        text role
+        text met_at
+        text importance "legacy, mirrors base_priority"
+        text base_priority
+        text current_priority "computed, or frozen if override"
+        boolean priority_override
+        text industry
+        text function
+        text_array interests
+        int initial_follow_up_days
+        int follow_up_cadence_days
+        text_array goal_tags
+        text connection_status "connected | pipeline"
+        date first_contact_date
+        date last_interaction_date
+        date next_follow_up_date
+        text notes
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    USER_SETTINGS {
+        text user_id PK "app-level FK to Clerk user"
+        int auto_downgrade_after_months
+        text career_statement
+        text_array goal_tags
+        text_array career_goals
+        boolean has_seen_tutorial
+        boolean push_enabled
+        boolean notify_due_today
+        boolean notify_overdue
+        boolean notify_status_change
+        boolean notify_weekly_digest "stored, not wired to scheduler"
+        text reminder_time "stored, not wired to scheduler"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    PUSH_SUBSCRIPTIONS {
+        int id PK
+        text user_id "app-level FK to Clerk user"
+        text endpoint
+        text p256dh
+        text auth
+        timestamptz created_at
+    }
+
+    FEEDBACK {
+        uuid id PK
+        text user_id "app-level FK to Clerk user"
+        text type "bug | feature | general"
+        text subject
+        text description
+        text contact_email "not used for auth"
+        boolean may_contact
+        text page_url
+        text user_agent
+        text app_version
+        text status "new | reviewing | resolved | closed (only 'new' ever written)"
+        timestamptz created_at
+        timestamptz updated_at
+    }

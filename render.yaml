@@ -1,0 +1,42 @@
+services:
+- type: web
+name: novara-mobile2
+env: node
+plan: starter
+buildCommand: pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build
+startCommand: pnpm --filter @workspace/api-server run start
+healthCheckPath: /api/healthz
+envVars:
+- key: NODE_ENV
+value: production
+- key: DATABASE_URL
+sync: false
+- key: CLERK_PUBLISHABLE_KEY
+sync: false
+- key: CLERK_SECRET_KEY
+sync: false
+- key: GNEWS_API_KEY
+sync: false
+- key: VAPID_PUBLIC_KEY
+sync: false
+- key: VAPID_PRIVATE_KEY
+sync: false
+- key: VAPID_SUBJECT
+sync: false
+- key: RESEND_API_KEY
+sync: false
+- key: FEEDBACK_TO_EMAIL
+value: novaraconnect@gmail.com
+
+- type: static
+name: novara-mobile2-frontend
+env: static
+buildCommand: pnpm install --frozen-lockfile && pnpm --filter @workspace/project-novara run build
+staticPublishPath: artifacts/project-novara/dist/public
+envVars:
+- key: VITE_API_BASE_URL
+value: https://novara-mobile2.onrender.com
+- key: VITE_CLERK_PUBLISHABLE_KEY
+sync: false
+- key: VITE_CLERK_PROXY_URL
+value: https://novara-mobile2.onrender.com/api/__clerk

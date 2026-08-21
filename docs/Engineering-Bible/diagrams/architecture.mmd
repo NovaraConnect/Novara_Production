@@ -1,0 +1,57 @@
+%% Novara — component architecture
+%% See docs/Engineering-Bible/02-System-Architecture.md
+graph TB
+    subgraph Clients
+        WEB["project-novara<br/>React 19 + Vite PWA<br/>(the real production web app)"]
+        MOBILE["novara-mobile<br/>Expo / React Native<br/>(Expo Go bundle, not app-store)"]
+        SANDBOX["mockup-sandbox<br/>internal preview tool<br/>(not deployed)"]
+    end
+
+    subgraph Backend["api-server (Express 5, Node)"]
+        APP["app.ts<br/>middleware pipeline"]
+        AUTHMW["requireAuth<br/>middlewares/auth.ts"]
+        PROXY["clerkProxyMiddleware<br/>/api/__clerk"]
+        ROUTES["routes/*.ts<br/>contacts, settings, notifications,<br/>feedback, news, linkedin, health"]
+        LIBS["lib/*<br/>priority.ts, email.ts, push.ts,<br/>scheduler.ts, logger.ts"]
+    end
+
+    subgraph SharedLibs["Shared workspace libraries"]
+        DB["lib/db (Drizzle)<br/>feedback schema + migration only"]
+        SPEC["lib/api-spec (OpenAPI)<br/>covers /healthz only"]
+        ZOD["lib/api-zod"]
+        RQ["lib/api-client-react"]
+    end
+
+    subgraph External["External services"]
+        CLERK["Clerk<br/>authentication"]
+        NEON[("Neon Postgres<br/>contacts, user_settings,<br/>push_subscriptions, feedback")]
+        GNEWS["GNews.io<br/>company news"]
+        RESEND["Resend<br/>feedback notification email"]
+        PUSHSVC["Browser Push Services<br/>(VAPID / Web Push)"]
+        LINKEDIN["linkedin.com<br/>server-side scraped"]
+    end
+
+    WEB -->|"Bearer token via fetch<br/>lib/api.ts"| APP
+    MOBILE -->|"Bearer token via fetch<br/>lib/api.ts"| APP
+    WEB -->|"proxied Frontend API calls"| PROXY
+    PROXY --> CLERK
+
+    APP --> AUTHMW
+    APP --> ROUTES
+    ROUTES --> AUTHMW
+    ROUTES --> LIBS
+    ROUTES -->|"raw parameterized SQL<br/>via pg.Pool (db.ts)"| NEON
+    ROUTES --> GNEWS
+    ROUTES --> LINKEDIN
+    LIBS --> RESEND
+    LIBS --> PUSHSVC
+    APP -.->|"clerkMiddleware<br/>session verification"| CLERK
+
+    DB -.->|"drizzle-kit generate/push<br/>NOT used at runtime"| NEON
+    SPEC --> ZOD
+    SPEC --> RQ
+
+    SANDBOX -.->|"not part of deployed product"| SANDBOX
+
+    classDef gap fill:#fee,stroke:#c00,stroke-width:1px;
+    class DB gap

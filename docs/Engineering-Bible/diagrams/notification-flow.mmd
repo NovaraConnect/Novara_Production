@@ -1,0 +1,37 @@
+%% Novara — daily notification scheduler
+%% See docs/Engineering-Bible/05-Business-Rules.md (rule 9), lib/scheduler.ts
+flowchart TD
+    A["node-cron: '0 9 * * *' UTC<br/>in-process, api-server"] --> B{"VAPID_PUBLIC_KEY and<br/>VAPID_PRIVATE_KEY set?"}
+    B -->|"no"| C["startScheduler() logs warning,<br/>cron job never registered"]
+    B -->|"yes"| D["runDailyNotifications() fires"]
+
+    D --> E["SELECT users WHERE<br/>push_enabled = TRUE"]
+    E --> F["For each user with<br/>>=1 push_subscriptions row"]
+
+    F --> G{"notify_due_today?"}
+    G -->|"yes"| G1["contacts WHERE<br/>next_follow_up_date = today"]
+    G1 --> G2{"count"}
+    G2 -->|"1"| G3["'Follow-up due today'<br/>(named contact)"]
+    G2 -->|">1"| G4["'N follow-ups due today'<br/>(grouped)"]
+
+    F --> H{"notify_overdue?"}
+    H -->|"yes"| H1["contacts WHERE<br/>next_follow_up_date < today"]
+    H1 --> H2{"count"}
+    H2 -->|"1"| H3["'Overdue follow-up'<br/>(named contact)"]
+    H2 -->|">1"| H4["'N overdue contacts'<br/>(grouped)"]
+
+    F --> I{"notify_status_change?"}
+    I -->|"yes"| I1["for each contact:<br/>daysOverdue = today - next_follow_up_date"]
+    I1 --> I2{"daysOverdue == 1"}
+    I2 -->|"yes"| I3["'Contact warming down'"]
+    I1 --> I4{"daysOverdue ==<br/>follow_up_cadence_days"}
+    I4 -->|"yes"| I5["'Contact went cold'"]
+
+    G3 & G4 & H3 & H4 & I3 & I5 --> J["cap at 5 notifications<br/>per user per run"]
+    J --> K["sendPush() per subscription<br/>via web-push (VAPID)"]
+    K --> L{"push result"}
+    L -->|"410/404 'gone'"| M["DELETE the stale<br/>push_subscriptions row"]
+    L -->|"ok"| N["delivered"]
+
+    classDef gap fill:#fee,stroke:#c00,stroke-width:1px;
+    class C gap

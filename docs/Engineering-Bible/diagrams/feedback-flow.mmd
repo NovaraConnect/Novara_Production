@@ -1,0 +1,39 @@
+%% Novara — feedback submission flow
+%% See docs/Engineering-Bible/04-API.md, 05-Business-Rules.md (rule 8)
+sequenceDiagram
+    participant U as User
+    participant FE as Feedback.tsx
+    participant BE as POST /api/feedback
+    participant Lim as feedbackLimiter<br/>(10/hr per userId)
+    participant DB as Neon: feedback table
+    participant Email as lib/email.ts
+    participant Resend as Resend API
+
+    U->>FE: fills subject/description/type,<br/>optional contact email
+    FE->>FE: zod validation (client-side)
+    FE->>BE: POST /api/feedback + Bearer token
+    BE->>BE: requireAuth -> req.userId
+    BE->>Lim: check rate limit for req.userId
+    alt over limit
+        Lim-->>FE: 429 Too many feedback submissions
+    else within limit
+        BE->>BE: validate type/subject/description length
+        BE->>DB: INSERT INTO feedback (...)<br/>status = 'new'
+        DB-->>BE: row (id, status, createdAt)
+        BE-->>FE: 201 { id, type, subject, status, createdAt }
+        FE-->>U: toast "Thanks for the feedback!"
+        Note over BE,Resend: Response already sent.<br/>Email is best-effort from here.
+        BE->>Email: sendFeedbackNotification(payload)
+        alt RESEND_API_KEY not set
+            Email->>Email: log warning, skip send
+        else key configured
+            Email->>Resend: emails.send({ to: FEEDBACK_TO_EMAIL, ... })
+            alt Resend API error
+                Resend-->>Email: { error }
+                Email->>Email: throw -> caught by .catch()<br/>logger.error "Failed to send feedback notification email"
+            else success
+                Resend-->>Email: sent
+            end
+        end
+    end
+    Note over DB: The DB row is never rolled back<br/>regardless of email outcome.

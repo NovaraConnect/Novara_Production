@@ -1,0 +1,27 @@
+%% Novara — typical authenticated API request
+%% See docs/Engineering-Bible/04-API.md, 08-Authentication.md
+sequenceDiagram
+    participant U as User (browser)
+    participant FE as project-novara (React)
+    participant Clerk as Clerk
+    participant BE as api-server (Express)
+    participant MW as requireAuth middleware
+    participant DB as Neon Postgres
+
+    U->>FE: interacts with a page (e.g. Dashboard)
+    FE->>Clerk: getToken() (Clerk React SDK)
+    Clerk-->>FE: session JWT
+    FE->>BE: fetch /api/contacts<br/>Authorization: Bearer <token>
+    BE->>BE: clerkMiddleware verifies token,<br/>attaches auth state to req
+    BE->>MW: requireAuth(req, res, next)
+    alt no valid session
+        MW-->>FE: 401 { error: "Unauthorized" }
+    else valid session
+        MW->>BE: req.userId = verified Clerk userId
+        BE->>DB: SELECT * FROM contacts<br/>WHERE user_id = $1<br/>ORDER BY next_follow_up_date ASC
+        DB-->>BE: rows
+        BE->>BE: dbToContact() row -> camelCase
+        BE-->>FE: 200 [...contacts]
+        FE->>FE: TanStack Query caches result<br/>(staleTime: 30s)
+        FE-->>U: renders contact list
+    end

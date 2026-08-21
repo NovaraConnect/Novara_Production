@@ -1,0 +1,27 @@
+%% Novara — PWA install flow, AS IMPLEMENTED IN THIS WORKING COPY
+%% See docs/Engineering-Bible/05-Business-Rules.md (rule 7) and 15-Known-Issues.md
+%% NOTE: this diagram documents what the code in this checkout actually does,
+%% which includes a known gap (see the red "landing" nodes below).
+flowchart TD
+    A["Visitor opens the app<br/>in a browser (not installed)"] --> B{"isStandaloneMode()?<br/>InstallPrompt.tsx"}
+    B -->|"yes (already installed)"| C["InstallPrompt renders nothing"]
+    B -->|"no"| D{"novara_install_dismissed<br/>in localStorage?"}
+    D -->|"yes"| C
+    D -->|"no"| E["Bottom banner shown:<br/>'Install this app on your phone'"]
+
+    E --> F{"User taps Install"}
+    F -->|"Android, beforeinstallprompt<br/>fired earlier"| G["Native browser install prompt<br/>(deferredPrompt.prompt())"]
+    G -->|"accepted"| H["App installed to home screen"]
+    F -->|"iOS Safari, or Android<br/>with no deferred prompt"| I["Navigate to /install<br/>(InstallGuide.tsx)"]
+    I --> J["Manual steps shown,<br/>tabbed iPhone / Android"]
+    J --> K["User follows OS-native<br/>'Add to Home Screen'"]
+    K --> H
+
+    H --> L["User later opens the<br/>installed app icon"]
+    L --> M["PWA manifest start_url<br/>= '/install' (vite.config.ts)"]
+    M --> N["App opens directly to<br/>InstallGuide, NOT the dashboard"]
+
+    N -.->|"known gap, this working copy"| GAP["HomeRedirect in App.tsx has no<br/>standalone-display-mode check to<br/>catch this and redirect to /dashboard<br/>or /sign-in — see 15-Known-Issues.md"]
+
+    classDef gap fill:#fee,stroke:#c00,stroke-width:2px;
+    class N,GAP gap
