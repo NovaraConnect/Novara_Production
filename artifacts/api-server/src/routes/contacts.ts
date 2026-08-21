@@ -10,7 +10,7 @@ import {
   type PriorityLevel,
 } from "../lib/priority";
 import { recalculateContactsForUser } from "../lib/recalculate";
-import { isAiEnrichEnabled, inferContactFacets, enrichBlanksBestEffort } from "../lib/enrich";
+import { analyzeContactWithAI } from "../lib/enrich";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -93,36 +93,45 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
     );
     const profile = profileFromSettingsRow(settingsRow);
 
-    // Automatic best-effort AI enrichment — fill blank industry/function so the
-    // suggested priority reflects the company's industry. Never blocks or fails
-    // contact creation; silently keeps the given fields if AI is off or errors.
-    const enrichedCreate = await enrichBlanksBestEffort(
-      { company, role, industry, function: contactFunction },
-      (detail) => logger.warn({ detail, company }, "AI enrichment (create) failed; using deterministic fields"),
+    const basePriority = normalizePriority(importance, "Medium");
+
+    // AI-judged semantic match when a provider key is set; the deterministic
+    // keyword matcher is the fallback. Never blocks or fails contact creation.
+    const analysis = await analyzeContactWithAI(
+      { careerStatement: profile.careerStatement, careerGoals: profile.careerGoals, goalTags: profile.goalTags },
+      { company, role, industry, function: contactFunction, notes, interests: interestsArr },
+      (detail) => logger.warn({ detail, company }, "AI match (create) failed; using deterministic score"),
     );
-    if (enrichedCreate.changed) {
+
+    let industryVal: string | null;
+    let functionVal: string | null;
+    let suggestedPriority: PriorityLevel;
+    if (analysis) {
+      suggestedPriority = analysis.priority;
+      // Never overwrite a value the user explicitly entered.
+      industryVal = String(industry ?? "").trim() ? industry : analysis.industry;
+      functionVal = String(contactFunction ?? "").trim() ? contactFunction : analysis.function;
       logger.info(
-        { company, industry: enrichedCreate.industry, function: enrichedCreate.function },
-        "AI enrichment (create) applied",
+        { company, priority: analysis.priority, reason: analysis.reason, industry: analysis.industry },
+        "AI match (create) applied",
+      );
+    } else {
+      industryVal = industry || null;
+      functionVal = contactFunction || null;
+      suggestedPriority = computeSuggestedPriority(
+        {
+          company: company || null,
+          role: role || null,
+          industry: industryVal,
+          function: functionVal,
+          interests: interestsArr,
+          goalTags: goalTagsArr,
+          notes: notes || null,
+          metAt: metAt || null,
+        },
+        profile,
       );
     }
-    const industryVal = enrichedCreate.industry;
-    const functionVal = enrichedCreate.function;
-
-    const basePriority = normalizePriority(importance, "Medium");
-    const suggestedPriority = computeSuggestedPriority(
-      {
-        company: company || null,
-        role: role || null,
-        industry: industryVal,
-        function: functionVal,
-        interests: interestsArr,
-        goalTags: goalTagsArr,
-        notes: notes || null,
-        metAt: metAt || null,
-      },
-      profile,
-    );
 
     // effectivePriority = manualPriorityOverride ?? aiSuggestedPriority
     const isPriorityOverride = Boolean(priorityOverride);
@@ -222,38 +231,50 @@ router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
     const finalGoalTags: string[] = Array.isArray(goalTags) ? goalTags : (existing.goal_tags ?? []);
     const finalBasePriority = normalizePriority(importance ?? existing.base_priority, "Medium");
 
-    // Automatic best-effort AI enrichment on edit (fills blanks only).
-    const enrichedEdit = await enrichBlanksBestEffort(
-      { company: finalCompany, role: finalRole, industry: finalIndustry, function: finalFunction },
-      (detail) => logger.warn({ detail, company: finalCompany }, "AI enrichment (edit) failed; using deterministic fields"),
-    );
-    if (enrichedEdit.changed) {
-      logger.info(
-        { company: finalCompany, industry: enrichedEdit.industry, function: enrichedEdit.function },
-        "AI enrichment (edit) applied",
-      );
-    }
-    finalIndustry = enrichedEdit.industry;
-    finalFunction = enrichedEdit.function;
-
-    // ── Priority: manual override wins, otherwise the fresh AI suggestion ──
-    const isPriorityOverride = priorityOverride !== undefined
-      ? Boolean(priorityOverride)
-      : Boolean(existing.priority_override);
-
-    const suggestedPriority = computeSuggestedPriority(
+    // AI-judged semantic match when enabled; deterministic fallback.
+    const analysisEdit = await analyzeContactWithAI(
+      { careerStatement: profile.careerStatement, careerGoals: profile.careerGoals, goalTags: profile.goalTags },
       {
         company: finalCompany,
         role: finalRole,
         industry: finalIndustry,
         function: finalFunction,
-        interests: finalInterests,
-        goalTags: finalGoalTags,
         notes: notes !== undefined ? notes : existing.notes,
-        metAt: metAt !== undefined ? metAt : existing.met_at,
+        interests: finalInterests,
       },
-      profile,
+      (detail) => logger.warn({ detail, company: finalCompany }, "AI match (edit) failed; using deterministic score"),
     );
+
+    // ── Priority: manual override wins, otherwise the AI/deterministic suggestion ──
+    const isPriorityOverride = priorityOverride !== undefined
+      ? Boolean(priorityOverride)
+      : Boolean(existing.priority_override);
+
+    let suggestedPriority: PriorityLevel;
+    if (analysisEdit) {
+      suggestedPriority = analysisEdit.priority;
+      // Only fill blanks the user didn't set; never overwrite entered values.
+      if (!String(finalIndustry ?? "").trim() && analysisEdit.industry) finalIndustry = analysisEdit.industry;
+      if (!String(finalFunction ?? "").trim() && analysisEdit.function) finalFunction = analysisEdit.function;
+      logger.info(
+        { company: finalCompany, priority: analysisEdit.priority, reason: analysisEdit.reason, industry: analysisEdit.industry },
+        "AI match (edit) applied",
+      );
+    } else {
+      suggestedPriority = computeSuggestedPriority(
+        {
+          company: finalCompany,
+          role: finalRole,
+          industry: finalIndustry,
+          function: finalFunction,
+          interests: finalInterests,
+          goalTags: finalGoalTags,
+          notes: notes !== undefined ? notes : existing.notes,
+          metAt: metAt !== undefined ? metAt : existing.met_at,
+        },
+        profile,
+      );
+    }
 
     const effectivePriority: PriorityLevel = isPriorityOverride
       ? normalizePriority(manualPriority ?? existing.current_priority, suggestedPriority)
@@ -460,82 +481,6 @@ router.post("/contacts/import", requireAuth, async (req: Request, res: Response)
   }
 
   res.json({ imported, skipped });
-});
-
-// POST /api/contacts/:id/enrich  — OPTIONAL AI enrichment.
-// Infers industry/function from the contact's company + role and fills any
-// blank fields, then recomputes the AI-suggested priority. Returns 503 when
-// the feature is disabled (no ANTHROPIC_API_KEY). Never required for any core
-// flow — this is an explicit, after-the-fact action on a single contact.
-router.post("/contacts/:id/enrich", requireAuth, async (req: Request, res: Response) => {
-  if (!isAiEnrichEnabled()) {
-    res.status(503).json({
-      error: "AI enrichment is not enabled for this deployment.",
-      feature: "ai_enrich",
-      enabled: false,
-    });
-    return;
-  }
-
-  const userId = (req as AuthedRequest).userId;
-  const { id } = req.params;
-  try {
-    const { rows: [row] } = await pool.query(
-      "SELECT * FROM contacts WHERE id = $1 AND user_id = $2",
-      [id, userId],
-    );
-    if (!row) {
-      res.status(404).json({ error: "Contact not found" });
-      return;
-    }
-
-    let inferred;
-    try {
-      inferred = await inferContactFacets({ company: row.company, role: row.role });
-    } catch (err) {
-      const detail = err instanceof Error ? err.message : String(err);
-      logger.warn({ detail, contactId: id }, "AI enrichment (manual) failed");
-      res.status(502).json({ error: "AI enrichment failed", detail });
-      return;
-    }
-
-    // Only fill fields the user left blank — never overwrite their own values.
-    const fillIndustry = !String(row.industry ?? "").trim() && inferred.industry
-      ? inferred.industry
-      : null;
-    const fillFunction = !String(row.function ?? "").trim() && inferred.function
-      ? inferred.function
-      : null;
-
-    if (fillIndustry || fillFunction) {
-      await pool.query(
-        `UPDATE contacts
-            SET industry = COALESCE($1, industry),
-                function = COALESCE($2, function),
-                updated_at = NOW()
-          WHERE id = $3 AND user_id = $4`,
-        [fillIndustry, fillFunction, id, userId],
-      );
-      // Reuse the canonical, idempotent recompute so priority/cadence reflect
-      // the new fields (honours manual overrides).
-      await recalculateContactsForUser(userId);
-    }
-
-    const { rows: [updated] } = await pool.query(
-      "SELECT * FROM contacts WHERE id = $1 AND user_id = $2",
-      [id, userId],
-    );
-    res.json({
-      enriched: Boolean(fillIndustry || fillFunction),
-      inferred,
-      contact: dbToContact(updated),
-    });
-  } catch (err) {
-    res.status(500).json({
-      error: "Failed to enrich contact",
-      detail: err instanceof Error ? err.message : String(err),
-    });
-  }
 });
 
 export default router;

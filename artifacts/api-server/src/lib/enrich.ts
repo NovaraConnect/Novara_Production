@@ -1,35 +1,54 @@
 // ============================================================================
-// OPTIONAL, AUTOMATIC AI contact enrichment.
+// OPTIONAL AI matching engine.
 //
-// Runs best-effort during contact create/edit and the career-goal recompute,
-// so a contact's suggested priority/cadence reflect the company's industry
-// (e.g. Tesla → automotive) WITHOUT any manual action. Strictly optional and
-// non-blocking: if no provider key is set, or the call fails/times out, the
-// contact is still saved with the deterministic result — nothing core depends
-// on AI.
+// When a provider key is configured, the AI judges how well a contact aligns
+// with the user's WHOLE career profile (free-text statement + listed goals +
+// goal tags, considered together) and returns a priority band directly —
+// semantic matching, not keyword overlap (beauty ≈ cosmetics ≈ L'Oréal,
+// fashion ≈ apparel ≈ luxury, fintech ≈ financial services). It also infers
+// the contact's industry/function for display and news relevance.
+//
+// Strictly optional and non-blocking: with no key, or on any failure/timeout,
+// callers fall back to the deterministic keyword matcher
+// (computeSuggestedPriority). Nothing core depends on AI.
 //
 // Provider-flexible, free-first:
 //   • GEMINI_API_KEY    → Google Gemini free tier (default; no card)
 //   • ANTHROPIC_API_KEY → Claude Haiku (fallback if no Gemini key)
-// Gemini is called over plain HTTPS; the Anthropic SDK is imported lazily.
 // ============================================================================
 
+import { normalizePriority, type PriorityLevel } from "./priority";
+
 const SYSTEM_PROMPT =
-  "You classify a professional contact for a networking CRM so their industry " +
-  "can be matched against a user's career interests, which may be phrased in " +
-  "different words. Given a company and role, return two fields:\n" +
-  "(1) industry — the company's primary industry as 2-5 common lowercase " +
-  "keywords/synonyms covering the different ways people refer to it, " +
-  "space-separated. Examples: 'automotive cars mobility', 'beauty cosmetics " +
-  "personal care', 'fintech financial services banking', 'pharmaceutical " +
-  "biotech life sciences', 'fashion apparel retail'.\n" +
-  "(2) function — the contact's business function as 1-3 common lowercase " +
-  "keywords. Examples: 'product management', 'software engineering', 'sales'.\n" +
-  "If you cannot determine a field with reasonable confidence, use an empty string.";
+  "You are the matching engine for a professional networking CRM. Given a " +
+  "user's career goals and a single contact, decide how high a NETWORKING " +
+  "PRIORITY this contact should be for the user, and infer the contact's " +
+  "industry and business function.\\n\\n" +
+  "Priority is exactly one of: High, Medium, Low.\\n" +
+  "- High: the contact strongly advances the user's stated goals — they do, " +
+  "or hire for, the kind of role/work the user wants AND are at a company or " +
+  "in an industry the user is targeting; or they are a recruiter / talent " +
+  "lead for a target industry.\\n" +
+  "- Medium: partial or indirect alignment — the right industry but a " +
+  "different function, or the right kind of role but an unrelated industry, " +
+  "or a loose/adjacent connection.\\n" +
+  "- Low: no meaningful alignment with the user's goals.\\n\\n" +
+  "Judge by MEANING, not exact words: treat synonyms and clearly related " +
+  "concepts as matches (beauty ≈ cosmetics ≈ personal care ≈ L'Oréal; fashion " +
+  "≈ apparel ≈ luxury; fintech ≈ financial services ≈ banking; automotive ≈ " +
+  "cars ≈ mobility). The user's free-text statement, listed goals, and goal " +
+  "tags are COMPLEMENTARY — any of them can drive a match, and they never " +
+  "override each other.\\n\\n" +
+  "Also return: industry — the company's primary industry as 2-5 lowercase " +
+  "keywords/synonyms; function — the contact's business function as 1-3 " +
+  "lowercase keywords. Empty string if unknown.\\n\\n" +
+  'Return ONLY a JSON object: {"priority": "High|Medium|Low", "reason": "<one ' +
+  'short sentence explaining the alignment>", "industry": "<keywords or empty>", ' +
+  '"function": "<keywords or empty>"}';
 
 const GEMINI_DEFAULT_MODEL = "gemini-3.6-flash"; // free tier; override via GEMINI_MODEL
 const ANTHROPIC_MODEL = "claude-haiku-4-5";
-const REQUEST_TIMEOUT_MS = 7000;
+const REQUEST_TIMEOUT_MS = 6000;
 
 type Provider = "gemini" | "anthropic";
 
@@ -44,7 +63,24 @@ export function isAiEnrichEnabled(): boolean {
   return activeProvider() !== null;
 }
 
-export interface InferredFacets {
+export interface UserGoals {
+  careerStatement?: string | null;
+  careerGoals?: string[] | null;
+  goalTags?: string[] | null;
+}
+
+export interface AnalyzedContact {
+  company?: string | null;
+  role?: string | null;
+  industry?: string | null;
+  function?: string | null;
+  notes?: string | null;
+  interests?: string[] | null;
+}
+
+export interface ContactAnalysis {
+  priority: PriorityLevel;
+  reason: string;
   industry: string | null;
   function: string | null;
 }
@@ -56,80 +92,82 @@ function cleanLabel(value: unknown): string | null {
   return trimmed.length <= 100 ? trimmed : null;
 }
 
-function parseFacets(text: string | null | undefined): InferredFacets {
-  if (!text) return { industry: null, function: null };
+function hasGoalSignal(goals: UserGoals): boolean {
+  const statement = String(goals.careerStatement ?? "").trim();
+  const list = (goals.careerGoals ?? []).filter((g) => String(g ?? "").trim());
+  const tags = (goals.goalTags ?? []).filter((t) => String(t ?? "").trim());
+  return statement !== "" || list.length > 0 || tags.length > 0;
+}
+
+/**
+ * AI-judged match. Returns the priority band + reason (and inferred
+ * industry/function) for one contact against the user's whole profile.
+ * Best-effort: returns null when AI is disabled, the profile has no goal
+ * signal, or the provider call fails/times out — callers then fall back to the
+ * deterministic matcher. Never throws.
+ */
+export async function analyzeContactWithAI(
+  goals: UserGoals,
+  contact: AnalyzedContact,
+  onError?: (message: string) => void,
+): Promise<ContactAnalysis | null> {
+  if (!isAiEnrichEnabled() || !hasGoalSignal(goals) || !String(contact.company ?? "").trim()) {
+    return null;
+  }
+
+  const userText =
+    "USER CAREER GOALS\n" +
+    `- Career statement: ${String(goals.careerStatement ?? "").trim() || "(none)"}\n` +
+    `- Goals: ${(goals.careerGoals ?? []).filter(Boolean).join("; ") || "(none)"}\n` +
+    `- Goal tags: ${(goals.goalTags ?? []).filter(Boolean).join("; ") || "(none)"}\n\n` +
+    "CONTACT\n" +
+    `- Company: ${String(contact.company ?? "").trim() || "(unknown)"}\n` +
+    `- Role: ${String(contact.role ?? "").trim() || "(unknown)"}\n` +
+    `- Interests: ${(contact.interests ?? []).filter(Boolean).join("; ") || "(none)"}\n` +
+    `- Notes: ${String(contact.notes ?? "").trim() || "(none)"}`;
+
+  try {
+    const text = activeProvider() === "gemini"
+      ? await completeViaGemini(userText)
+      : await completeViaAnthropic(userText);
+    return parseAnalysis(text);
+  } catch (err) {
+    onError?.(err instanceof Error ? err.message : String(err));
+    return null;
+  }
+}
+
+function parseAnalysis(text: string | null | undefined): ContactAnalysis | null {
+  if (!text) return null;
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch {
-    return { industry: null, function: null };
+    return null;
   }
-  const obj = (parsed ?? {}) as { industry?: unknown; function?: unknown };
-  return { industry: cleanLabel(obj.industry), function: cleanLabel(obj.function) };
+  const obj = (parsed ?? {}) as {
+    priority?: unknown;
+    reason?: unknown;
+    industry?: unknown;
+    function?: unknown;
+  };
+  // Require a priority the model actually chose; otherwise treat as a failure
+  // so the caller falls back to deterministic scoring.
+  const rawPriority = typeof obj.priority === "string" ? obj.priority.trim() : "";
+  if (!/^(high|medium|low)$/i.test(rawPriority)) return null;
+  return {
+    priority: normalizePriority(rawPriority),
+    reason: typeof obj.reason === "string" ? obj.reason.trim().slice(0, 240) : "",
+    industry: cleanLabel(obj.industry),
+    function: cleanLabel(obj.function),
+  };
 }
 
-/**
- * Infer industry + function from company/role via the configured provider.
- * Throws on any provider/HTTP error (callers wrap in best-effort). Callers
- * MUST gate on isAiEnrichEnabled() first.
- */
-export async function inferContactFacets(input: {
-  company: string;
-  role?: string | null;
-}): Promise<InferredFacets> {
-  const provider = activeProvider();
-  if (!provider) {
-    throw new Error("AI enrichment is not enabled (no GEMINI_API_KEY or ANTHROPIC_API_KEY)");
-  }
-  const company = input.company.trim();
-  const role = (input.role ?? "").trim() || "(unknown)";
-  return provider === "gemini"
-    ? inferViaGemini(company, role)
-    : inferViaAnthropic(`Company: ${company}\nRole: ${role}`);
-}
-
-/**
- * Best-effort enrichment of blank industry/function. NEVER throws — on any
- * failure it returns the original fields unchanged and reports via onError.
- * Skips the call entirely when disabled, when there's no company, or when both
- * fields are already filled (never overwrites user-entered values).
- */
-export async function enrichBlanksBestEffort(
-  fields: { company?: string | null; role?: string | null; industry?: string | null; function?: string | null },
-  onError?: (message: string) => void,
-): Promise<{ industry: string | null; function: string | null; changed: boolean }> {
-  const industry0 = fields.industry ?? null;
-  const function0 = fields.function ?? null;
-  const haveIndustry = String(industry0 ?? "").trim() !== "";
-  const haveFunction = String(function0 ?? "").trim() !== "";
-  const company = String(fields.company ?? "").trim();
-
-  if (!isAiEnrichEnabled() || !company || (haveIndustry && haveFunction)) {
-    return { industry: industry0, function: function0, changed: false };
-  }
-  try {
-    const inferred = await inferContactFacets({ company, role: fields.role });
-    const industry = haveIndustry ? industry0 : inferred.industry;
-    const fn = haveFunction ? function0 : inferred.function;
-    const changed = (!haveIndustry && !!inferred.industry) || (!haveFunction && !!inferred.function);
-    return { industry, function: fn, changed };
-  } catch (err) {
-    onError?.(err instanceof Error ? err.message : String(err));
-    return { industry: industry0, function: function0, changed: false };
-  }
-}
-
-// ── Google Gemini (free tier) — responseMimeType JSON, no strict schema ──────
-async function inferViaGemini(company: string, role: string): Promise<InferredFacets> {
+// ── Google Gemini (free tier) — responseMimeType JSON ────────────────────────
+async function completeViaGemini(userText: string): Promise<string | null> {
   const apiKey = process.env["GEMINI_API_KEY"]!.trim();
   const model = process.env["GEMINI_MODEL"]?.trim() || GEMINI_DEFAULT_MODEL;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-
-  const userText =
-    `Company: ${company}\nRole: ${role}\n\n` +
-    'Respond with ONLY a JSON object of exactly this shape: ' +
-    '{"industry": "<canonical lowercase industry or empty string>", ' +
-    '"function": "<canonical lowercase function or empty string>"}';
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -142,11 +180,7 @@ async function inferViaGemini(company: string, role: string): Promise<InferredFa
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
         contents: [{ role: "user", parts: [{ text: userText }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: 0,
-          maxOutputTokens: 256,
-        },
+        generationConfig: { responseMimeType: "application/json", temperature: 0, maxOutputTokens: 300 },
       }),
     });
   } finally {
@@ -157,42 +191,40 @@ async function inferViaGemini(company: string, role: string): Promise<InferredFa
     const body = await res.text().catch(() => "");
     throw new Error(`Gemini(${model}) HTTP ${res.status}: ${body.slice(0, 200)}`);
   }
-
   const data = (await res.json()) as {
     candidates?: { content?: { parts?: { text?: string }[] } }[];
   };
-  return parseFacets(data.candidates?.[0]?.content?.parts?.[0]?.text);
+  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
 }
 
 // ── Anthropic Claude (fallback) — lazy-imported SDK ──────────────────────────
-async function inferViaAnthropic(userText: string): Promise<InferredFacets> {
+async function completeViaAnthropic(userText: string): Promise<string | null> {
   const { default: Anthropic } = await import("@anthropic-ai/sdk");
   const client = new Anthropic();
-
   const message = await client.messages.create({
     model: ANTHROPIC_MODEL,
-    max_tokens: 200,
+    max_tokens: 300,
     system: SYSTEM_PROMPT,
     output_config: {
       format: {
         type: "json_schema",
         schema: {
           type: "object",
-          properties: { industry: { type: "string" }, function: { type: "string" } },
-          required: ["industry", "function"],
+          properties: {
+            priority: { type: "string" },
+            reason: { type: "string" },
+            industry: { type: "string" },
+            function: { type: "string" },
+          },
+          required: ["priority", "reason", "industry", "function"],
           additionalProperties: false,
         },
       },
     },
     messages: [{ role: "user", content: userText }],
   });
-
-  let text: string | undefined;
   for (const block of message.content) {
-    if (block.type === "text") {
-      text = block.text;
-      break;
-    }
+    if (block.type === "text") return block.text;
   }
-  return parseFacets(text);
+  return null;
 }
