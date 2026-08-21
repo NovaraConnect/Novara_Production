@@ -23,7 +23,7 @@ const SYSTEM_PROMPT =
   "operations, design, legal, recruiting. If you cannot determine a field " +
   "with reasonable confidence, use an empty string for it.";
 
-const GEMINI_DEFAULT_MODEL = "gemini-2.0-flash"; // free tier; override via GEMINI_MODEL
+const GEMINI_DEFAULT_MODEL = "gemini-3.6-flash"; // free tier; override via GEMINI_MODEL
 const ANTHROPIC_MODEL = "claude-haiku-4-5";
 const REQUEST_TIMEOUT_MS = 7000;
 
