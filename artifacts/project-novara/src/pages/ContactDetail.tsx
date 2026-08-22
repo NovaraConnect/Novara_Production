@@ -483,7 +483,7 @@ export default function ContactDetail() {
                 <Loader2 className="w-4 h-4 animate-spin" /><span>Fetching latest news…</span>
               </div>
             )}
-            {newsStatus === "empty" && <p className="text-sm text-muted-foreground italic">No recent {contact.company} news found.</p>}
+            {newsStatus === "empty" && <p className="text-sm text-muted-foreground italic">No strong recent {contact.company} news found.</p>}
             {newsStatus === "error" && <p className="text-sm text-amber-600 dark:text-amber-400 italic">Couldn't load news right now — please try again shortly.</p>}
             {newsStatus === "timeout" && <p className="text-sm text-amber-600 dark:text-amber-400 italic">News request timed out. {headlines.length > 0 ? "Showing the last results we had." : "Try again shortly."}</p>}
             {newsStatus === "config-missing" && <p className="text-sm text-muted-foreground italic">Company news isn't configured yet.</p>}
