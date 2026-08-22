@@ -44,6 +44,7 @@ const formSchema = z.object({
   phone: z.string().optional(),
   industry: z.string().optional(),
   function: z.string().optional(),
+  preferredContactMethod: z.enum(["none", "text", "email", "linkedin"]).optional(),
   importance: z.enum(["High", "Medium", "Low"]),
   connectionStatus: z.enum(["connected", "pipeline"]),
   initialFollowUpDays: z.coerce.number().refine(val => [1,2,3].includes(val)),
@@ -77,7 +78,7 @@ export default function EditContact() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       firstName: "", lastName: "", company: "", role: "", metAt: "",
-      linkedinUrl: "", email: "", phone: "", industry: "", function: "",
+      linkedinUrl: "", email: "", phone: "", industry: "", function: "", preferredContactMethod: "none",
       importance: "Medium", connectionStatus: "connected" as const,
       initialFollowUpDays: 2, followUpCadenceDays: 21, notes: ""
     }
@@ -104,6 +105,7 @@ export default function EditContact() {
         phone: contact.phone ?? "",
         industry: contact.industry ?? "",
         function: contact.function ?? "",
+        preferredContactMethod: contact.preferredContactMethod ?? "none",
         importance: resolveFormPriority(contact),
         connectionStatus: contact.connectionStatus ?? "connected",
         initialFollowUpDays: contact.initialFollowUpDays,
@@ -156,6 +158,7 @@ export default function EditContact() {
           priorityOverride,
           currentPriority: priorityOverride ? overridePriority : undefined,
           cadenceOverride,
+          preferredContactMethod: values.preferredContactMethod === "none" ? undefined : values.preferredContactMethod,
           initialFollowUpDays: values.initialFollowUpDays as Contact["initialFollowUpDays"],
           followUpCadenceDays: values.followUpCadenceDays as Contact["followUpCadenceDays"],
         } as any
@@ -505,6 +508,46 @@ export default function EditContact() {
                 </FormItem>
               )} />
             </div>
+
+            {/* Preferred contact method */}
+            <FormField control={form.control} name="preferredContactMethod" render={({ field }) => {
+              const phone = form.watch("phone");
+              const email = form.watch("email");
+              const linkedinUrl = form.watch("linkedinUrl");
+              const missing =
+                field.value === "text" && !phone?.trim() ? "Add a phone number to use Text."
+                  : field.value === "email" && !email?.trim() ? "Add an email to use Email."
+                    : field.value === "linkedin" && !linkedinUrl?.trim() ? "Add a LinkedIn URL to use LinkedIn."
+                      : null;
+              const opts = [
+                { value: "none", label: "None" },
+                { value: "text", label: "Text" },
+                { value: "email", label: "Email" },
+                { value: "linkedin", label: "LinkedIn" },
+              ] as const;
+              return (
+                <FormItem>
+                  <FormLabel>Preferred contact method (Optional)</FormLabel>
+                  <FormControl>
+                    <div className="grid grid-cols-4 gap-1.5 rounded-xl bg-muted p-1">
+                      {opts.map((o) => (
+                        <button
+                          key={o.value}
+                          type="button"
+                          onClick={() => field.onChange(o.value)}
+                          className={`h-9 rounded-lg text-xs font-semibold transition-colors ${field.value === o.value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                          data-testid={`preferred-${o.value}`}
+                        >
+                          {o.label}
+                        </button>
+                      ))}
+                    </div>
+                  </FormControl>
+                  {missing && <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5">{missing}</p>}
+                  <FormMessage />
+                </FormItem>
+              );
+            }} />
 
             <FormField control={form.control} name="notes" render={({ field }) => (
               <FormItem>

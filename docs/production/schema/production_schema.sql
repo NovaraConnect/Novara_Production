@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS public.contacts (
     industry               text,
     function               text,
     interests              text[] DEFAULT '{}'::text[] NOT NULL,
+    preferred_contact_method text,
     CONSTRAINT contacts_pkey PRIMARY KEY (id)
 );
 CREATE INDEX IF NOT EXISTS contacts_user_id_idx ON public.contacts USING btree (user_id);

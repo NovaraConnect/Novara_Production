@@ -15,6 +15,12 @@ import { logger } from "../lib/logger";
 
 const router = Router();
 
+const PREFERRED_METHODS = new Set(["text", "email", "linkedin"]);
+/** Only "text" | "email" | "linkedin" persist; anything else (incl. "none") → null. */
+function normalizePreferred(v: unknown): string | null {
+  return typeof v === "string" && PREFERRED_METHODS.has(v) ? v : null;
+}
+
 function toArrayLiteral(arr: string[]): string {
   if (!arr.length) return "{}";
   return `{${arr.map(t => `"${String(t).replace(/"/g, '\\"')}"`).join(",")}}`;
@@ -59,7 +65,10 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
     importance, initialFollowUpDays, followUpCadenceDays, goalTags, connectionStatus, notes,
     industry, function: contactFunction, interests,
     priorityOverride, currentPriority: manualPriority, cadenceOverride,
+    preferredContactMethod,
   } = req.body;
+
+  const preferredMethod = normalizePreferred(preferredContactMethod);
 
   if (!firstName || !lastName || !company) {
     res.status(400).json({ error: "firstName, lastName, company are required" });
@@ -152,14 +161,16 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
         industry, function, interests,
         initial_follow_up_days, follow_up_cadence_days, cadence_override,
         goal_tags, connection_status,
-        first_contact_date, last_interaction_date, next_follow_up_date, notes
+        first_contact_date, last_interaction_date, next_follow_up_date, notes,
+        preferred_contact_method
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9,
         $10, $10, $11, $12,
         $13, $14, $15::text[],
         $16, $17, $18,
         $19::text[], $20,
-        CURRENT_DATE, CURRENT_DATE, CURRENT_DATE + (($16)::int * INTERVAL '1 day'), $21
+        CURRENT_DATE, CURRENT_DATE, CURRENT_DATE + (($16)::int * INTERVAL '1 day'), $21,
+        $22
       ) RETURNING *`,
       [
         userId, firstName, lastName, linkedinUrl || null, email || null, phone || null,
@@ -169,6 +180,7 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
         initialFollowUpDays || 7, effectiveCadence, isCadenceOverride,
         goalTagsLiteral, connectionStatus || "connected",
         notes || null,
+        preferredMethod,
       ],
     );
     res.status(201).json(dbToContact(contact));
@@ -207,7 +219,10 @@ router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
     nextFollowUpDate, notes,
     industry, function: contactFunction, interests,
     priorityOverride, currentPriority: manualPriority, cadenceOverride,
+    preferredContactMethod,
   } = req.body;
+
+  const preferredMethod = normalizePreferred(preferredContactMethod);
 
   try {
     const [existingResult, settingsResult] = await Promise.all([
@@ -323,6 +338,7 @@ router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
         connection_status = COALESCE($21, connection_status),
         next_follow_up_date = COALESCE($22::date, next_follow_up_date),
         notes = $23,
+        preferred_contact_method = $24,
         updated_at = NOW()
       WHERE id = $1 AND user_id = $2
       RETURNING *`,
@@ -337,6 +353,7 @@ router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
         goalTagsLiteral, connectionStatus || null,
         nextFollowUpDate ? nextFollowUpDate.split("T")[0] : null,
         notes ?? null,
+        preferredMethod,
       ],
     );
     res.json(dbToContact(contact));
