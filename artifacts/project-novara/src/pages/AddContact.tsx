@@ -16,6 +16,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { toast } from "sonner";
 import { suggestPriority, suggestInitialFollowUp, deriveSuggestedCadence, MANUAL_CADENCE_OPTIONS, isPriorityLevel } from "@/lib/suggest";
 import { BusinessCardScanner, type ScannedContact } from "@/components/BusinessCardScanner";
+import { LinkedInScreenshotImport } from "@/components/LinkedInScreenshotImport";
+import type { LinkedInDraft } from "@/lib/linkedinParse";
 import { QRScanner, type ScannedQRContact } from "@/components/QRScanner";
 
 const INITIAL_OPTIONS: Contact["initialFollowUpDays"][] = [1, 2, 3];
@@ -145,6 +147,25 @@ export default function AddContact() {
     setCadenceOverridden(false);
   }, [form]);
 
+  const handleLinkedInExtracted = useCallback((data: LinkedInDraft) => {
+    const opts = { shouldDirty: true, shouldTouch: true } as const;
+    if (data.firstName) form.setValue("firstName", data.firstName, opts);
+    if (data.lastName) form.setValue("lastName", data.lastName, opts);
+    if (data.role) form.setValue("role", data.role, opts);
+    if (data.company) form.setValue("company", data.company, opts);
+    if (data.linkedinUrl) form.setValue("linkedinUrl", data.linkedinUrl, opts);
+    // Never sets email/phone. Append provenance/location without clobbering
+    // anything the user may have already typed into notes.
+    if (data.notes) {
+      const existing = (form.getValues("notes") ?? "").trim();
+      form.setValue("notes", existing ? `${existing}\n${data.notes}` : data.notes, opts);
+    }
+    setImportanceSuggestionDismissed(false);
+    setImportanceOverridden(false);
+    setInitialOverridden(false);
+    setCadenceOverridden(false);
+  }, [form]);
+
   const addInterest = () => {
     const trimmed = interestInput.trim();
     if (!trimmed || interests.includes(trimmed)) return;
@@ -217,6 +238,9 @@ export default function AddContact() {
             {/* Business Card Scanner */}
             <BusinessCardScanner onExtracted={handleCardScanned} />
             <p className="text-xs text-muted-foreground text-center -mt-4 mb-2">For best results — good lighting, card fills the frame, avoid glare. First scan might take 5–15 seconds</p>
+
+            {/* LinkedIn Screenshot Import */}
+            <LinkedInScreenshotImport onExtracted={handleLinkedInExtracted} />
 
             {/* QR Code Scanner */}
             <div className="mb-6">
