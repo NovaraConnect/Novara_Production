@@ -22,7 +22,10 @@ function makeCacheKey(company: string, industry?: string | null, role?: string |
   const c = company.toLowerCase().replace(/\s+/g, "_");
   const i = (industry ?? "").toLowerCase().replace(/\s+/g, "_");
   const r = (role ?? "").toLowerCase().replace(/\s+/g, "_");
-  return `novara_news_${c}__${i}__${r}`;
+  // Version prefix (v2): bumping it invalidates old localStorage entries so a
+  // deploy of the improved ranking doesn't keep serving stale weak/duplicate
+  // news from a user's cache for up to the 6h TTL.
+  return `novara_news_v2_${c}__${i}__${r}`;
 }
 
 function readLocalCache(key: string): NewsCache | null {
