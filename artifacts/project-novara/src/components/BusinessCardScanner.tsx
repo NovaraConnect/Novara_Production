@@ -2,15 +2,10 @@ import { useState, useRef } from "react";
 import { Camera, Image as ImageIcon, Loader2, X, ScanLine, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { extractContactFields, type ScannedContact } from "@/lib/businessCardParse";
 
-export interface ScannedContact {
-  firstName?: string;
-  lastName?: string;
-  company?: string;
-  role?: string;
-  email?: string;
-  phone?: string;
-}
+// Re-exported so existing importers (e.g. AddContact) keep working unchanged.
+export type { ScannedContact };
 
 interface BusinessCardScannerProps {
   onExtracted: (data: ScannedContact) => void;
@@ -49,111 +44,8 @@ async function preprocessImage(file: File): Promise<Blob> {
   });
 }
 
-// ────────────────────────────────────────────────────────────
-// Text extraction heuristics
-// ────────────────────────────────────────────────────────────
-const ROLE_KEYWORDS =
-  /\b(CEO|CFO|CTO|COO|CMO|CRO|VP|SVP|EVP|MD|GM|Director|Manager|Engineer|Developer|Designer|President|Founder|Co-Founder|Partner|Associate|Consultant|Analyst|Officer|Coordinator|Lead|Head|Principal|Senior|Junior|Account|Executive|Specialist|Strategist|Producer|Architect|Scientist|Researcher|Advisor|Representative|Recruiter|Talent)\b/i;
-
-const COMPANY_SUFFIXES =
-  /\b(Inc\.?|LLC|Ltd\.?|Corp\.?|Co\.?|Company|Group|Solutions|Technologies?|Tech|Services?|Systems?|Associates?|Partners?|Global|International|Studios?|Agency|Ventures?|Capital|Bank|Financial|Holdings?|Foundation|Labs?|Laboratories?|Institute|Consulting|Advisors?|Investments?|Management)\b/i;
-
-function extractContactFields(rawText: string): ScannedContact {
-  const result: ScannedContact = {};
-
-  // Normalise: collapse multiple spaces, fix common OCR artefacts
-  const text = rawText.replace(/\r/g, "\n").replace(/[ \t]+/g, " ");
-  const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
-
-  // ── Email ─────────────────────────────────────────────────
-  const emailMatch = text.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
-  if (emailMatch) result.email = emailMatch[0].toLowerCase();
-
-  // ── Phone ─────────────────────────────────────────────────
-  const phoneRe =
-    /(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}|(\+\d{1,3}[-.\s]?)(\(?\d{1,4}\)?[-.\s]?){2,6}\d{2,}/;
-  const phoneMatch = text.match(phoneRe);
-  if (phoneMatch) {
-    const candidate = phoneMatch[0].trim();
-    const digits = candidate.replace(/\D/g, "");
-    if (digits.length >= 7 && digits.length <= 15) result.phone = candidate;
-  }
-
-  // Track which lines are already consumed
-  const usedLines = new Set<string>();
-  if (result.email) {
-    lines.forEach(l => { if (l.toLowerCase().includes(result.email!.toLowerCase())) usedLines.add(l); });
-  }
-  if (result.phone) {
-    lines.forEach(l => { if (l.replace(/\D/g, "").includes(result.phone!.replace(/\D/g, "").slice(0, 7))) usedLines.add(l); });
-  }
-  // Always skip URLs and web addresses
-  lines.forEach(l => {
-    if (/^(www\.|https?:\/\/|http:\/\/)/i.test(l)) usedLines.add(l);
-    if (/\.(com|org|net|io|co\.)/i.test(l) && !/@/.test(l)) usedLines.add(l);
-  });
-
-  // ── Company — pass 1: explicit suffix (Tesla Inc, Google LLC, etc.) ────
-  const companyBySuffix = lines.find(l => {
-    if (usedLines.has(l)) return false;
-    if (/^\+?\(?\d/.test(l)) return false;
-    return COMPANY_SUFFIXES.test(l);
-  });
-  if (companyBySuffix) { result.company = companyBySuffix.trim(); usedLines.add(companyBySuffix); }
-
-  // ── Role ──────────────────────────────────────────────────
-  const roleLine = lines.find(l => {
-    if (usedLines.has(l)) return false;
-    if (/^\+?\(?\d/.test(l)) return false;
-    return ROLE_KEYWORDS.test(l);
-  });
-  if (roleLine) { result.role = roleLine.trim(); usedLines.add(roleLine); }
-
-  // ── Name ──────────────────────────────────────────────────
-  // Look for 2–4 word line where every word starts with a capital letter,
-  // no digits, no punctuation except hyphens (for hyphenated names).
-  const nameLine = lines.find(l => {
-    if (usedLines.has(l)) return false;
-    if (/\d/.test(l)) return false;
-    if (/@/.test(l)) return false;
-    const words = l.split(/\s+/);
-    if (words.length < 2 || words.length > 4) return false;
-    return words.every(w =>
-      /^[A-ZÁÉÍÓÚÀÈÌÒÙÄËÏÖÜ][a-záéíóúàèìòùäëïöü]+$/.test(w) || // "Smith"
-      /^[A-ZÁÉÍÓÚ\-]+$/.test(w) ||                                // "SMITH" or "MARY-JANE"
-      /^[A-ZÁ][a-z]+\-[A-ZÁ][a-z]+$/.test(w)                    // "Mary-Jane"
-    );
-  });
-  if (nameLine) {
-    const parts = nameLine.trim().split(/\s+/);
-    const tc = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-    result.firstName = tc(parts[0]);
-    result.lastName = parts.slice(1).map(tc).join(" ");
-    usedLines.add(nameLine);
-  }
-
-  // ── Company — pass 2: standalone brand name (no suffix) ───────────────
-  // Runs after name + role so those lines are already consumed.
-  // Catches "Tesla", "Apple", "NVIDIA", "McKinsey & Company" etc.
-  if (!result.company) {
-    const companyByShape = lines.find(l => {
-      if (usedLines.has(l)) return false;
-      if (/^\+?\(?\d/.test(l)) return false;   // starts with digit → phone/address
-      if (/@/.test(l)) return false;             // email
-      if (ROLE_KEYWORDS.test(l)) return false;   // job title
-      const words = l.split(/\s+/);
-      if (words.length < 1 || words.length > 5) return false;
-      // Every word must start with a capital letter and consist only of
-      // letters, &, -, ., or , — filters out sentences and addresses.
-      return words.every(w => /^[A-Z]/.test(w) && /^[A-Za-z&.,\-]+$/.test(w));
-    });
-    if (companyByShape) { result.company = companyByShape.trim(); usedLines.add(companyByShape); }
-  }
-
-  return result;
-}
-
-// ────────────────────────────────────────────────────────────
+// Text extraction now lives in the pure, unit-tested parser
+// `@/lib/businessCardParse` (imported above).
 
 type ScanStatus = "idle" | "processing" | "done" | "error";
 
