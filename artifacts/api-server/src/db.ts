@@ -24,6 +24,7 @@ export type Contact = {
   priority_override: boolean;
   industry: string | null;
   function: string | null;
+  preferred_contact_method: string | null;
   interests: string[];
   initial_follow_up_days: number;
   follow_up_cadence_days: number;
@@ -61,6 +62,7 @@ export function dbToContact(row: Contact) {
     priorityOverride: row.priority_override ?? false,
     industry: row.industry ?? undefined,
     function: row.function ?? undefined,
+    preferredContactMethod: (row.preferred_contact_method ?? undefined) as "text" | "email" | "linkedin" | undefined,
     interests: row.interests ?? [],
     initialFollowUpDays: row.initial_follow_up_days,
     followUpCadenceDays: row.follow_up_cadence_days,

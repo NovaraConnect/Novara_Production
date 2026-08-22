@@ -6,7 +6,7 @@ import { ImportanceBadge } from "@/components/ImportanceBadge";
 import {
   ArrowLeft, Edit2, Trash2, Linkedin, MapPin, AlignLeft, CalendarDays,
   CheckCircle2, Bell, CalendarPlus, ExternalLink, Newspaper, Loader2, RefreshCw,
-  Mail, Phone, TrendingUp, TrendingDown, Briefcase, Tag,
+  Mail, Phone, TrendingUp, TrendingDown, Briefcase, Tag, Send, MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +17,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { availableMethods, usablePreferred, openContactMethod, METHOD_LABEL, type ContactMethod } from "@/lib/contactActions";
 import { downloadIcs, googleCalendarUrl } from "@/lib/calendar";
 import { requestNotificationPermission, sendNotification, isDigestEnabled, setDigestEnabled, scheduleDigestCheck } from "@/lib/webNotifications";
 import { useCompanyNews } from "@/hooks/useCompanyNews";
@@ -76,6 +77,70 @@ export default function ContactDetail() {
     } catch {
       toast.error("Failed to record interaction.");
     }
+  };
+
+  // ── "Contact now" action ────────────────────────────────────────────────
+  const preferredMethod = usablePreferred(contact);
+  const contactMethods = availableMethods(contact);
+  // One-click when there's a usable preferred method or a single option; a
+  // dropdown chooser when several exist and no preference; a clear message
+  // when nothing is reachable.
+  const directMethod = preferredMethod ?? (contactMethods.length === 1 ? contactMethods[0] : null);
+
+  const promptMarkContacted = () => {
+    toast(`Reached out to ${contact.firstName}?`, {
+      description: "Opening a method doesn't log it — mark contacted once you have.",
+      action: { label: "Mark contacted", onClick: () => { void handleMarkContacted(); } },
+      duration: 6000,
+    });
+  };
+
+  const handleOpenMethod = (method: ContactMethod) => {
+    if (openContactMethod(contact, method)) promptMarkContacted();
+  };
+
+  const methodIcon = (m: ContactMethod) =>
+    m === "text" ? <MessageSquare className="w-4 h-4" />
+      : m === "email" ? <Mail className="w-4 h-4" />
+        : <Linkedin className="w-4 h-4" />;
+
+  const renderContactNow = () => {
+    const cls = "h-14 rounded-xl text-sm sm:text-base font-semibold gap-1.5";
+    if (contactMethods.length === 0) {
+      return (
+        <Button
+          variant="secondary"
+          className={cls}
+          onClick={() => toast.error("No contact method available", { description: "Add a phone, email, or LinkedIn URL to this contact." })}
+          data-testid="button-contact-now"
+        >
+          <Send className="w-5 h-5" />Contact now
+        </Button>
+      );
+    }
+    if (directMethod) {
+      return (
+        <Button variant="secondary" className={cls} onClick={() => handleOpenMethod(directMethod)} data-testid="button-contact-now">
+          <Send className="w-5 h-5" />Contact now
+        </Button>
+      );
+    }
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="secondary" className={cls} data-testid="button-contact-now">
+            <Send className="w-5 h-5" />Contact now
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          {contactMethods.map((m) => (
+            <DropdownMenuItem key={m} onClick={() => handleOpenMethod(m)} className="gap-2 cursor-pointer" data-testid={`contact-now-${m}`}>
+              {methodIcon(m)}{METHOD_LABEL[m]}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
   };
 
   const handleDelete = async () => {
@@ -217,20 +282,23 @@ export default function ContactDetail() {
           )}
         </div>
 
-        {/* Primary action */}
-        <Button
-          onClick={handleMarkContacted}
-          className="w-full h-14 rounded-xl text-base font-semibold shadow-md active:scale-[0.98] transition-transform mb-4"
-          disabled={markContacted.isPending}
-          data-testid="button-mark-contacted"
-        >
-          {markContacted.isPending ? (
-            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-          ) : (
-            <CheckCircle2 className="w-5 h-5 mr-2" />
-          )}
-          Mark as Contacted Today
-        </Button>
+        {/* Primary actions */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <Button
+            onClick={handleMarkContacted}
+            className="h-14 rounded-xl text-sm sm:text-base font-semibold shadow-md active:scale-[0.98] transition-transform gap-1.5"
+            disabled={markContacted.isPending}
+            data-testid="button-mark-contacted"
+          >
+            {markContacted.isPending ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5" />
+            )}
+            Mark contacted
+          </Button>
+          {renderContactNow()}
+        </div>
 
         {/* Calendar + Notifications row */}
         <div className="grid grid-cols-2 gap-3 mb-8">

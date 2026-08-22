@@ -5,6 +5,7 @@ export interface Contact {
   linkedinUrl?: string;
   email?: string;
   phone?: string;
+  preferredContactMethod?: "text" | "email" | "linkedin";
   company: string;
   role?: string;
   metAt?: string;
