@@ -16,5 +16,8 @@ export function useFeatures() {
     staleTime: 5 * 60_000,
   });
 
-  return { aiEnrich: data?.aiEnrich ?? false };
+  return {
+    aiEnrich: data?.aiEnrich ?? false,
+    cardAiParse: data?.cardAiParse ?? false,
+  };
 }

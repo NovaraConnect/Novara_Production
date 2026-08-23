@@ -7,6 +7,7 @@ import settingsRouter from "./settings";
 import notificationsRouter from "./notifications";
 import feedbackRouter from "./feedback";
 import featuresRouter from "./features";
+import parseCardRouter from "./parseCard";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(settingsRouter);
 router.use(notificationsRouter);
 router.use(feedbackRouter);
 router.use(featuresRouter);
+router.use(parseCardRouter);
 
 export default router;
