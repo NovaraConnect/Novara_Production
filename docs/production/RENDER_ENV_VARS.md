@@ -47,7 +47,7 @@ a graceful `{ ok:false, reason:"ai_disabled" }`.
 | Variable | Value | Notes |
 |---|---|---|
 | `CARD_AI_PARSE` | `on` | Enables `POST /api/parse-card-text`. Off/unset ⇒ feature disabled. |
-| `CARD_AI_PROVIDER` | `anthropic` \| `gemini` | Optional. If unset, prefers Anthropic when its key is present, else Gemini. |
+| `CARD_AI_PROVIDER` | `anthropic` \| `gemini` | **REQUIRED** when `CARD_AI_PARSE=on`. Must be set **explicitly** — there is **no auto-default and no cross-provider fallback**. Unset/invalid ⇒ feature disabled. |
 | `ANTHROPIC_API_KEY` | `sk-ant-…` | Provider credential (Cloe sets it). No training on API inputs. |
 | `GEMINI_API_KEY` | `…` | Provider credential (Cloe sets it). **Must be a paid / no-training setup.** |
 | `CARD_AI_ANTHROPIC_MODEL` | `claude-haiku-4-5` | Optional model override. |

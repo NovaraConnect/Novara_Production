@@ -100,25 +100,42 @@ describe("gating & provider selection (no key at startup required)", () => {
     expect(isCardAiParseEnabled()).toBe(false);
   });
 
-  it("enabled with flag + a key; prefers Anthropic by default", () => {
+  it("disabled when CARD_AI_PROVIDER is unset, even with keys present (NO auto-default)", () => {
     reset();
     process.env.CARD_AI_PARSE = "on";
     process.env.ANTHROPIC_API_KEY = "sk-test";
     process.env.GEMINI_API_KEY = "g-test";
-    expect(activeCardProvider()).toBe("anthropic");
-    expect(isCardAiParseEnabled()).toBe(true);
+    expect(activeCardProvider()).toBeNull();
+    expect(isCardAiParseEnabled()).toBe(false);
   });
 
-  it("respects CARD_AI_PROVIDER override and requires that provider's key", () => {
+  it("enabled only with an EXPLICIT provider + its own key", () => {
+    reset();
+    process.env.CARD_AI_PARSE = "on";
+    process.env.CARD_AI_PROVIDER = "anthropic";
+    process.env.ANTHROPIC_API_KEY = "sk-test";
+    expect(activeCardProvider()).toBe("anthropic");
+    expect(isCardAiParseEnabled()).toBe(true);
+
     reset();
     process.env.CARD_AI_PARSE = "on";
     process.env.CARD_AI_PROVIDER = "gemini";
     process.env.GEMINI_API_KEY = "g-test";
     expect(activeCardProvider()).toBe("gemini");
+    expect(isCardAiParseEnabled()).toBe(true);
+  });
+
+  it("NO cross-provider fallback: selected provider missing its key → disabled", () => {
     reset();
     process.env.CARD_AI_PARSE = "on";
     process.env.CARD_AI_PROVIDER = "anthropic";
-    process.env.GEMINI_API_KEY = "g-test"; // wrong key for the chosen provider
+    process.env.GEMINI_API_KEY = "g-test"; // wrong key → must NOT fall back to gemini
+    expect(activeCardProvider()).toBeNull();
+
+    reset();
+    process.env.CARD_AI_PARSE = "on";
+    process.env.CARD_AI_PROVIDER = "gemini";
+    process.env.ANTHROPIC_API_KEY = "sk-test"; // wrong key → must NOT fall back to anthropic
     expect(activeCardProvider()).toBeNull();
   });
 });

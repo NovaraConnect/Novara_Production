@@ -12,8 +12,8 @@
 // tier trains on inputs and MUST NOT be used for real card text.
 //
 // Config (all optional; app works with none set):
-//   CARD_AI_PARSE=on            enable the feature
-//   CARD_AI_PROVIDER=anthropic|gemini   pick provider (else prefer anthropic)
+//   CARD_AI_PARSE=on            enable the feature (must be explicit)
+//   CARD_AI_PROVIDER=anthropic|gemini   REQUIRED — no auto-default, no fallback
 //   ANTHROPIC_API_KEY / GEMINI_API_KEY  provider credential (Cloe sets these)
 //   GEMINI_MODEL, CARD_AI_ANTHROPIC_MODEL   optional model overrides
 // ============================================================================
@@ -45,17 +45,16 @@ function flagOn(v: string | undefined): boolean {
   return !!v && ["1", "true", "on", "yes"].includes(v.trim().toLowerCase());
 }
 
-/** Chosen provider, or null when none is usable. Configurable via
- *  CARD_AI_PROVIDER; otherwise prefer Anthropic (no-training), then Gemini. */
+/** Chosen provider, or null when unusable. The provider MUST be selected
+ *  EXPLICITLY via CARD_AI_PROVIDER (`anthropic` | `gemini`) — there is NO
+ *  auto-default and NO cross-provider fallback, because card OCR text can
+ *  contain personal data. Returns null (→ feature disabled) when the provider
+ *  is unset/invalid or the selected provider's key is missing. */
 export function activeCardProvider(): CardProvider | null {
   const pref = process.env["CARD_AI_PROVIDER"]?.trim().toLowerCase();
-  const hasAnthropic = !!process.env["ANTHROPIC_API_KEY"];
-  const hasGemini = !!process.env["GEMINI_API_KEY"];
-  if (pref === "anthropic") return hasAnthropic ? "anthropic" : null;
-  if (pref === "gemini") return hasGemini ? "gemini" : null;
-  if (hasAnthropic) return "anthropic";
-  if (hasGemini) return "gemini";
-  return null;
+  if (pref === "anthropic") return process.env["ANTHROPIC_API_KEY"] ? "anthropic" : null;
+  if (pref === "gemini") return process.env["GEMINI_API_KEY"] ? "gemini" : null;
+  return null; // provider not explicitly selected → disabled
 }
 
 /** Enabled only when the CARD_AI_PARSE flag is on AND a provider key exists. */
