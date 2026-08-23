@@ -17,6 +17,8 @@ export interface ScannedContact {
   role?: string;
   email?: string;
   phone?: string;
+  /** Optional; only set by the AI parser (deterministic parser never fills it). */
+  website?: string;
 }
 
 const ROLE_KEYWORDS =

@@ -3,6 +3,10 @@ import { Camera, Image as ImageIcon, Loader2, X, ScanLine, CheckCircle2, AlertCi
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { extractContactFields, type ScannedContact } from "@/lib/businessCardParse";
+import { mergeCardResult } from "@/lib/cardMerge";
+import { useFeatures } from "@/hooks/useFeatures";
+import { useAuth } from "@clerk/react";
+import { apiFetch } from "@/lib/api";
 
 // Re-exported so existing importers (e.g. AddContact) keep working unchanged.
 export type { ScannedContact };
@@ -53,6 +57,33 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
   const [status, setStatus] = useState<ScanStatus>("idle");
   const cameraRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
+  const { cardAiParse } = useFeatures();
+  const { getToken } = useAuth();
+
+  // Optional: refine the deterministic parse with the AI text parser. Sends the
+  // OCR TEXT ONLY (never the image), and falls back to `deterministic` on any
+  // disable/miss/slow/error. Best-effort — never throws.
+  const refineWithAi = async (text: string, deterministic: ScannedContact): Promise<ScannedContact> => {
+    if (!cardAiParse) return deterministic;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 7000);
+      const res = await apiFetch(getToken, "/api/parse-card-text", {
+        method: "POST",
+        json: { text },
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) return deterministic;
+      const data = await res.json();
+      if (data?.ok && data.fields) {
+        return mergeCardResult(deterministic, { fields: data.fields, confidence: data.confidence });
+      }
+      return deterministic;
+    } catch {
+      return deterministic;
+    }
+  };
 
   const processFile = async (file: File) => {
     if (file.size > MAX_FILE_BYTES) {
@@ -100,8 +131,10 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
         return;
       }
 
+      const finalData = await refineWithAi(text, extracted);
+
       setStatus("done");
-      onExtracted(extracted);
+      onExtracted(finalData);
       toast.success("Card scanned — review and edit the pre-filled fields below");
     } catch (err) {
       console.error("[BusinessCardScanner OCR error]", err);

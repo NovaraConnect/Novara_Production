@@ -209,6 +209,8 @@ export async function submitFeedback(
 export interface Features {
   /** Whether optional AI contact enrichment is available in this deployment. */
   aiEnrich: boolean;
+  /** Whether optional AI business-card text parsing is available. */
+  cardAiParse: boolean;
 }
 
 /** Non-secret capability flags. Defaults everything off if the call fails, so
@@ -216,10 +218,11 @@ export interface Features {
 export async function fetchFeatures(getToken: GetAuthToken): Promise<Features> {
   try {
     const res = await apiFetch(getToken, "/api/features");
-    if (!res.ok) return { aiEnrich: false };
-    return await res.json();
+    if (!res.ok) return { aiEnrich: false, cardAiParse: false };
+    const data = await res.json();
+    return { aiEnrich: !!data?.aiEnrich, cardAiParse: !!data?.cardAiParse };
   } catch {
-    return { aiEnrich: false };
+    return { aiEnrich: false, cardAiParse: false };
   }
 }
 
