@@ -71,7 +71,7 @@ const SYSTEM_PROMPT =
   `Rules:\n` +
   `- Use ONLY text present in the input. NEVER invent or guess an email, phone, website, name, or company.\n` +
   `- If a value is not clearly present, use null and add a short warning.\n` +
-  `- role = the job title only (e.g. "Manager"), not taglines, addresses, or OCR noise.\n` +
+  `- role = the job TITLE words only (e.g. "Manager", "Marketing Director"). Exclude company names, brand names, and any word that is not part of the title itself. If a line reads like "Borcelle Manager" or "Carrs Manager", the role is just "Manager". Also exclude taglines, addresses, and OCR noise.\n` +
   `- Output JSON only. No prose, no code fences.`;
 
 // ── strict validation (no external schema dependency) ──

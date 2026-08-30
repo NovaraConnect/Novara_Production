@@ -4,7 +4,7 @@
 // deterministic draft is used unchanged. AI-provided email/phone/website are
 // RE-VALIDATED before use so the model can't inject a fabricated contact.
 // ============================================================================
-import type { ScannedContact } from "@/lib/businessCardParse";
+import { cleanRole, type ScannedContact } from "@/lib/businessCardParse";
 
 export interface AiCardFields {
   firstName: string | null;
@@ -65,7 +65,14 @@ export function mergeCardResult(deterministic: ScannedContact, ai: AiCardResult 
   setIfPresent("firstName", f.firstName);
   setIfPresent("lastName", f.lastName);
   setIfPresent("company", f.company);
-  setIfPresent("role", f.role);
+
+  // De-noise the AI role through the deterministic cleaner: it drops brand /
+  // company / adjacent noise words glued to the title ("Carrs Manager" ->
+  // "Manager") while keeping real multi-word titles ("Marketing Manager").
+  // When the cleaner finds no known role keyword (e.g. "Barista"), keep the
+  // AI's raw role rather than dropping a legitimate title.
+  const aiRole = (f.role ?? "").trim();
+  if (aiRole) merged.role = cleanRole(aiRole) ?? aiRole;
 
   if (f.email && isValidEmail(f.email)) merged.email = f.email.trim().toLowerCase();
   if (f.phone && isValidPhone(f.phone)) merged.phone = f.phone.trim();

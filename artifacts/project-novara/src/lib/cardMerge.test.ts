@@ -73,3 +73,21 @@ describe("validators", () => {
     expect(normalizeWebsite("localhost")).toBeNull();
   });
 });
+
+describe("mergeCardResult — AI role de-noising (cleanRole safety net)", () => {
+  it("strips brand/noise words glued to the title (\"Carrs Manager\" → \"Manager\")", () => {
+    expect(mergeCardResult(DET, ai({ role: "Carrs Manager" })).role).toBe("Manager");
+  });
+
+  it("strips a company name prefix (\"Borcelle Manager\" → \"Manager\")", () => {
+    expect(mergeCardResult(DET, ai({ role: "Borcelle Manager" })).role).toBe("Manager");
+  });
+
+  it("keeps a legitimate multi-word title (\"Marketing Manager\")", () => {
+    expect(mergeCardResult(DET, ai({ role: "Marketing Manager" })).role).toBe("Marketing Manager");
+  });
+
+  it("keeps the raw AI role when no known keyword is present (\"Barista\")", () => {
+    expect(mergeCardResult(DET, ai({ role: "Barista" })).role).toBe("Barista");
+  });
+});

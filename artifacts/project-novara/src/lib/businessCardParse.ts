@@ -68,7 +68,7 @@ function isNameWord(w: string): boolean {
 /** Clean a role line: keep the contiguous run of role-keyword/modifier words
  *  around the primary keyword, dropping OCR noise glued on. Returns undefined
  *  if no keyword is present. */
-function cleanRole(line: string): string | undefined {
+export function cleanRole(line: string): string | undefined {
   const words = line.trim().split(/\s+/);
   const isKw = (w: string) => ROLE_KEYWORDS.test(w);
   const isMod = (w: string) => ROLE_MODIFIERS.has(w.toLowerCase().replace(/[^a-zà-ÿ]/g, ""));
