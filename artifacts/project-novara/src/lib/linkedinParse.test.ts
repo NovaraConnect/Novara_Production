@@ -147,3 +147,82 @@ describe("parseLinkedInProfile — a connections line is not mistaken for compan
     expect(d.company).toBe("Stripe");
   });
 });
+
+// ── Real-screenshot shapes ──────────────────────────────────────────────────
+// Every case below was a live failure found during QA on realistic layouts:
+// the earlier parser rejected decorated name lines and then accepted UI chrome,
+// a location, or a wrapped headline fragment in their place.
+describe("realistic LinkedIn screenshot layouts", () => {
+  it("reads a name carrying a connection-degree badge, not the button row", () => {
+    const d = parseLinkedInProfile(
+      [
+        "Priya Raman · 2nd",
+        "Head of Growth at Northwind Labs",
+        "Austin, Texas, United States · Contact info",
+        "2,431 followers · 500+ connections",
+        "Message   Connect   More",
+      ].join("\n"),
+    );
+    expect(d.firstName).toBe("Priya");
+    expect(d.lastName).toBe("Raman");
+    expect(d.role).toBe("Head of Growth");
+    expect(d.company).toBe("Northwind Labs");
+    expect(d.notes).toContain("Location: Austin, Texas, United States");
+  });
+
+  it("never takes an action-button row as the name", () => {
+    const d = parseLinkedInProfile(
+      ["Message   Connect   More", "Following", "See all"].join("\n"),
+    );
+    expect(d.firstName).toBeUndefined();
+    expect(d.lastName).toBeUndefined();
+  });
+
+  it("handles an honorific and a credential suffix", () => {
+    const d = parseLinkedInProfile(
+      ["Dr. Priya Raman, MBA", "Chief Marketing Officer", "Northwind Labs", "San Francisco Bay Area"].join("\n"),
+    );
+    expect(d.firstName).toBe("Priya");
+    expect(d.lastName).toBe("Raman");
+    expect(d.role).toBe("Chief Marketing Officer");
+    expect(d.company).toBe("Northwind Labs");
+  });
+
+  it("handles pronouns next to the name", () => {
+    const d = parseLinkedInProfile(
+      ["Priya Raman (she/her)", "Product Manager at Acme Corp", "1,204 followers", "Message"].join("\n"),
+    );
+    expect(d.firstName).toBe("Priya");
+    expect(d.lastName).toBe("Raman");
+    expect(d.company).toBe("Acme Corp");
+  });
+
+  it("takes the employer line, not a wrapped headline fragment", () => {
+    const d = parseLinkedInProfile(
+      [
+        "Priya Raman",
+        "Head of Growth | Building demand engines",
+        "for B2B SaaS | ex-Acme",
+        "Northwind Labs",
+        "Austin, Texas, United States",
+        "500+ connections",
+      ].join("\n"),
+    );
+    expect(d.role).toBe("Head of Growth");
+    expect(d.company).toBe("Northwind Labs");
+  });
+
+  it("strips employment type from the company", () => {
+    const d = parseLinkedInProfile(
+      ["Priya Raman", "Head of Growth", "Northwind Labs · Full-time", "Jan 2023 - Present · 2 yrs 8 mos", "Austin, Texas"].join("\n"),
+    );
+    expect(d.company).toBe("Northwind Labs");
+  });
+
+  it("never reports a location as the role", () => {
+    const d = parseLinkedInProfile(
+      ["Priya Raman", "San Francisco Bay Area", "500+ connections"].join("\n"),
+    );
+    expect(d.role).toBeUndefined();
+  });
+});
