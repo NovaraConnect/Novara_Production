@@ -167,8 +167,22 @@ export async function parseCardTextWith(
     const raw = await complete(SYSTEM_PROMPT, text.slice(0, MAX_TEXT), controller.signal);
     if (!raw) return null;
     return validate(extractJson(raw));
-  } catch {
-    return null; // timeout / provider error → caller falls back to deterministic
+  } catch (err) {
+    // Timeout / provider error → caller falls back to deterministic. Log the
+    // provider's OWN error shape (name/status/message) so failures are
+    // diagnosable instead of silently swallowed. This is the provider's error
+    // text (e.g. "404 model_not_found", "401 authentication_error"), never the
+    // OCR text or parsed fields — no PII.
+    const e = err as { name?: string; status?: number; message?: string };
+    console.warn(
+      "[card-parse-error] " +
+        JSON.stringify({
+          name: e?.name ?? null,
+          status: e?.status ?? null,
+          message: typeof e?.message === "string" ? e.message.slice(0, 300) : null,
+        }),
+    );
+    return null;
   } finally {
     clearTimeout(timer);
   }
