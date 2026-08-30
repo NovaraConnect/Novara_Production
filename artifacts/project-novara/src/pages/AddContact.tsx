@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { useContacts } from "@/hooks/useContacts";
 import { useSettings } from "@/hooks/useSettings";
@@ -18,6 +18,12 @@ import { suggestPriority, suggestInitialFollowUp, deriveSuggestedCadence, MANUAL
 import { BusinessCardScanner, type ScannedContact } from "@/components/BusinessCardScanner";
 import { LinkedInScreenshotImport } from "@/components/LinkedInScreenshotImport";
 import type { LinkedInDraft } from "@/lib/linkedinParse";
+import {
+  planLinkedInImport,
+  LINKEDIN_IMPORT_FIELDS,
+  type AppliedImport,
+  type FormSnapshot,
+} from "@/lib/linkedinImportDraft";
 import { QRScanner, type ScannedQRContact } from "@/components/QRScanner";
 
 const INITIAL_OPTIONS: Contact["initialFollowUpDays"][] = [1, 2, 3];
@@ -154,19 +160,27 @@ export default function AddContact() {
     setCadenceOverridden(false);
   }, [form]);
 
+  // Tracks what the last LinkedIn import wrote, so a second import can withdraw
+  // it instead of leaving the previous profile's values behind.
+  const lastLinkedInImport = useRef<AppliedImport>({});
+
   const handleLinkedInExtracted = useCallback((data: LinkedInDraft) => {
     const opts = { shouldDirty: true, shouldTouch: true } as const;
-    if (data.firstName) form.setValue("firstName", data.firstName, opts);
-    if (data.lastName) form.setValue("lastName", data.lastName, opts);
-    if (data.role) form.setValue("role", data.role, opts);
-    if (data.company) form.setValue("company", data.company, opts);
-    if (data.linkedinUrl) form.setValue("linkedinUrl", data.linkedinUrl, opts);
-    // Never sets email/phone. Append provenance/location without clobbering
-    // anything the user may have already typed into notes.
-    if (data.notes) {
-      const existing = (form.getValues("notes") ?? "").trim();
-      form.setValue("notes", existing ? `${existing}\n${data.notes}` : data.notes, opts);
+
+    const snapshot = {
+      notes: form.getValues("notes") ?? "",
+    } as FormSnapshot;
+    for (const field of LINKEDIN_IMPORT_FIELDS) {
+      snapshot[field] = form.getValues(field) ?? "";
     }
+
+    const { updates, applied } = planLinkedInImport(snapshot, lastLinkedInImport.current, data);
+    for (const [field, value] of Object.entries(updates)) {
+      form.setValue(field as keyof FormSnapshot, value, opts);
+    }
+    lastLinkedInImport.current = applied;
+
+    // Never sets email/phone — a LinkedIn screenshot doesn't fill those.
     setImportanceSuggestionDismissed(false);
     setImportanceOverridden(false);
     setInitialOverridden(false);
