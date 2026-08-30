@@ -247,6 +247,34 @@ describe("realistic LinkedIn screenshot layouts", () => {
     expect(d.notes).toContain("Location: Austin, Texas, United States");
   });
 
+  it("reads a name OCR mangled the capitalisation of", () => {
+    const d = parseLinkedInProfile(
+      ["PRIYA raman", "Head of Growth", "Northwind Labs", "Austin, Texas"].join("\n"),
+    );
+    expect(d.firstName).toBe("Priya");
+    expect(d.lastName).toBe("Raman");
+    expect(d.role).toBe("Head of Growth");
+  });
+
+  it("handles a middle initial and a verification glyph", () => {
+    const a = parseLinkedInProfile(["Priya K. Raman", "Head of Growth", "Northwind Labs"].join("\n"));
+    expect(a.firstName).toBe("Priya");
+    const b = parseLinkedInProfile(["Priya Raman \u2713", "Head of Growth at Northwind Labs"].join("\n"));
+    expect(b.firstName).toBe("Priya");
+    expect(b.lastName).toBe("Raman");
+  });
+
+  it("keeps name particles lowercase", () => {
+    const d = parseLinkedInProfile(["Ana Maria de la Cruz", "Product Manager at Acme Corp"].join("\n"));
+    expect(d.lastName).toBe("Maria de la Cruz");
+  });
+
+  it("ignores phone status-bar noise above the name", () => {
+    const d = parseLinkedInProfile(["9:41", "Priya Raman", "Head of Growth", "Northwind Labs"].join("\n"));
+    expect(d.firstName).toBe("Priya");
+    expect(d.role).toBe("Head of Growth");
+  });
+
   it("leaves an abbreviation's period alone (no space before it)", () => {
     const d = parseLinkedInProfile(
       ["Priya Raman", "Head of Growth", "Northwind Labs Inc."].join("\n"),

@@ -73,8 +73,11 @@ function stripNameDecorations(line: string): string {
   return line
     .replace(DEGREE_BADGE_RE, "")
     .replace(PRONOUN_RE, "")
+    // Verification badges / emoji / stray OCR glyphs around the name.
+    .replace(/[^\p{L}\p{M}\s.,'’-]/gu, " ")
     .replace(HONORIFIC_RE, "")
     .replace(CREDENTIAL_SUFFIX_RE, "")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -124,7 +127,11 @@ function cleanCompany(s: string): string {
     .trim();
 }
 
+const NAME_PARTICLES = new Set(["de", "del", "da", "di", "van", "von", "der", "la", "le", "bin", "al"]);
+
 function titleCaseWord(s: string): string {
+  const lower = s.toLowerCase();
+  if (NAME_PARTICLES.has(lower)) return lower; // "de la Cruz", not "De La Cruz"
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 }
 
@@ -141,12 +148,34 @@ function looksLikeName(rawLine: string): boolean {
   if (/\d/.test(line) || /@/.test(line)) return false;
   if (ROLE_KEYWORDS.test(line)) return false; // "Product Manager" is not a name
   const words = line.split(/\s+/);
-  if (words.length < 2 || words.length > 4) return false;
+  if (words.length < 2 || words.length > 5) return false; // "Ana María de la Cruz"
   return words.every((w) =>
     /^[A-ZÀ-Þ][a-zà-ÿ'’]+$/.test(w) ||          // Mixed case incl. accents (José)
     /^[A-ZÀ-Þ][A-ZÀ-Þ.'’-]+$/.test(w) ||        // ALLCAPS
+    /^[A-ZÀ-Þ]\.?$/.test(w) ||                  // Middle initial ("K." / "K")
+    /^(?:de|del|da|di|van|von|der|la|le|bin|al)$/i.test(w) || // name particles
     /^[A-Z][a-z]+-[A-Z][a-z]+$/.test(w),        // Hyphenated (Mary-Jane)
   );
+}
+
+/** Second pass, used only when no line passes the strict test. OCR routinely
+ *  mangles capitalisation on the name line ("PRIYA raman", "Priya Ramanm"), and
+ *  a blank name cascades — the headline is only searched below the name, so
+ *  role and location go missing too. Stays conservative: chrome, action rows,
+ *  locations, URLs, connection counts and role-worded lines are still rejected,
+ *  and at least one word must look like a capitalised name. */
+function looksLikeNameLoose(rawLine: string): boolean {
+  const line = stripNameDecorations(rawLine);
+  if (!line) return false;
+  if (isActionRow(line)) return false;
+  if (LOCATION_HINT_RE.test(line)) return false;
+  if (CONNECTIONS_RE.test(line) || LINKEDIN_URL_RE.test(line)) return false;
+  if (/\d/.test(line) || /@/.test(line)) return false;
+  if (ROLE_KEYWORDS.test(line)) return false;
+  const words = line.split(/\s+/);
+  if (words.length < 2 || words.length > 5) return false;
+  if (!words.every((w) => /^[\p{L}\p{M}.'’-]+$/u.test(w))) return false;
+  return words.some((w) => /^[A-ZÀ-Þ]/.test(w));
 }
 
 export function parseLinkedInProfile(rawText: string): LinkedInDraft {
@@ -173,9 +202,12 @@ export function parseLinkedInProfile(rawText: string): LinkedInDraft {
   const lines = allLines.filter((l) => !isChrome(l.toLowerCase()));
 
   // 2) Name — topmost name-shaped line.
+  // Take the topmost plausible name. The loose test only applies near the top of
+  // the screenshot, where the name actually is — otherwise a strict match
+  // further down (the company line, say) would win over an OCR-mangled name.
   let nameIdx = -1;
   for (let i = 0; i < lines.length; i++) {
-    if (looksLikeName(lines[i])) { nameIdx = i; break; }
+    if (looksLikeName(lines[i]) || (i < 8 && looksLikeNameLoose(lines[i]))) { nameIdx = i; break; }
   }
   if (nameIdx >= 0) {
     const parts = stripNameDecorations(lines[nameIdx]).split(/\s+/);
