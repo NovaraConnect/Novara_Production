@@ -55,7 +55,7 @@ clerkMiddleware((req) => ({
 This middleware verifies the incoming Bearer token and attaches auth state to the request, but does
 **not** itself reject unauthenticated requests — that's `requireAuth`'s job (`middlewares/auth.ts`),
 applied individually per route. Routes that don't call `requireAuth`
-(`GET /api/healthz`, `GET /api/company-news`, `POST /api/linkedin/import`,
+(`GET /api/healthz`, `GET /api/company-news`,
 `GET /api/notifications/vapid-public-key`) are reachable without any session at all — see
 `04-API.md` and `12-Security.md`.
 
