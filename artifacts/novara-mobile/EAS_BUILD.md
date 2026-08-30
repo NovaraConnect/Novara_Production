@@ -51,8 +51,8 @@ Settings, and an `authedFetch` helper in `lib/api.ts`.
 **Still pending before submission:**
 1. Data source is still local `AsyncStorage`; the contact CRUD + one-time migration
    to the authenticated backend (`POST /api/contacts/import`) are the next milestone.
-2. `lib/api.ts` `importFromLinkedIn` / `getCompanyNews` still call the now-auth-gated
-   endpoints without a token — convert them to `authedFetch` when wiring data.
+2. `lib/api.ts` `getCompanyNews` still calls the now-auth-gated endpoint without a
+   token — convert it to `authedFetch` when wiring data.
 3. Set `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` (placeholders are in `eas.json`).
 4. Configure the app's redirect scheme (`novara://`) in the Clerk instance if OAuth
    is used (email/password needs no redirect).

@@ -12,7 +12,6 @@ import type {
   Contact,
   UserSettings,
   CreateContactInput,
-  LinkedInImportResult,
   CompanyNewsResult,
   ImportResult,
 } from "./types";
@@ -36,23 +35,6 @@ async function apiFetch(
   }
   const res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
   return res;
-}
-
-// ── LinkedIn import ───────────────────────────────────────────────────────────
-
-export async function importFromLinkedIn(
-  url: string,
-  getToken: GetToken,
-): Promise<LinkedInImportResult> {
-  const res = await apiFetch("/api/linkedin/import", getToken, {
-    method: "POST",
-    body: JSON.stringify({ url }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { error?: string }).error ?? "Import failed");
-  }
-  return res.json();
 }
 
 // ── Company news ──────────────────────────────────────────────────────────────

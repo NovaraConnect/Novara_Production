@@ -35,12 +35,13 @@ Auth-gated (`requireAuth`, need `Authorization: Bearer <clerk-token>`):
 - Settings: `GET/PUT /api/settings`
 - Notifications: `GET/PUT /api/notifications/settings`, `POST/DELETE /api/notifications/subscribe`, `POST /api/notifications/test`
 - Feedback: `POST /api/feedback`
-- LinkedIn: `POST /api/linkedin/import`
 - News: `GET /api/company-news`
 
 Open (no auth): `GET /api/healthz`, `GET /api/notifications/vapid-public-key`.
 
-> The current mobile `lib/api.ts` calls `/api/linkedin/import` and `/api/company-news` with **no token** → they will 401 until auth is added. This plan fixes that.
+> The current mobile `lib/api.ts` calls `/api/company-news` with **no token** → it will 401 until auth is added. This plan fixes that.
+>
+> (An `importFromLinkedIn` client calling `POST /api/linkedin/import` used to be listed here too. That route and both of its clients were removed in PR #9.)
 
 ## 4. Packages to add
 Install with `npx expo install` (picks SDK-54-compatible versions), and add to the
@@ -106,7 +107,7 @@ Current `lib/api.ts` uses a bare `fetch` with no auth. Mirror the web app's
   (or wrap in a small `useApi()` hook that closes over `getToken`).
 - Backend already verifies these bearer tokens (`requireAuth` → Clerk `getAuth`), and the
   web app proves the exact same header works — so no backend change is needed.
-- Update `importFromLinkedIn` and `getCompanyNews` in `lib/api.ts` to use `authedFetch`.
+- Update `getCompanyNews` in `lib/api.ts` to use `authedFetch`.
 
 ## 9. Migrating existing local contacts into the authenticated backend
 The backend already has the ideal endpoint: **`POST /api/contacts/import`** accepts
@@ -133,7 +134,7 @@ prerequisites (Clerk redirect config, package install), which are flagged.
 3. **Provider + env** — wrap `app/_layout.tsx` in `ClerkProvider`; add `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` to `eas.json` profiles. *Risk: low; needs the key value.*
 4. **Auth screens + gate** — `app/(auth)/sign-in.tsx`, `sign-up.tsx`; route via `isSignedIn`. *Risk: routing edge cases (loading flicker, deep links). Test signed-out/in transitions.*
 5. **Sign-out** — button in settings; clear React Query cache. *Risk: low.*
-6. **`authedFetch`** — add to `lib/api.ts`; convert `importFromLinkedIn` + `getCompanyNews`. *Risk: low; verify 200s against a real token.*
+6. **`authedFetch`** — add to `lib/api.ts`; convert `getCompanyNews`. *Risk: low; verify 200s against a real token.*
 7. **Backend-backed data hooks** — new `useContacts`/`useProfile` that call `/api/contacts*` and `/api/settings` with `authedFetch`, replacing AsyncStorage CRUD. Keep the mobile `Contact` mapping to the API response. *Risk: HIGHEST — field-shape drift between mobile `Contact` and API DTO (e.g. base/current priority, dates as `YYYY-MM-DD` vs ISO). Add a mapping layer + typecheck.*
 8. **One-time migration** — on first authed launch, import local contacts via `/api/contacts/import`; set `novara_migrated_v1`. *Risk: double-import (mitigated by dedup + flag); seed rows (filter them).*
 9. **[external, later] Clerk redirect config** — add `novara://` to allowed redirects in the Clerk instance (only if using OAuth). *Risk: external; not needed for email/password.*

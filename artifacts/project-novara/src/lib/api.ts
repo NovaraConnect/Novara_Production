@@ -32,32 +32,6 @@ export async function apiFetch(
   });
 }
 
-// ── LinkedIn import ──────────────────────────────────────────────────────────
-
-interface LinkedInImportResult {
-  firstName?: string;
-  lastName?: string;
-  company?: string;
-  role?: string;
-  linkedinUrl?: string;
-  parsedFromSlug?: boolean;
-}
-
-export async function importFromLinkedIn(
-  getToken: GetAuthToken,
-  url: string,
-): Promise<LinkedInImportResult> {
-  const res = await apiFetch(getToken, "/api/linkedin/import", {
-    method: "POST",
-    json: { url },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { error?: string }).error ?? "Import failed");
-  }
-  return res.json();
-}
-
 // ── Company news ─────────────────────────────────────────────────────────────
 
 export interface Headline {

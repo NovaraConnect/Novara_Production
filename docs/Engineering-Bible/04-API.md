@@ -24,21 +24,6 @@ See also: `diagrams/api-sequence.mmd`, `diagrams/feedback-flow.mmd`.
   `NEON_DATABASE_URL`, not `DATABASE_URL` — this check currently validates the wrong variable name
   for the DB connection string specifically (see `15-Known-Issues.md`).
 
-## LinkedIn import
-
-### `POST /api/linkedin/import`
-- **Auth:** none (confirmed by direct reading — no `requireAuth` in `routes/linkedin.ts`)
-- **Request:** `{ url: string }` — must match `linkedin\.com\/in\//i`
-- **Response `200`:** `{ firstName?, lastName?, role?, company?, linkedinUrl, location?, parsedFromSlug: boolean }`
-- **Response `400`:** missing/invalid URL
-- **Response `422`:** page fetched but no usable data extracted (`{ error, partial }`)
-- **Response `502`:** fetch failed or timed out (10s timeout via `AbortController`)
-- **Business rule:** server-side-fetches the given LinkedIn URL with a spoofed browser
-  `User-Agent` and tries three extraction strategies in priority order: JSON-LD `Person` schema →
-  Open Graph meta tags → `<title>` tag → (if still nothing) parsing the profile URL's slug itself
-  (stripping a trailing ID-looking segment). This is a server-side fetch of an arbitrary
-  (LinkedIn-domain-restricted) URL — see `12-Security.md` for the SSRF-adjacent discussion.
-
 ## Company news
 
 ### `GET /api/company-news?company=&industry=&role=`
