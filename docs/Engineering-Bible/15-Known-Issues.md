@@ -84,15 +84,14 @@ for on-call debugging.
 
 ## 5. No app-wide rate limiting
 
-Only `POST /api/feedback` is rate-limited. See `12-Security.md`.
+Only `POST /api/feedback` and `POST /api/parse-card-text` are rate-limited. See `12-Security.md`.
 
 ## 6. One unauthenticated, unrate-limited data route
 
 `GET /api/company-news`. See `04-API.md` and `12-Security.md`.
 
-(`POST /api/linkedin/import` was the second such route; it was removed entirely in PR #9 —
-profile import is now a client-side-OCR screenshot flow, so the backend no longer fetches
-linkedin.com at all.)
+(`POST /api/linkedin/import` was the second such route; it was removed entirely in PR #9, so
+the backend no longer fetches linkedin.com at all.)
 
 ## 7. No migrations framework for three of four tables
 

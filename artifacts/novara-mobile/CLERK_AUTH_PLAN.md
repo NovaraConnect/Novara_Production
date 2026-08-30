@@ -41,7 +41,7 @@ Open (no auth): `GET /api/healthz`, `GET /api/notifications/vapid-public-key`.
 
 > The current mobile `lib/api.ts` calls `/api/company-news` with **no token** → it will 401 until auth is added. This plan fixes that.
 >
-> (An `importFromLinkedIn` client calling `POST /api/linkedin/import` used to be listed here too. That route and both of its clients were removed in PR #9 — profile import is now a client-side-OCR screenshot flow.)
+> (An `importFromLinkedIn` client calling `POST /api/linkedin/import` used to be listed here too. That route and both of its clients were removed in PR #9.)
 
 ## 4. Packages to add
 Install with `npx expo install` (picks SDK-54-compatible versions), and add to the

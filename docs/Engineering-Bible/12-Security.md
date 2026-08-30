@@ -85,11 +85,10 @@ own declared literal union from being written directly via the API.
 
 No route currently fetches a user-supplied URL. `POST /api/linkedin/import` — previously the one
 endpoint that did, and the one flagged here as most worth a focused security review — was removed
-entirely in PR #9. LinkedIn profile import is now a client-side-OCR screenshot flow: the browser
-extracts the text on-device and posts only that text, so the backend never fetches linkedin.com.
+entirely in PR #9, so the backend no longer fetches linkedin.com at all.
 
 The outbound requests the API still makes are to fixed, first-party-configured hosts (GNews for
-company news; the configured AI provider for the optional card / LinkedIn text parsers), not to
+company news; the configured AI provider for the optional business-card text parser), not to
 user-supplied URLs.
 
 ## OWASP-style summary (informal, not a formal pen-test)
