@@ -327,6 +327,51 @@ describe("realistic LinkedIn screenshot layouts", () => {
     expect(b.lastName).toBe("West");
   });
 
+  it("parses an own-profile screenshot (edit chrome, Open to work)", () => {
+    // Second real failing screenshot (names changed). The top chrome OCR'd into
+    // garbage — "I'mlooking For... Poy" and icon soup "O)) aa" — which the
+    // parser previously accepted as the name and the role.
+    const d = parseLinkedInProfile(
+      [
+        "19:31",
+        "I'mlooking For... Poy",
+        "O)) aa",
+        "Marta Ferreira Grimaldi, MBA @",
+        "UF MBA '26 | ex-Northwind | Data Driven Marketing",
+        "University of Florida",
+        "Gainesville, Florida, United States",
+        "500+ connections",
+        "Open to    Add section",
+        "Open to work · Recruiters only",
+        "Show details",
+        "Activity",
+        "784 followers",
+      ].join("\n"),
+    );
+    expect(d.firstName).toBe("Marta");
+    expect(d.lastName).toBe("Ferreira Grimaldi");
+    expect(d.company).toBe("University of Florida");
+    expect(d.notes).toContain("Location: Gainesville, Florida, United States");
+  });
+
+  it("rejects icon soup rather than putting it in a field", () => {
+    const d = parseLinkedInProfile(["O)) aa", "~ | ((", "Marta Ferreira", "Head of Growth"].join("\n"));
+    expect(d.firstName).toBe("Marta");
+    expect(d.role).toBe("Head of Growth");
+  });
+
+  it("catches UI text even when OCR runs the words together", () => {
+    const d = parseLinkedInProfile(["I'mlooking For Poy", "Marta Ferreira", "Head of Growth"].join("\n"));
+    expect(d.firstName).toBe("Marta");
+  });
+
+  it("keeps pronouns and parenthesised scope working", () => {
+    const a = parseLinkedInProfile(["Marta Ferreira (she/her)", "Head of Growth at Acme Corp"].join("\n"));
+    expect(a.firstName).toBe("Marta");
+    const b = parseLinkedInProfile(["Marta Ferreira", "Head of Growth (EMEA)"].join("\n"));
+    expect(b.role).toBe("Head of Growth (EMEA)");
+  });
+
   it("never takes the search placeholder as the name", () => {
     const d = parseLinkedInProfile(
       ["I'm looking for...", "Marta Ferreira", "Brand Partnerships"].join("\n"),

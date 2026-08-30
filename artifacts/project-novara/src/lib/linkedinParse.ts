@@ -103,11 +103,44 @@ function isActionRow(line: string): boolean {
 // Truncated UI text ("I'm looking for...", "Throughout my career, I've...") and
 // the phone's status-bar clock. Neither is profile content, and the search
 // placeholder sits directly above the name — exactly where a name is expected.
-const TRUNCATED_UI_RE = /(?:\.{2,}|…)\s*$/;
+const TRUNCATED_UI_RE = /(?:\.{2,}|…)/;
+
+// OCR frequently runs adjacent UI words together ("I'm looking for..." came back
+// as "I'mlooking For... Poy"), so whole-line equality misses them. Comparing on
+// letters-only prefixes catches the line however the spacing lands.
+const CHROME_COLLAPSED = [
+  "imlookingfor", "lookingfor", "searchfor", "opento", "opentowork",
+  "addsection", "showdetails", "createapost", "mynetwork", "notifications",
+  "seeall", "showall", "visitmywebsite", "askaboutexperience", "highlights",
+  "peopleyoumayknow", "mutualconnections", "recruitersonly", "addmoredetails",
+];
+
+function collapse(line: string): string {
+  return line.toLowerCase().replace(/[^a-zà-ÿ]/g, "");
+}
+
+/** Share of characters that are letters or spaces. Lines OCR'd from icons come
+ *  back as punctuation soup ("O)) aa") and must never reach a form field. */
+function letterRatio(line: string): number {
+  const letters = (line.match(/[\p{L}\p{M} ]/gu) ?? []).length;
+  return line.length ? letters / line.length : 0;
+}
+
+/** A line is usable content only if it reads as words: mostly letters, no
+ *  ellipsis, and at least one word of real length. Anything else is OCR noise —
+ *  and a blank field beats a garbage one, since the user reviews every draft. */
+function isReadable(line: string): boolean {
+  if (!line.trim()) return false;
+  if (TRUNCATED_UI_RE.test(line)) return false;
+  if (letterRatio(line) < 0.6) return false;
+  return line.split(/\s+/).some((w) => (w.match(/\p{L}/gu) ?? []).length >= 3);
+}
 const CLOCK_RE = /^\d{1,2}[:.]\d{2}\s*(?:am|pm)?$/i;
 
 function isChrome(lineLower: string): boolean {
   if (UI_CHROME.has(lineLower)) return true;
+  const flat = collapse(lineLower);
+  if (flat && CHROME_COLLAPSED.some((c) => flat.startsWith(c))) return true;
   if (lineLower.length <= 2) return true; // stray glyphs / nav icons
   if (isActionRow(lineLower)) return true;
   if (CLOCK_RE.test(lineLower)) return true;
@@ -123,6 +156,7 @@ const NAME_STOPWORDS = new Set(["of", "and", "the", "for", "&"]);
 function looksLikeCompanyName(s: string): boolean {
   const t = s.trim();
   if (!t || /\d{4}/.test(t) || /@/.test(t)) return false;
+  if (!isReadable(t)) return false;
   if (LOCATION_HINT_RE.test(t) || CONNECTIONS_RE.test(t)) return false;
   if (ROLE_KEYWORDS.test(t)) return false;
   const words = t.split(/\s+/);
@@ -161,6 +195,7 @@ function titleCaseWord(s: string): string {
 // name line is rejected and something else (often a button row) is taken as the
 // name instead.
 function looksLikeName(rawLine: string): boolean {
+  if (!isReadable(rawLine)) return false;
   const line = stripNameDecorations(rawLine);
   if (!line) return false;
   if (isActionRow(line)) return false;        // "Message Connect More" is not a name
@@ -185,6 +220,7 @@ function looksLikeName(rawLine: string): boolean {
  *  locations, URLs, connection counts and role-worded lines are still rejected,
  *  and at least one word must look like a capitalised name. */
 function looksLikeNameLoose(rawLine: string): boolean {
+  if (!isReadable(rawLine)) return false;
   const line = stripNameDecorations(rawLine);
   if (!line) return false;
   if (isActionRow(line)) return false;
@@ -255,7 +291,7 @@ export function parseLinkedInProfile(rawText: string): LinkedInDraft {
       // A pure location line is not a role — but a headline that happens to
       // end in a city still is, so only skip when no role wording is present.
       if (LOCATION_HINT_RE.test(l) && !ROLE_KEYWORDS.test(l)) continue;
-      if (!/[A-Za-zÀ-ÿ]{2,}/.test(l)) continue; // needs real letters, not glyphs
+      if (!isReadable(l)) continue;             // punctuation soup from icons
       headline = l;
       break;
     }
