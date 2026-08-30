@@ -177,17 +177,22 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
 
       {/* ── Done ── */}
       {status === "done" && (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-            <span className="text-sm font-medium text-foreground">
-              Fields pre-filled — review &amp; edit below
-            </span>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+            <div>
+              <span className="text-sm font-medium text-foreground">
+                Fields pre-filled below
+              </span>
+              <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
+                Scans aren't always perfect — please check every field for accuracy before saving.
+              </p>
+            </div>
           </div>
           <button
             type="button"
             onClick={reset}
-            className="text-muted-foreground hover:text-foreground p-1 rounded-md"
+            className="text-muted-foreground hover:text-foreground p-1 rounded-md shrink-0"
             aria-label="Dismiss"
           >
             <X className="w-3.5 h-3.5" />
