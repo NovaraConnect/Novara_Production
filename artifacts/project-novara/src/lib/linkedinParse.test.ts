@@ -304,6 +304,29 @@ describe("realistic LinkedIn screenshot layouts", () => {
     expect(d.notes).toContain("Location: Miami-Fort Lauderdale Area");
   });
 
+  it("strips the connection badge even when OCR mangles the digit", () => {
+    // Real OCR output for "Tatiana Fonseca ✅ · 1st" was "Tatiana Fonseca @ -'st".
+    for (const nameLine of [
+      "Tatiana Fonseca -'st",
+      "Tatiana Fonseca @ -'st",
+      "Tatiana Fonseca · 1st",
+      "Tatiana Fonseca - 2nd",
+      "Tatiana Fonseca · Ist",
+    ]) {
+      const d = parseLinkedInProfile([nameLine, "Brand Partnerships | IPSY"].join("\n"));
+      expect(d.firstName).toBe("Tatiana");
+      expect(d.lastName).toBe("Fonseca");
+    }
+  });
+
+  it("leaves real names that end in a degree-like syllable alone", () => {
+    const a = parseLinkedInProfile(["Anna Ernst", "Brand Partnerships | IPSY"].join("\n"));
+    expect(a.lastName).toBe("Ernst");
+    const b = parseLinkedInProfile(["Mary-Beth West", "Brand Partnerships | IPSY"].join("\n"));
+    expect(b.firstName).toBe("Mary-Beth"); // hyphenated parts stay capitalised
+    expect(b.lastName).toBe("West");
+  });
+
   it("never takes the search placeholder as the name", () => {
     const d = parseLinkedInProfile(
       ["I'm looking for...", "Marta Ferreira", "Brand Partnerships"].join("\n"),

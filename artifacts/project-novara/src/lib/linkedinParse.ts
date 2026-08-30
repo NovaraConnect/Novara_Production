@@ -57,8 +57,13 @@ const ACTION_WORDS = new Set([
   "open", "to", "work", "see", "all", "show", "contact", "info",
 ]);
 
-// Trailing connection-degree badge: "Priya Raman · 2nd".
-const DEGREE_BADGE_RE = /\s*[·•|]\s*(?:1st|2nd|3rd)\b.*$/i;
+// Trailing connection-degree badge: "Priya Raman · 2nd". OCR frequently loses
+// or garbles the digit — real output has included "-'st" and "· Ist" — so the
+// digit is optional and stray quote marks are tolerated. A separator is still
+// required, which is what keeps real names ending in "st" (Ernst, West) and
+// hyphenated names (Mary-Beth) intact.
+const DEGREE_BADGE_RE =
+  /\s*[·•|\-–—]\s*['’"`]?\s*[\dIl]{0,2}\s*['’"`]?\s*(?:st|nd|rd|th)\b.*$/i;
 // Pronouns shown next to the name: "Priya Raman (she/her)".
 const PRONOUN_RE = /\s*\((?:he|she|they|him|her|them)[^)]*\)/gi;
 // "Dr. Priya Raman" / "Prof Priya Raman".
@@ -143,7 +148,11 @@ const NAME_PARTICLES = new Set(["de", "del", "da", "di", "van", "von", "der", "l
 function titleCaseWord(s: string): string {
   const lower = s.toLowerCase();
   if (NAME_PARTICLES.has(lower)) return lower; // "de la Cruz", not "De La Cruz"
-  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  // Capitalise each hyphenated part: "Mary-Beth", not "Mary-beth".
+  return lower
+    .split("-")
+    .map((part) => (part ? part.charAt(0).toUpperCase() + part.slice(1) : part))
+    .join("-");
 }
 
 // 2–4 capitalized words, no digits/@, and not a job-title line. Decorations
