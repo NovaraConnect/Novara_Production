@@ -52,15 +52,6 @@ export type FollowUpCadenceDays = 14 | 30 | 60 | 90;
 
 // ── API response shapes ───────────────────────────────────────────────────────
 
-export interface LinkedInImportResult {
-  firstName?: string;
-  lastName?: string;
-  company?: string;
-  role?: string;
-  linkedinUrl?: string;
-  parsedFromSlug?: boolean;
-}
-
 export interface Headline {
   title: string;
   source: string;
