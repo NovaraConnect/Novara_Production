@@ -37,3 +37,25 @@ here are placeholders — real values live only in Render.
 ```bash
 npx web-push generate-vapid-keys
 ```
+
+## Optional — Business-card AI text parser (`novara-prod-api`)
+
+All optional. If unset, the app works exactly as before (deterministic
+business-card parsing only); the backend still starts and the endpoint returns
+a graceful `{ ok:false, reason:"ai_disabled" }`.
+
+| Variable | Value | Notes |
+|---|---|---|
+| `CARD_AI_PARSE` | `on` | Enables `POST /api/parse-card-text`. Off/unset ⇒ feature disabled. |
+| `CARD_AI_PROVIDER` | `anthropic` \| `gemini` | **REQUIRED** when `CARD_AI_PARSE=on`. Must be set **explicitly** — there is **no auto-default and no cross-provider fallback**. Unset/invalid ⇒ feature disabled. |
+| `ANTHROPIC_API_KEY` | `sk-ant-…` | Provider credential (Cloe sets it). No training on API inputs. |
+| `GEMINI_API_KEY` | `…` | Provider credential (Cloe sets it). **Must be a paid / no-training setup.** |
+| `CARD_AI_ANTHROPIC_MODEL` | `claude-haiku-4-5` | Optional model override. |
+| `GEMINI_MODEL` | `gemini-3.6-flash` | Optional model override. |
+
+> ⚠️ **Privacy:** business-card OCR text can include names, emails, phones,
+> addresses. The image is **never** sent — OCR runs on the device and only the
+> text is posted. **Do NOT use the Gemini *free* tier** for real card text (it
+> trains on submitted content). Use **Anthropic** or a **paid / no-training
+> Gemini** project where submitted content is not used to improve Google
+> products. The endpoint never logs the OCR text or parsed fields.

@@ -141,6 +141,13 @@ export default function AddContact() {
     if (data.role) form.setValue("role", data.role, opts);
     if (data.email) form.setValue("email", data.email, opts);
     if (data.phone) form.setValue("phone", data.phone, opts);
+    // Website (only ever set by the optional AI parser) → append to notes,
+    // without clobbering anything already typed.
+    if (data.website) {
+      const existing = (form.getValues("notes") ?? "").trim();
+      const line = `Website: ${data.website}`;
+      form.setValue("notes", existing ? `${existing}\n${line}` : line, opts);
+    }
     setImportanceSuggestionDismissed(false);
     setImportanceOverridden(false);
     setInitialOverridden(false);
