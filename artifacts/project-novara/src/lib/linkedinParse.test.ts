@@ -225,4 +225,32 @@ describe("realistic LinkedIn screenshot layouts", () => {
     );
     expect(d.role).toBeUndefined();
   });
+
+  it("survives OCR reading the '·' separator as '.' or '-'", () => {
+    // What tesseract actually returns for a real screenshot: the middot is
+    // rendered as a period or hyphen, so every "·" rule has to see it anyway.
+    const d = parseLinkedInProfile(
+      [
+        "Priya Raman . 2nd",
+        "Head of Growth at Northwind Labs",
+        "Austin, Texas, United States . Contact info",
+        "2,431 followers . 500+ connections",
+        "Message    Connect    More",
+        "Experience",
+        "Northwind Labs - Full-time",
+      ].join("\n"),
+    );
+    expect(d.firstName).toBe("Priya");
+    expect(d.lastName).toBe("Raman");
+    expect(d.role).toBe("Head of Growth");
+    expect(d.company).toBe("Northwind Labs");
+    expect(d.notes).toContain("Location: Austin, Texas, United States");
+  });
+
+  it("leaves an abbreviation's period alone (no space before it)", () => {
+    const d = parseLinkedInProfile(
+      ["Priya Raman", "Head of Growth", "Northwind Labs Inc."].join("\n"),
+    );
+    expect(d.company).toBe("Northwind Labs Inc.");
+  });
 });

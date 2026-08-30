@@ -151,7 +151,15 @@ function looksLikeName(rawLine: string): boolean {
 
 export function parseLinkedInProfile(rawText: string): LinkedInDraft {
   const draft: LinkedInDraft = {};
-  const text = (rawText ?? "").replace(/\r/g, "\n").replace(/[ \t]+/g, " ");
+  // OCR rarely reproduces LinkedIn's "·" separator faithfully — it comes back as
+  // ".", "-", "–" or "•" depending on the screenshot. Normalise any standalone
+  // separator (one surrounded by spaces) to "·" so the rules below see a
+  // consistent shape. Spacing is what makes this safe: "Inc." and "St. Jude"
+  // have no space before the dot and are left alone.
+  const text = (rawText ?? "")
+    .replace(/\r/g, "\n")
+    .replace(/[ \t]+/g, " ")
+    .replace(/ [.\-–—•*] /g, " · ");
   const allLines = text.split("\n").map((l) => l.trim()).filter(Boolean);
 
   // 1) LinkedIn URL — only if visibly present.
