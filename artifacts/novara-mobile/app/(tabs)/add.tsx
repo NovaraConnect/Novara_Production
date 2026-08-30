@@ -8,7 +8,6 @@ import {
   ScrollView,
   Alert,
   Platform,
-  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,7 +18,6 @@ import { useContacts } from "@/hooks/useContacts";
 import { useProfile } from "@/hooks/useProfile";
 import { Contact } from "@/types/contact";
 import { suggestInitialFollowUp, suggestFollowUpDays, suggestImportance } from "@/lib/utils";
-import { importFromLinkedIn } from "@/lib/api";
 
 const IMPORTANCE_OPTIONS: Contact["importance"][] = ["High", "Medium", "Low"];
 const INITIAL_OPTIONS: Contact["initialFollowUpDays"][] = [1, 2, 3, 5, 7, 14];
@@ -57,13 +55,9 @@ export default function AddContact() {
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [importUrl, setImportUrl] = useState("");
-  const [importing, setImporting] = useState(false);
-  const [importStatus, setImportStatus] = useState<"idle" | "success" | "error">("idle");
 
   const topPaddingWeb = Platform.OS === "web" ? 67 : 0;
 
-  const isLinkedInUrl = (v: string) => /linkedin\.com\/in\//i.test(v);
 
   const [importanceSuggestion, setImportanceSuggestion] = useState<{ importance: "High" | "Medium" | "Low"; reason: string } | null>(null);
   const [importanceSuggestionDismissed, setImportanceSuggestionDismissed] = useState(false);
@@ -101,29 +95,6 @@ export default function AddContact() {
     setSelectedGoalTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
-  };
-
-  const handleLinkedInImport = async () => {
-    if (!importUrl.trim() || importing) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setImporting(true);
-    setImportStatus("idle");
-    try {
-      const data = await importFromLinkedIn(importUrl.trim());
-      if (data.firstName) setFirstName(data.firstName);
-      if (data.lastName) setLastName(data.lastName);
-      if (data.role) setRole(data.role);
-      if (data.company) setCompany(data.company);
-      if (data.linkedinUrl) setLinkedinUrl(data.linkedinUrl);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setImportStatus("success");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Could not import profile.";
-      setImportStatus("error");
-      Alert.alert("LinkedIn Import", msg + "\n\nYou can still fill in the details manually.");
-    } finally {
-      setImporting(false);
-    }
   };
 
   const validate = () => {
@@ -220,56 +191,6 @@ export default function AddContact() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]}
       >
-        {/* LinkedIn Import */}
-        <Text style={[styles.groupLabel, { color: colors.mutedForeground, marginTop: 4 }]}>IMPORT FROM LINKEDIN</Text>
-        <View
-          style={[
-            styles.linkedinBox,
-            {
-              backgroundColor: colors.card,
-              borderColor: importStatus === "success" ? colors.warm + "60" : importStatus === "error" ? colors.destructive + "40" : colors.border,
-            },
-          ]}
-        >
-          <Ionicons name="logo-linkedin" size={18} color="#0077B5" style={{ marginTop: 1 }} />
-          <TextInput
-            value={importUrl}
-            onChangeText={(v) => { setImportUrl(v); setImportStatus("idle"); }}
-            placeholder="linkedin.com/in/username"
-            placeholderTextColor={colors.mutedForeground}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            style={[styles.linkedinInput, { color: colors.foreground, fontFamily: "PlusJakartaSans_400Regular" }]}
-          />
-          {importing ? (
-            <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 4 }} />
-          ) : isLinkedInUrl(importUrl) ? (
-            <Pressable
-              onPress={handleLinkedInImport}
-              style={({ pressed }) => [
-                styles.linkedinBtn,
-                { backgroundColor: pressed ? colors.primary + "cc" : colors.primary },
-              ]}
-            >
-              <Text style={[styles.linkedinBtnText, { color: colors.primaryForeground }]}>Import</Text>
-            </Pressable>
-          ) : null}
-        </View>
-        {importStatus === "success" && (
-          <View style={styles.importStatusRow}>
-            <Ionicons name="checkmark-circle" size={14} color={colors.warm} />
-            <Text style={[styles.importStatusText, { color: colors.warmText }]}>
-              Profile imported — review and save below
-            </Text>
-          </View>
-        )}
-        {importStatus === "idle" && !isLinkedInUrl(importUrl) && (
-          <Text style={[styles.importHint, { color: colors.mutedForeground }]}>
-            Paste a profile URL to auto-fill name, role & company. Results may vary.
-          </Text>
-        )}
-
         <Text style={[styles.groupLabel, { color: colors.mutedForeground }]}>CONTACT TYPE</Text>
         <View style={[styles.typeRow, { backgroundColor: colors.muted, borderRadius: 14, padding: 3 }]}>
           {(["connected", "pipeline"] as const).map((opt) => {
@@ -586,12 +507,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  linkedinInput: { flex: 1, fontSize: 14, padding: 0 },
-  linkedinBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8 },
-  linkedinBtnText: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold" },
-  importStatusRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
-  importStatusText: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular" },
-  importHint: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", marginTop: 4, lineHeight: 17 },
   suggestionBanner: {
     flexDirection: "row",
     alignItems: "flex-start",
