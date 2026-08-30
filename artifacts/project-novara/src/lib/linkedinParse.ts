@@ -27,6 +27,9 @@ const UI_CHROME = new Set([
   "contact info", "activity", "experience", "education", "skills", "about",
   "connections", "mutual connections", "open to", "open to work", "see all",
   "show all", "view profile", "people you may know", "suggested", "highlights",
+  "i'm looking for", "im looking for", "looking for", "add more details",
+  "ask about experience", "mutual connections", "save contact", "featured",
+  "recommendations", "interests", "licenses and certifications", "projects",
 ]);
 
 const ROLE_KEYWORDS =
@@ -39,7 +42,7 @@ const LINKEDIN_URL_RE =
   /(?:https?:\/\/)?(?:[a-z]{2,3}\.)?linkedin\.com\/in\/[A-Za-z0-9\-_%]+/i;
 
 const CONNECTIONS_RE =
-  /\b\d[\d,]*\+?\s+(?:connections?|followers?)\b|\bcontact info\b/i;
+  /\b\d[\d,]*\+?\s+(?:connections?|followers?)\b|\bcontact info\b|\bmutual connections?\b|\b\d+\s+other\b/i;
 
 // A location-ish line: "City, Region[, Country]" or "Greater X …" / "… Area".
 const LOCATION_HINT_RE = /,\s*[A-Z][a-z]+|\bGreater\s+[A-Z]|\bArea\b/;
@@ -92,10 +95,18 @@ function isActionRow(line: string): boolean {
   return t.every((w) => ACTION_WORDS.has(w));
 }
 
+// Truncated UI text ("I'm looking for...", "Throughout my career, I've...") and
+// the phone's status-bar clock. Neither is profile content, and the search
+// placeholder sits directly above the name — exactly where a name is expected.
+const TRUNCATED_UI_RE = /(?:\.{2,}|…)\s*$/;
+const CLOCK_RE = /^\d{1,2}[:.]\d{2}\s*(?:am|pm)?$/i;
+
 function isChrome(lineLower: string): boolean {
   if (UI_CHROME.has(lineLower)) return true;
   if (lineLower.length <= 2) return true; // stray glyphs / nav icons
   if (isActionRow(lineLower)) return true;
+  if (CLOCK_RE.test(lineLower)) return true;
+  if (TRUNCATED_UI_RE.test(lineLower)) return true;
   return false;
 }
 
@@ -172,10 +183,18 @@ function looksLikeNameLoose(rawLine: string): boolean {
   if (CONNECTIONS_RE.test(line) || LINKEDIN_URL_RE.test(line)) return false;
   if (/\d/.test(line) || /@/.test(line)) return false;
   if (ROLE_KEYWORDS.test(line)) return false;
+  if (TRUNCATED_UI_RE.test(line)) return false;
   const words = line.split(/\s+/);
   if (words.length < 2 || words.length > 5) return false;
   if (!words.every((w) => /^[\p{L}\p{M}.'’-]+$/u.test(w))) return false;
-  return words.some((w) => /^[A-ZÀ-Þ]/.test(w));
+  // The first word must be capitalised, and at most one word may not be — that
+  // covers OCR damage ("PRIYA raman") without swallowing prose like
+  // "I'm looking for" or "You both worked".
+  if (!/^[A-ZÀ-Þ]/.test(words[0])) return false;
+  const uncapitalised = words.filter(
+    (w) => !/^[A-ZÀ-Þ]/.test(w) && !NAME_PARTICLES.has(w.toLowerCase()),
+  ).length;
+  return uncapitalised <= 1;
 }
 
 export function parseLinkedInProfile(rawText: string): LinkedInDraft {

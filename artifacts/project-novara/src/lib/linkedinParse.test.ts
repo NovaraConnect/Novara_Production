@@ -275,6 +275,48 @@ describe("realistic LinkedIn screenshot layouts", () => {
     expect(d.role).toBe("Head of Growth");
   });
 
+  it("parses a full mobile profile screenshot, chrome and all", () => {
+    // Structure taken from a real failing screenshot (names changed): status-bar
+    // clock, search placeholder, verified badge + degree, a headline that wraps,
+    // an employer line with the school after the separator, then the location,
+    // connection count and mutual-connections row.
+    const d = parseLinkedInProfile(
+      [
+        "18:53",
+        "I'm looking for...",
+        "Marta Ferreira @ - 1st",
+        "Brand Partnerships | ACMEBOX | ex-Northwind | Beauty,",
+        "Wellness & Consumer Brand Growth",
+        "ACMEBOX - Miami International University of Art and Design",
+        "Miami-Fort Lauderdale Area",
+        "500+ connections",
+        "Natalia Sofia, Riccardo and 65 other mutual",
+        "connections",
+        "Message",
+        "Highlights",
+        "You both worked at Northwind",
+      ].join("\n"),
+    );
+    expect(d.firstName).toBe("Marta");
+    expect(d.lastName).toBe("Ferreira");
+    expect(d.role).toBe("Brand Partnerships");
+    expect(d.company).toBe("ACMEBOX");
+    expect(d.notes).toContain("Location: Miami-Fort Lauderdale Area");
+  });
+
+  it("never takes the search placeholder as the name", () => {
+    const d = parseLinkedInProfile(
+      ["I'm looking for...", "Marta Ferreira", "Brand Partnerships"].join("\n"),
+    );
+    expect(d.firstName).toBe("Marta");
+    expect(d.lastName).toBe("Ferreira");
+  });
+
+  it("ignores the status-bar clock", () => {
+    const d = parseLinkedInProfile(["9:41", "18:53", "Marta Ferreira", "Head of Growth"].join("\n"));
+    expect(d.firstName).toBe("Marta");
+  });
+
   it("leaves an abbreviation's period alone (no space before it)", () => {
     const d = parseLinkedInProfile(
       ["Priya Raman", "Head of Growth", "Northwind Labs Inc."].join("\n"),
