@@ -6,6 +6,7 @@
 import { Router, type Request, type Response } from "express";
 import { isAiEnrichEnabled } from "../lib/enrich";
 import { isCardAiParseEnabled } from "../lib/cardAiParse";
+import { isLinkedInAiParseEnabled } from "../lib/linkedinAiParse";
 
 const router = Router();
 
@@ -14,6 +15,7 @@ router.get("/features", (_req: Request, res: Response) => {
   res.json({
     aiEnrich: isAiEnrichEnabled(),
     cardAiParse: isCardAiParseEnabled(),
+    linkedinAiParse: isLinkedInAiParseEnabled(),
   });
 });
 

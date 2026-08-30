@@ -4,6 +4,10 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { MAX_FILE_BYTES, recognizeImageText } from "@/lib/imageOcr";
 import { parseLinkedInProfile, hasUsableFields, type LinkedInDraft } from "@/lib/linkedinParse";
+import { mergeLinkedInResult } from "@/lib/linkedinMerge";
+import { useFeatures } from "@/hooks/useFeatures";
+import { useAuth } from "@clerk/react";
+import { apiFetch } from "@/lib/api";
 
 interface LinkedInScreenshotImportProps {
   onExtracted: (data: LinkedInDraft) => void;
@@ -18,6 +22,33 @@ type Status = "idle" | "processing" | "done" | "error";
 export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImportProps) {
   const [status, setStatus] = useState<Status>("idle");
   const libraryRef = useRef<HTMLInputElement>(null);
+  const { linkedinAiParse } = useFeatures();
+  const { getToken } = useAuth();
+
+  // Optional: refine the deterministic parse with the AI text parser. Sends the
+  // OCR TEXT ONLY (never the screenshot), and falls back to `deterministic` on
+  // any disable/miss/slow/error. Best-effort — never throws.
+  const refineWithAi = async (text: string, deterministic: LinkedInDraft): Promise<LinkedInDraft> => {
+    if (!linkedinAiParse) return deterministic;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 7000);
+      const res = await apiFetch(getToken, "/api/parse-linkedin-text", {
+        method: "POST",
+        json: { text },
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) return deterministic;
+      const data = await res.json();
+      if (data?.ok && data.fields) {
+        return mergeLinkedInResult(deterministic, { fields: data.fields, confidence: data.confidence });
+      }
+      return deterministic;
+    } catch {
+      return deterministic;
+    }
+  };
 
   const processFile = async (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -46,8 +77,10 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
         return;
       }
 
+      const finalDraft = await refineWithAi(text, draft);
+
       setStatus("done");
-      onExtracted(draft);
+      onExtracted(finalDraft);
       toast.success("Draft prefilled — review and edit the fields below.");
     } catch (err) {
       // Logs the OCR/runtime error only — never the image or the extracted text.
@@ -88,17 +121,22 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
 
       {/* ── Done ── */}
       {status === "done" && (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-            <span className="text-sm font-medium text-foreground">
-              Draft prefilled — review &amp; edit below
-            </span>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+            <div>
+              <span className="text-sm font-medium text-foreground">
+                Draft prefilled below
+              </span>
+              <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
+                Screenshot reading isn't always perfect — please check every field for accuracy before saving.
+              </p>
+            </div>
           </div>
           <button
             type="button"
             onClick={reset}
-            className="text-muted-foreground hover:text-foreground p-1 rounded-md"
+            className="text-muted-foreground hover:text-foreground p-1 rounded-md shrink-0"
             aria-label="Dismiss"
           >
             <X className="w-3.5 h-3.5" />

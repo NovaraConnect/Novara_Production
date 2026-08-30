@@ -19,5 +19,6 @@ export function useFeatures() {
   return {
     aiEnrich: data?.aiEnrich ?? false,
     cardAiParse: data?.cardAiParse ?? false,
+    linkedinAiParse: data?.linkedinAiParse ?? false,
   };
 }
