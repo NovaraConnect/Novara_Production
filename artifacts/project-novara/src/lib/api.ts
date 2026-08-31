@@ -185,6 +185,10 @@ export interface Features {
   aiEnrich: boolean;
   /** Whether optional AI business-card text parsing is available. */
   cardAiParse: boolean;
+  /** Whether optional AI LinkedIn-screenshot text parsing is available. */
+  linkedinAiParse: boolean;
+  /** Whether the LinkedIn screenshot importer is shown at all. */
+  linkedinScreenshotImport: boolean;
 }
 
 /** Non-secret capability flags. Defaults everything off if the call fails, so
@@ -192,11 +196,17 @@ export interface Features {
 export async function fetchFeatures(getToken: GetAuthToken): Promise<Features> {
   try {
     const res = await apiFetch(getToken, "/api/features");
-    if (!res.ok) return { aiEnrich: false, cardAiParse: false };
+    if (!res.ok)
+      return { aiEnrich: false, cardAiParse: false, linkedinAiParse: false, linkedinScreenshotImport: false };
     const data = await res.json();
-    return { aiEnrich: !!data?.aiEnrich, cardAiParse: !!data?.cardAiParse };
+    return {
+      aiEnrich: !!data?.aiEnrich,
+      cardAiParse: !!data?.cardAiParse,
+      linkedinAiParse: !!data?.linkedinAiParse,
+      linkedinScreenshotImport: !!data?.linkedinScreenshotImport,
+    };
   } catch {
-    return { aiEnrich: false, cardAiParse: false };
+    return { aiEnrich: false, cardAiParse: false, linkedinAiParse: false, linkedinScreenshotImport: false };
   }
 }
 

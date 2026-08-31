@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { useContacts } from "@/hooks/useContacts";
 import { useSettings } from "@/hooks/useSettings";
@@ -16,7 +16,16 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { toast } from "sonner";
 import { suggestPriority, suggestInitialFollowUp, deriveSuggestedCadence, MANUAL_CADENCE_OPTIONS, isPriorityLevel } from "@/lib/suggest";
 import { BusinessCardScanner, type ScannedContact } from "@/components/BusinessCardScanner";
+import { LinkedInScreenshotImport } from "@/components/LinkedInScreenshotImport";
+import type { LinkedInDraft } from "@/lib/linkedinParse";
+import {
+  planLinkedInImport,
+  LINKEDIN_IMPORT_FIELDS,
+  type AppliedImport,
+  type FormSnapshot,
+} from "@/lib/linkedinImportDraft";
 import { QRScanner, type ScannedQRContact } from "@/components/QRScanner";
+import { useFeatures } from "@/hooks/useFeatures";
 
 const INITIAL_OPTIONS: Contact["initialFollowUpDays"][] = [1, 2, 3];
 const CADENCE_OPTIONS: Contact["followUpCadenceDays"][] = [...MANUAL_CADENCE_OPTIONS];
@@ -152,6 +161,38 @@ export default function AddContact() {
     setCadenceOverridden(false);
   }, [form]);
 
+
+
+  // Deployment-level switch for showing the LinkedIn screenshot importer.
+  const { linkedinScreenshotImport } = useFeatures();
+
+  // Tracks what the last LinkedIn import wrote, so a second import can withdraw
+  // it instead of leaving the previous profile's values behind.
+  const lastLinkedInImport = useRef<AppliedImport>({});
+
+  const handleLinkedInExtracted = useCallback((data: LinkedInDraft) => {
+    const opts = { shouldDirty: true, shouldTouch: true } as const;
+
+    const snapshot = {
+      notes: form.getValues("notes") ?? "",
+    } as FormSnapshot;
+    for (const field of LINKEDIN_IMPORT_FIELDS) {
+      snapshot[field] = form.getValues(field) ?? "";
+    }
+
+    const { updates, applied } = planLinkedInImport(snapshot, lastLinkedInImport.current, data);
+    for (const [field, value] of Object.entries(updates)) {
+      form.setValue(field as keyof FormSnapshot, value, opts);
+    }
+    lastLinkedInImport.current = applied;
+
+    // Never sets email/phone — a LinkedIn screenshot doesn't fill those.
+    setImportanceSuggestionDismissed(false);
+    setImportanceOverridden(false);
+    setInitialOverridden(false);
+    setCadenceOverridden(false);
+  }, [form]);
+
   const addInterest = () => {
     const trimmed = interestInput.trim();
     if (!trimmed || interests.includes(trimmed)) return;
@@ -224,6 +265,13 @@ export default function AddContact() {
             {/* Business Card Scanner */}
             <BusinessCardScanner onExtracted={handleCardScanned} />
             <p className="text-xs text-muted-foreground text-center -mt-4 mb-2">For best results — good lighting, card fills the frame, avoid glare. First scan might take 5–15 seconds</p>
+
+            {/* LinkedIn Screenshot Import — hidden unless the deployment enables
+                LINKEDIN_SCREENSHOT_IMPORT, so it can be switched off without a
+                deploy. */}
+            {linkedinScreenshotImport && (
+              <LinkedInScreenshotImport onExtracted={handleLinkedInExtracted} />
+            )}
 
             {/* QR Code Scanner */}
             <div className="mb-6">
