@@ -20,5 +20,6 @@ export function useFeatures() {
     aiEnrich: data?.aiEnrich ?? false,
     cardAiParse: data?.cardAiParse ?? false,
     linkedinAiParse: data?.linkedinAiParse ?? false,
+    linkedinScreenshotImport: data?.linkedinScreenshotImport ?? false,
   };
 }

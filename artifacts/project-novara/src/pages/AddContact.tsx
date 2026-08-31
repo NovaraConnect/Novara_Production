@@ -25,6 +25,7 @@ import {
   type FormSnapshot,
 } from "@/lib/linkedinImportDraft";
 import { QRScanner, type ScannedQRContact } from "@/components/QRScanner";
+import { useFeatures } from "@/hooks/useFeatures";
 
 const INITIAL_OPTIONS: Contact["initialFollowUpDays"][] = [1, 2, 3];
 const CADENCE_OPTIONS: Contact["followUpCadenceDays"][] = [...MANUAL_CADENCE_OPTIONS];
@@ -160,6 +161,11 @@ export default function AddContact() {
     setCadenceOverridden(false);
   }, [form]);
 
+
+
+  // Deployment-level switch for showing the LinkedIn screenshot importer.
+  const { linkedinScreenshotImport } = useFeatures();
+
   // Tracks what the last LinkedIn import wrote, so a second import can withdraw
   // it instead of leaving the previous profile's values behind.
   const lastLinkedInImport = useRef<AppliedImport>({});
@@ -260,8 +266,12 @@ export default function AddContact() {
             <BusinessCardScanner onExtracted={handleCardScanned} />
             <p className="text-xs text-muted-foreground text-center -mt-4 mb-2">For best results — good lighting, card fills the frame, avoid glare. First scan might take 5–15 seconds</p>
 
-            {/* LinkedIn Screenshot Import */}
-            <LinkedInScreenshotImport onExtracted={handleLinkedInExtracted} />
+            {/* LinkedIn Screenshot Import — hidden unless the deployment enables
+                LINKEDIN_SCREENSHOT_IMPORT, so it can be switched off without a
+                deploy. */}
+            {linkedinScreenshotImport && (
+              <LinkedInScreenshotImport onExtracted={handleLinkedInExtracted} />
+            )}
 
             {/* QR Code Scanner */}
             <div className="mb-6">
