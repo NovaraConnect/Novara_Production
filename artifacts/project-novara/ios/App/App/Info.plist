@@ -22,6 +22,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Novara uses the camera so you can scan business cards and prefill contact details.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Novara lets you choose screenshots or business card images from your photo library to prefill contact details.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
