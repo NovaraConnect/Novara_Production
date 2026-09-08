@@ -14,15 +14,22 @@ Xcode, and what has to happen in accounts only Cloe controls.
 | Path | Purpose |
 |---|---|
 | `artifacts/project-novara/capacitor.config.ts` | Shell config, incl. the remote/bundled mode switch |
-| `artifacts/project-novara/package.json` | `@capacitor/{cli,core,ios}` devDeps + `ios:*` scripts |
 | `.gitignore` | Excludes iOS build output and per-developer Xcode state |
 
 **Not in the repo yet:** the generated `ios/` native project. It is created by
 `cap add ios`, which needs Xcode and CocoaPods — see step 2.
 
-The Capacitor packages are **devDependencies**. They are installed during the
-`novara-prod-web` build (Render runs a workspace-wide `pnpm install`) but none
-of their code enters the browser bundle.
+**Capacitor is deliberately not a repo dependency.** `novara-prod-web` runs
+`pnpm install --frozen-lockfile` on every deploy, and there is no reason for the
+production web build to install — or be able to fail on — packages it never
+uses. The CLI is invoked on demand with `pnpm dlx @capacitor/cli@7.4.4`, which
+downloads it into a temporary store and leaves `package.json` and
+`pnpm-lock.yaml` untouched.
+
+When `ios/` is generated and committed, revisit this: at that point pinning
+`@capacitor/{cli,core,ios}` in `package.json` may be worth the install cost, so
+that native and JS versions can't drift. Until then, the pinned `@7.4.4` in the
+commands below is the version contract.
 
 ---
 
@@ -92,9 +99,10 @@ VITE_API_BASE_URL=https://api.novaraconnect.group \
 VITE_CLERK_PUBLISHABLE_KEY=<the pk_live key already used by novara-prod-web> \
   pnpm run build
 
-pnpm run ios:add     # generates ios/ — commit this directory
-pnpm run ios:sync    # copies web assets + native config into ios/
-pnpm run ios:open    # opens Xcode
+# Capacitor CLI is run on demand — nothing is added to package.json.
+pnpm dlx @capacitor/cli@7.4.4 add ios     # generates ios/ — commit this directory
+pnpm dlx @capacitor/cli@7.4.4 sync ios    # copies web assets + native config
+pnpm dlx @capacitor/cli@7.4.4 open ios    # opens Xcode
 ```
 
 `VITE_*` values are baked in at build time. They are the same non-secret values
@@ -153,9 +161,11 @@ to the backend.
 Nothing here is deployed, so rollback is repo-only:
 
 - **Before merge:** close the PR.
-- **After merge:** revert it. The only production-visible artifact is
-  `pnpm-lock.yaml`; reverting restores the previous lockfile and the next
-  `novara-prod-web` deploy builds exactly as it does today.
+- **After merge:** revert it. Nothing in this change reaches the production web
+  build: `package.json` and `pnpm-lock.yaml` are untouched, so installs are
+  byte-identical and the built bundle is unchanged. Merging still triggers a
+  `novara-prod-web` deploy (Auto-Deploy fires on any push to `main`), but that
+  deploy produces the same output as the one before it.
 - The shell has no effect on the running web app in either mode. Pulling a
   TestFlight build does not touch production.
 - If a released iOS build misbehaves in `remote` mode, the web fix deploys

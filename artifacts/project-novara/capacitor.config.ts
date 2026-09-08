@@ -4,6 +4,14 @@
 // The web app is the source of truth. This shell exists to put Novara on
 // TestFlight and the App Store; it adds no product logic of its own.
 //
+// This file is read ONLY by the Capacitor CLI, which is run on demand via
+// `pnpm dlx @capacitor/cli@7.4.4` (see docs/production/IOS_TESTFLIGHT.md).
+// Capacitor is deliberately NOT a repo dependency: novara-prod-web runs
+// `pnpm install --frozen-lockfile` on every deploy, and there is no reason for
+// the production web build to install packages it never uses. The CLI's own
+// `CapacitorConfig` type is therefore not imported — the shape below is what
+// the CLI expects, and it validates the file when it loads it.
+//
 // TWO MODES, switched by NOVARA_IOS_MODE at `cap sync` time:
 //
 //   remote (default) — the shell loads https://app.novaraconnect.group.
@@ -21,16 +29,14 @@
 //     accept the native origin before sign-in will work. See
 //     docs/production/IOS_TESTFLIGHT.md before switching.
 //
-// Nothing here changes the deployed web app; this file is only read by the
-// Capacitor CLI on a Mac with Xcode.
+// Nothing here changes the deployed web app.
 // ============================================================================
-import type { CapacitorConfig } from "@capacitor/cli";
 
 const mode = process.env["NOVARA_IOS_MODE"] === "bundled" ? "bundled" : "remote";
 
 const PRODUCTION_WEB_URL = "https://app.novaraconnect.group";
 
-const config: CapacitorConfig = {
+const config = {
   appId: "group.novaraconnect.app",
   appName: "Novara",
   // Where `cap sync` copies web assets from. Populated by `pnpm run build`.
@@ -41,16 +47,17 @@ const config: CapacitorConfig = {
     // Matches the app's own background so launch doesn't flash white.
     backgroundColor: "#f9f9f7",
     // Let the web app own the safe-area insets, as it already does for PWA.
-    contentInset: "never",
+    contentInset: "never" as const,
   },
-  server:
-    mode === "remote"
-      ? {
+  ...(mode === "remote"
+    ? {
+        server: {
           url: PRODUCTION_WEB_URL,
           // No cleartext: production is HTTPS only.
           cleartext: false,
-        }
-      : undefined,
+        },
+      }
+    : {}),
 };
 
 export default config;
