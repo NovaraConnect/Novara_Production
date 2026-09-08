@@ -14,22 +14,32 @@ Xcode, and what has to happen in accounts only Cloe controls.
 | Path | Purpose |
 |---|---|
 | `artifacts/project-novara/capacitor.config.ts` | Shell config, incl. the remote/bundled mode switch |
-| `.gitignore` | Excludes iOS build output and per-developer Xcode state |
+| `artifacts/project-novara/ios/` | The generated native Xcode project |
+| `artifacts/project-novara/package.json` | `@capacitor/{cli,core,ios}` pinned at 7.4.4 |
 
-**Not in the repo yet:** the generated `ios/` native project. It is created by
-`cap add ios`, which needs Xcode and CocoaPods — see step 2.
+**Why Capacitor is a repo dependency.** An earlier version of this document told
+you to run the CLI on demand with `pnpm dlx @capacitor/cli@7.4.4`, to keep the
+packages out of the production web install. That does not work: `cap add ios`
+resolves the native platform from the project's own `node_modules/@capacitor/ios`
+and fails with *"Could not find the ios platform"* when the CLI is running from a
+temporary dlx store. `cap sync` has the same requirement. The packages are
+therefore pinned as devDependencies.
 
-**Capacitor is deliberately not a repo dependency.** `novara-prod-web` runs
-`pnpm install --frozen-lockfile` on every deploy, and there is no reason for the
-production web build to install — or be able to fail on — packages it never
-uses. The CLI is invoked on demand with `pnpm dlx @capacitor/cli@7.4.4`, which
-downloads it into a temporary store and leaves `package.json` and
-`pnpm-lock.yaml` untouched.
+Consequence to be aware of: `novara-prod-web` runs `pnpm install
+--frozen-lockfile` on every deploy, so these three packages are installed on
+every production web build. None of their code enters the browser bundle — it
+costs install time, not bundle size.
 
-When `ios/` is generated and committed, revisit this: at that point pinning
-`@capacitor/{cli,core,ios}` in `package.json` may be worth the install cost, so
-that native and JS versions can't drift. Until then, the pinned `@7.4.4` in the
-commands below is the version contract.
+**Invoke the CLI through the local binary**, not `pnpm exec` / `pnpm run`:
+
+```bash
+./node_modules/.bin/cap <command>
+```
+
+pnpm's wrappers run a dependency-status check that re-runs `pnpm install`, which
+trips this repo's `ERR_PNPM_IGNORED_BUILDS` gate (the same gate the Render build
+commands work around with `pnpm approve-builds --all`). The binary directly does
+not.
 
 ---
 
@@ -82,32 +92,55 @@ release, once the Clerk origin question is answered.
 4. **Signing** — Xcode's automatic signing is sufficient; it will create the
    development and distribution certificates on first build.
 
-## Step 2 — Generate the native project (Mac with Xcode)
+## Step 2 — Build the web app and sync the native project
 
-Requires **Xcode** (with command line tools) and **CocoaPods**. Neither is
-installed on the machine used to write this, which is why `ios/` is not
-committed yet.
+Requires **Xcode** (with command line tools) and **CocoaPods**. `ios/` is
+already generated and committed, so on a fresh clone you sync rather than add.
 
 ```bash
 # from the repo root
-pnpm install
+pnpm install --frozen-lockfile
 cd artifacts/project-novara
 
-# build the web app first — cap add/sync copies from dist/public
+# build the web app first — cap sync copies from dist/public
 PORT=5173 BASE_PATH=/ \
 VITE_API_BASE_URL=https://api.novaraconnect.group \
 VITE_CLERK_PUBLISHABLE_KEY=<the pk_live key already used by novara-prod-web> \
-  pnpm run build
+  ./node_modules/.bin/vite build --config vite.config.ts
 
-# Capacitor CLI is run on demand — nothing is added to package.json.
-pnpm dlx @capacitor/cli@7.4.4 add ios     # generates ios/ — commit this directory
-pnpm dlx @capacitor/cli@7.4.4 sync ios    # copies web assets + native config
-pnpm dlx @capacitor/cli@7.4.4 open ios    # opens Xcode
+# CocoaPods lives in Homebrew's prefix, which a non-login shell may not have
+export PATH="/opt/homebrew/bin:$PATH"
+export LANG=en_US.UTF-8
+
+./node_modules/.bin/cap sync ios     # copies web assets + runs pod install
+./node_modules/.bin/cap open ios     # opens ios/App/App.xcworkspace
 ```
+
+If `cap sync` reports *"Skipping pod install because CocoaPods is not
+installed"*, the `PATH` line above is missing — `pod` is at
+`/opt/homebrew/bin/pod`. You can also run it directly:
+
+```bash
+cd ios/App && pod install
+```
+
+Only if you ever need to regenerate the project from scratch:
+
+```bash
+./node_modules/.bin/cap add ios
+```
+
+Always open the **`.xcworkspace`**, never the `.xcodeproj` — CocoaPods requires
+it.
 
 `VITE_*` values are baked in at build time. They are the same non-secret values
 `novara-prod-web` already uses — the Clerk **publishable** key is public by
-design and is already embedded in the deployed web bundle.
+design and is already embedded in the deployed web bundle, so it can be read
+back out of it if needed.
+
+In `remote` mode these built assets are **not** what users see: the shell loads
+the live site. The build still has to run because `cap sync` copies from
+`dist/public`. The values matter when you switch to `bundled`.
 
 ## Step 3 — Native settings in Xcode
 
@@ -161,11 +194,11 @@ to the backend.
 Nothing here is deployed, so rollback is repo-only:
 
 - **Before merge:** close the PR.
-- **After merge:** revert it. Nothing in this change reaches the production web
-  build: `package.json` and `pnpm-lock.yaml` are untouched, so installs are
-  byte-identical and the built bundle is unchanged. Merging still triggers a
-  `novara-prod-web` deploy (Auto-Deploy fires on any push to `main`), but that
-  deploy produces the same output as the one before it.
+- **After merge:** revert it. The production-visible part is `pnpm-lock.yaml`:
+  three extra packages get installed on each `novara-prod-web` build, and none
+  of them enter the bundle, so the built output is unchanged. Reverting restores
+  the previous lockfile. Merging also triggers a `novara-prod-web` deploy
+  (Auto-Deploy fires on any push to `main`), producing the same site as before.
 - The shell has no effect on the running web app in either mode. Pulling a
   TestFlight build does not touch production.
 - If a released iOS build misbehaves in `remote` mode, the web fix deploys
