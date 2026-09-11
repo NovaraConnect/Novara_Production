@@ -154,7 +154,8 @@ reviewable in a diff and they survive a `cap sync`:
 | Display name | Novara | `CFBundleDisplayName` |
 | Version / build | 1.0.0 / 1 | `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` |
 | Deployment target | iOS 14.0 (Capacitor 7's floor) | `IPHONEOS_DEPLOYMENT_TARGET` |
-| Orientation | portrait only, iPhone and iPad, matching the PWA manifest | `UISupportedInterfaceOrientations`(`~ipad`) |
+| Orientation | portrait only, matching the PWA manifest | `UISupportedInterfaceOrientations` |
+| Device family | iPhone only | `TARGETED_DEVICE_FAMILY` |
 | Signing style | Automatic | `CODE_SIGN_STYLE` |
 | Camera permission | `NSCameraUsageDescription` | `Info.plist` |
 | Photo library permission | `NSPhotoLibraryUsageDescription` | `Info.plist` |
@@ -170,13 +171,19 @@ backend.
 manage signing* → pick your team. `DEVELOPMENT_TEAM` is deliberately not
 committed: it is account-specific, and Xcode writes it on first selection.
 
-### Open decision: iPad
+### iPhone only
 
-`TARGETED_DEVICE_FAMILY` is `"1,2"`, so the app currently ships for iPhone **and**
-iPad. That is fine technically — the web app is responsive — but iPad support
-requires its own set of App Store screenshots, and an iPad reviewer will judge
-the layout at iPad size. Setting it to `"1"` makes the app iPhone-only and drops
-both obligations. Not a blocker for TestFlight either way.
+`TARGETED_DEVICE_FAMILY` is `"1"`. The Capacitor template ships `"1,2"`
+(iPhone + iPad); iPad was dropped deliberately. Consequences, so nobody
+"restores" it by accident:
+
+- No iPad App Store screenshots to produce, and no iPad reviewer judging a
+  layout the PWA was never designed for.
+- The app does not appear in iPad search results and cannot be installed on
+  iPad. Reverting to `"1,2"` later is a one-line change, but adds the
+  screenshot set back.
+- `UISupportedInterfaceOrientations~ipad` was removed from `Info.plist` for the
+  same reason — with no iPad target it was dead configuration.
 
 ## Step 4 — TestFlight
 
