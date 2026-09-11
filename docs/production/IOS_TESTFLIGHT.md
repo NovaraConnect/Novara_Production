@@ -142,23 +142,41 @@ In `remote` mode these built assets are **not** what users see: the shell loads
 the live site. The build still has to run because `cap sync` copies from
 `dist/public`. The values matter when you switch to `bundled`.
 
-## Step 3 — Native settings in Xcode
+## Step 3 — Native settings
 
-Set once, then commit the changed `ios/` files.
+These are **already set in the repo**, so there is nothing to click for them.
+They are file settings rather than Xcode-session settings, which means they are
+reviewable in a diff and they survive a `cap sync`:
 
-- **Display name:** Novara. **Version:** 1.0.0. **Build:** 1.
-- **Deployment target:** iOS 14 or later (Capacitor 7's floor).
-- **Device orientation:** portrait only, matching the PWA manifest.
-- **Signing:** your team, automatic.
-- **`Info.plist` usage strings** — required, and the app will crash on first
-  use without them:
-  - `NSCameraUsageDescription` — "Novara uses the camera to scan business cards
-    so contact details can be filled in for you."
-  - `NSPhotoLibraryUsageDescription` — "Novara reads a screenshot you choose so
-    it can pre-fill contact details. Images stay on your device."
+| Setting | Value | Where |
+|---|---|---|
+| Bundle identifier | `group.novaraconnect.app` | `PRODUCT_BUNDLE_IDENTIFIER` |
+| Display name | Novara | `CFBundleDisplayName` |
+| Version / build | 1.0.0 / 1 | `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` |
+| Deployment target | iOS 14.0 (Capacitor 7's floor) | `IPHONEOS_DEPLOYMENT_TARGET` |
+| Orientation | portrait only, iPhone and iPad, matching the PWA manifest | `UISupportedInterfaceOrientations`(`~ipad`) |
+| Signing style | Automatic | `CODE_SIGN_STYLE` |
+| Camera permission | `NSCameraUsageDescription` | `Info.plist` |
+| Photo library permission | `NSPhotoLibraryUsageDescription` | `Info.plist` |
 
-Both are accurate: OCR runs on-device, and only the extracted text is ever sent
-to the backend.
+Both usage strings are required — iOS terminates the app on first camera or
+photo-library access if they are missing. Their wording is accurate about what
+happens: OCR runs on-device, and only the extracted text is ever sent to the
+backend.
+
+### The one thing Xcode has to do
+
+**Signing team.** Select the target → Signing & Capabilities → check *Automatically
+manage signing* → pick your team. `DEVELOPMENT_TEAM` is deliberately not
+committed: it is account-specific, and Xcode writes it on first selection.
+
+### Open decision: iPad
+
+`TARGETED_DEVICE_FAMILY` is `"1,2"`, so the app currently ships for iPhone **and**
+iPad. That is fine technically — the web app is responsive — but iPad support
+requires its own set of App Store screenshots, and an iPad reviewer will judge
+the layout at iPad size. Setting it to `"1"` makes the app iPhone-only and drops
+both obligations. Not a blocker for TestFlight either way.
 
 ## Step 4 — TestFlight
 
