@@ -66,7 +66,7 @@ return schemaReady;
 beforeEach(async () => {
 await ensureSchema();
 await pool.query(
-"TRUNCATE contacts, user_settings, push_subscriptions, feedback RESTART IDENTITY CASCADE",
+"TRUNCATE contacts, user_settings, push_subscriptions, apns_tokens, feedback RESTART IDENTITY CASCADE",
 );
 });
 

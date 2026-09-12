@@ -54,6 +54,15 @@ created_at timestamptz NOT NULL DEFAULT now(),
 updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS apns_tokens (
+id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+user_id text NOT NULL,
+device_token text NOT NULL,
+environment text NOT NULL DEFAULT 'production',
+created_at timestamptz NOT NULL DEFAULT now(),
+UNIQUE (user_id, device_token)
+);
+
 CREATE TABLE IF NOT EXISTS push_subscriptions (
 id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 user_id text NOT NULL,
