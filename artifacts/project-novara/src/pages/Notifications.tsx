@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { isInstalledExperience } from "@/lib/installPrompt";
 import {
   Bell,
   BellOff,
@@ -89,10 +90,7 @@ export default function Notifications() {
     /iPad|iPhone|iPod/.test(navigator.userAgent) &&
     !(window as unknown as { MSStream?: unknown }).MSStream;
 
-  const isStandalone =
-    typeof window !== "undefined" &&
-    (window.matchMedia("(display-mode: standalone)").matches ||
-      (navigator as Navigator & { standalone?: boolean }).standalone === true);
+  const isStandalone = isInstalledExperience();
 
   async function handleToggle(enabled: boolean) {
     if (enabled) {

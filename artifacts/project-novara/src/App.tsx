@@ -25,7 +25,7 @@ import NotFound from "@/pages/not-found";
 import SignInPage from "@/pages/SignIn";
 import SignUpPage from "@/pages/SignUp";
 import InstallPrompt from "@/components/InstallPrompt";
-import { hasSeenInstallPrompt, isStandaloneDisplayMode } from "@/lib/installPrompt";
+import { hasSeenInstallPrompt, isInstalledExperience } from "@/lib/installPrompt";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
@@ -167,7 +167,7 @@ function HomeRedirect() {
     return <LoadingScreen />;
   }
 
-  if (isStandaloneDisplayMode()) {
+  if (isInstalledExperience()) {
     return isSignedIn ? <Redirect to="/dashboard" /> : <Redirect to="/sign-in" />;
   }
 

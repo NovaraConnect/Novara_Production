@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@clerk/react";
 import { API_BASE } from "@/lib/apiBase";
 import { apiFetch } from "@/lib/api";
+import { isInstalledExperience } from "@/lib/installPrompt";
 
 export interface NotificationSettings {
   pushEnabled: boolean;
@@ -45,14 +46,6 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
     p,
     new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`Timed out: ${label} (${ms}ms)`)), ms)),
   ]);
-}
-
-function isStandaloneDisplay(): boolean {
-  if (typeof window === "undefined") return false;
-  return (
-    window.matchMedia?.("(display-mode: standalone)").matches === true ||
-    (navigator as Navigator & { standalone?: boolean }).standalone === true
-  );
 }
 
 export function useNotifications() {
@@ -118,7 +111,7 @@ export function useNotifications() {
     }
 
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    if (iOS && !isStandaloneDisplay()) {
+    if (iOS && !isInstalledExperience()) {
       setError("On iPhone, install Novara to your Home Screen first, then enable notifications from the installed app.");
       return false;
     }

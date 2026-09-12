@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { X, Share, MoreVertical, Plus, Download } from "lucide-react";
+import { isInstalledExperience } from "@/lib/installPrompt";
 
 type Platform = "ios" | "android" | "other";
 
@@ -9,13 +10,6 @@ function detectPlatform(): Platform {
   if (/iPad|iPhone|iPod/.test(ua) && !(window as unknown as { MSStream?: unknown }).MSStream) return "ios";
   if (/Android/.test(ua)) return "android";
   return "other";
-}
-
-function isStandaloneMode(): boolean {
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    (navigator as Navigator & { standalone?: boolean }).standalone === true
-  );
 }
 
 let deferredPrompt: Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> } | null = null;
@@ -39,7 +33,7 @@ export default function InstallPrompt() {
     if (localStorage.getItem(key) === "1") setDismissed(true);
   }, []);
 
-  if (dismissed || isStandaloneMode()) return null;
+  if (dismissed || isInstalledExperience()) return null;
 
   const platform = detectPlatform();
 
