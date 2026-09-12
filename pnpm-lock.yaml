@@ -415,9 +415,6 @@ importers:
 
   artifacts/project-novara:
     dependencies:
-      '@capacitor/push-notifications':
-        specifier: ^7.0.7
-        version: 7.0.7
       '@clerk/react':
         specifier: ^6.9.1
         version: 6.12.4(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -431,6 +428,12 @@ importers:
         specifier: ^7.0.0
         version: 7.0.0
     devDependencies:
+      '@capacitor/core':
+        specifier: 7.4.4
+        version: 7.4.4
+      '@capacitor/push-notifications':
+        specifier: 7.0.7
+        version: 7.0.7(@capacitor/core@7.4.4)
       '@clerk/testing':
         specifier: ^1.4.0
         version: 1.14.9(@playwright/test@1.61.1)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -1415,6 +1418,9 @@ packages:
 
   '@base-org/account@2.0.1':
     resolution: {integrity: sha512-tySVNx+vd6XEynZL0uvB10uKiwnAfThr8AbKTwILVG86mPbLAhEOInQIk+uDnvpTvfdUhC1Bi5T/46JvFoLZQQ==}
+
+  '@capacitor/core@7.4.4':
+    resolution: {integrity: sha512-xzjxpr+d2zwTpCaN0k+C6wKSZzWFAb9OVEUtmO72ihjr/NEDoLvsGl4WLfjWPcCO2zOy0b2X52tfRWjECFUjtw==}
 
   '@capacitor/push-notifications@7.0.7':
     resolution: {integrity: sha512-TgFsPV4uOez0RtFKsWPz3XCrLxc9th+UyAkillUY9vL6ezVKT35te9Sn4vGR0jeU2U0KUNU7Dt6oSCALnSiEKg==}
@@ -8829,7 +8835,13 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@capacitor/push-notifications@7.0.7': {}
+  '@capacitor/core@7.4.4':
+    dependencies:
+      tslib: 2.8.1
+
+  '@capacitor/push-notifications@7.0.7(@capacitor/core@7.4.4)':
+    dependencies:
+      '@capacitor/core': 7.4.4
 
   '@clerk/backend@2.33.6(react-dom@19.1.0(react@19.1.0))(react@19.1.0)':
     dependencies:
