@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@clerk/react";
 import { API_BASE } from "@/lib/apiBase";
 import { apiFetch } from "@/lib/api";
-import { isInstalledExperience } from "@/lib/installPrompt";
+import { isInstalledExperience, isNativeShell } from "@/lib/installPrompt";
+import { registerForNativePush, unregisterNativePush } from "@/lib/nativePush";
 
 export interface NotificationSettings {
   pushEnabled: boolean;
@@ -56,11 +57,15 @@ export function useNotifications() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // The native iOS shell has none of the Web Push APIs — it goes through APNs
+  // instead — so it is "supported" despite failing every browser feature test.
+  const isNative = isNativeShell();
   const isSupported =
-    typeof window !== "undefined" &&
-    "Notification" in window &&
-    "serviceWorker" in navigator &&
-    "PushManager" in window;
+    isNative ||
+    (typeof window !== "undefined" &&
+      "Notification" in window &&
+      "serviceWorker" in navigator &&
+      "PushManager" in window);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -75,22 +80,33 @@ export function useNotifications() {
       setLoading(false);
       return;
     }
-    setPermission(Notification.permission as PermissionState);
+    // Notification does not exist in a WKWebView; the native path learns its
+    // permission state from the plugin when the user opts in.
+    setPermission(isNative ? "default" : (Notification.permission as PermissionState));
 
     async function init() {
       try {
-        const [settingsRes, reg] = await Promise.all([
-          apiFetch(getToken, "/api/notifications/settings"),
-          navigator.serviceWorker.ready,
-        ]);
+        // navigator.serviceWorker does not exist in a WKWebView, so the
+        // native shell must not wait on it — doing so rejected the whole
+        // Promise.all and left settings unloaded.
+        const settingsRes = await apiFetch(getToken, "/api/notifications/settings");
 
+        let serverPushEnabled = false;
         if (settingsRes.ok) {
           const data = (await settingsRes.json()) as NotificationSettings;
           setSettings(data);
+          serverPushEnabled = data.pushEnabled;
         }
 
-        const sub = await reg.pushManager.getSubscription();
-        setIsSubscribed(!!sub);
+        if (isNative) {
+          // There is no local subscription object to inspect; the server's
+          // record of a registered APNs token is the source of truth.
+          setIsSubscribed(serverPushEnabled);
+        } else {
+          const reg = await navigator.serviceWorker.ready;
+          const sub = await reg.pushManager.getSubscription();
+          setIsSubscribed(!!sub);
+        }
       } catch {
         // Non-fatal — user just won't have current state
       } finally {
@@ -99,7 +115,7 @@ export function useNotifications() {
     }
 
     void init();
-  }, [getToken, isLoaded, isSignedIn, isSupported]);
+  }, [getToken, isLoaded, isSignedIn, isSupported, isNative]);
 
   const requestAndSubscribe = useCallback(async (): Promise<boolean> => {
     setError(null);
@@ -108,6 +124,25 @@ export function useNotifications() {
     if (!isSupported) {
       setError("Push notifications aren't supported in this browser.");
       return false;
+    }
+
+    // ── Native iOS app: APNs, not Web Push ───────────────────────────────────
+    if (isNative) {
+      try {
+        const { token, environment } = await registerForNativePush();
+        const res = await apiFetch(getToken, "/api/notifications/apns-token", {
+          method: "POST",
+          json: { token, environment },
+        });
+        if (!res.ok) throw new Error("Failed to register this device");
+        setPermission("granted");
+        setIsSubscribed(true);
+        setSettings((prev) => ({ ...prev, pushEnabled: true }));
+        return true;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to enable notifications");
+        return false;
+      }
     }
 
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -157,10 +192,23 @@ export function useNotifications() {
       setError(err instanceof Error ? err.message : "Failed to enable notifications");
       return false;
     }
-  }, [getToken, isSupported]);
+  }, [getToken, isSupported, isNative]);
 
   const unsubscribe = useCallback(async (): Promise<void> => {
     setError(null);
+
+    if (isNative) {
+      try {
+        await apiFetch(getToken, "/api/notifications/apns-token", { method: "DELETE", json: {} });
+        await unregisterNativePush();
+        setIsSubscribed(false);
+        setSettings((prev) => ({ ...prev, pushEnabled: false }));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to disable notifications");
+      }
+      return;
+    }
+
     try {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
@@ -177,7 +225,7 @@ export function useNotifications() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to disable notifications");
     }
-  }, [getToken]);
+  }, [getToken, isNative]);
 
   const updateSettings = useCallback(
     async (partial: Partial<NotificationSettings>): Promise<void> => {

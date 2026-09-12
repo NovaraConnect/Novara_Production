@@ -158,8 +158,14 @@ export default function Notifications() {
             <BellOff size={18} className="text-gray-400 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-semibold text-gray-700">Not supported</p>
+              {/* The old copy said "Try Chrome or Firefox", which is wrong on
+                  iOS: every iOS browser runs the same WebKit engine, so
+                  switching cannot help. The native app never reaches this
+                  block at all — it uses APNs and reports itself supported. */}
               <p className="text-xs text-gray-500 mt-1">
-                Your browser doesn't support push notifications. Try Chrome or Firefox.
+                {isIOS
+                  ? "On iPhone, push notifications need iOS 16.4 or later and Novara added to your Home Screen. Switching browsers won't help — they all use the same engine on iOS."
+                  : "This browser doesn't support push notifications. Chrome, Edge and Firefox do."}
               </p>
             </div>
           </div>

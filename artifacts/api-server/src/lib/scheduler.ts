@@ -1,6 +1,8 @@
 import cron from "node-cron";
 import { pool } from "../db";
 import { sendPush, type StoredSubscription } from "./push";
+import { sendApns, isApnsConfigured, isApnsEnvironment } from "./apns";
+import { chooseTransports } from "./pushRouting";
 import { logger } from "./logger";
 
 function daysBetween(a: Date, b: Date): number {
@@ -32,7 +34,18 @@ async function runDailyNotifications(): Promise<void> {
         "SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1",
         [user.user_id],
       );
-      if (subs.length === 0) continue;
+      const { rows: apnsRows } = await pool.query<{ device_token: string; environment: string }>(
+        "SELECT device_token, environment FROM apns_tokens WHERE user_id = $1",
+        [user.user_id],
+      );
+
+      // Prefer native when the user has the iOS app, so someone running both
+      // the PWA and the App Store build is not notified twice.
+      const transports = chooseTransports({
+        apnsTokenCount: isApnsConfigured() ? apnsRows.length : 0,
+        webSubscriptionCount: subs.length,
+      });
+      if (transports.length === 0) continue;
 
       const { rows: contacts } = await pool.query<{
         id: string;
@@ -117,12 +130,29 @@ async function runDailyNotifications(): Promise<void> {
 
       const toSend = notifications.slice(0, 5);
       for (const notif of toSend) {
-        for (const sub of subs) {
-          const result = await sendPush(sub, notif);
-          if (result === "gone") {
-            await pool
-              .query("DELETE FROM push_subscriptions WHERE endpoint = $1", [sub.endpoint])
-              .catch(() => {});
+        if (transports.includes("apns")) {
+          for (const row of apnsRows) {
+            const environment = isApnsEnvironment(row.environment) ? row.environment : "production";
+            const result = await sendApns(
+              { deviceToken: row.device_token, environment },
+              notif,
+            );
+            if (result === "gone") {
+              await pool
+                .query("DELETE FROM apns_tokens WHERE device_token = $1", [row.device_token])
+                .catch(() => {});
+            }
+          }
+        }
+
+        if (transports.includes("web")) {
+          for (const sub of subs) {
+            const result = await sendPush(sub, notif);
+            if (result === "gone") {
+              await pool
+                .query("DELETE FROM push_subscriptions WHERE endpoint = $1", [sub.endpoint])
+                .catch(() => {});
+            }
           }
         }
       }
@@ -137,8 +167,14 @@ async function runDailyNotifications(): Promise<void> {
 }
 
 export function startScheduler(): void {
-  if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
-    logger.warn("VAPID keys not configured — notification scheduler disabled");
+  const webConfigured = Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+  const nativeConfigured = isApnsConfigured();
+
+  // Previously this required VAPID specifically. With a second transport the
+  // gate is "at least one way to reach anyone" — otherwise an APNs-only
+  // deployment would start up with the scheduler silently disabled.
+  if (!webConfigured && !nativeConfigured) {
+    logger.warn("Neither VAPID nor APNs configured — notification scheduler disabled");
     return;
   }
   cron.schedule("0 9 * * *", runDailyNotifications, { timezone: "UTC" });

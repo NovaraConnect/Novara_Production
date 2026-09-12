@@ -2,6 +2,8 @@ import { Router } from "express";
 import { pool } from "../db";
 import { requireAuth, type AuthedRequest } from "../middlewares/auth";
 import { sendPush, VAPID_PUBLIC_KEY, type StoredSubscription } from "../lib/push";
+import { sendApns, isApnsConfigured, isApnsEnvironment, type ApnsEnvironment } from "../lib/apns";
+import { chooseTransports } from "../lib/pushRouting";
 import type { Request, Response } from "express";
 
 const router = Router();
@@ -175,34 +177,131 @@ router.delete("/notifications/subscribe", requireAuth, async (req: Request, res:
   }
 });
 
-// POST /api/notifications/test
-router.post("/notifications/test", requireAuth, async (req: Request, res: Response) => {
+// POST /api/notifications/apns-token — native iOS app registers its device token
+router.post("/notifications/apns-token", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as AuthedRequest).userId;
+  const { token, environment } = req.body as { token?: string; environment?: string };
+
+  if (!token || typeof token !== "string") {
+    res.status(400).json({ error: "Missing device token" });
+    return;
+  }
+  // Default to production: that is what TestFlight and App Store builds mint.
+  const env: ApnsEnvironment = isApnsEnvironment(environment) ? environment : "production";
+
   try {
-    const { rows: subs } = await pool.query<StoredSubscription>(
-      "SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1",
+    await pool.query(
+      `INSERT INTO apns_tokens (user_id, device_token, environment)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, device_token) DO UPDATE SET environment = $3`,
+      [userId, token, env],
+    );
+
+    await pool.query(
+      `INSERT INTO user_settings (user_id, push_enabled)
+       VALUES ($1, TRUE)
+       ON CONFLICT (user_id) DO UPDATE SET push_enabled = TRUE, updated_at = NOW()`,
       [userId],
     );
 
-    if (subs.length === 0) {
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Failed to save device token" });
+  }
+});
+
+// DELETE /api/notifications/apns-token
+router.delete("/notifications/apns-token", requireAuth, async (req: Request, res: Response) => {
+  const userId = (req as AuthedRequest).userId;
+  const { token } = req.body as { token?: string };
+
+  try {
+    if (token) {
+      await pool.query(
+        "DELETE FROM apns_tokens WHERE user_id = $1 AND device_token = $2",
+        [userId, token],
+      );
+    } else {
+      await pool.query("DELETE FROM apns_tokens WHERE user_id = $1", [userId]);
+    }
+
+    // Only clear the global flag if the user has no remaining device at all,
+    // otherwise unsubscribing on iPhone would silently kill PWA notifications.
+    const { rows: [counts] } = await pool.query<{ web: string; apns: string }>(
+      `SELECT
+         (SELECT COUNT(*) FROM push_subscriptions WHERE user_id = $1) AS web,
+         (SELECT COUNT(*) FROM apns_tokens        WHERE user_id = $1) AS apns`,
+      [userId],
+    );
+    if (Number(counts.web) === 0 && Number(counts.apns) === 0) {
+      await pool.query(
+        "UPDATE user_settings SET push_enabled = FALSE, updated_at = NOW() WHERE user_id = $1",
+        [userId],
+      );
+    }
+
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Failed to remove device token" });
+  }
+});
+
+// POST /api/notifications/test
+router.post("/notifications/test", requireAuth, async (req: Request, res: Response) => {
+  const userId = (req as AuthedRequest).userId;
+  const payload = {
+    title: "Novara Notifications",
+    body: "Push notifications are working! You'll be reminded when contacts need attention.",
+    tag: "test",
+    url: "/notifications",
+  };
+
+  try {
+    const { rows: webSubs } = await pool.query<StoredSubscription>(
+      "SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1",
+      [userId],
+    );
+    const { rows: apnsTokens } = await pool.query<{ device_token: string; environment: string }>(
+      "SELECT device_token, environment FROM apns_tokens WHERE user_id = $1",
+      [userId],
+    );
+
+    // Prefer native so a user with both the PWA and the iOS app installed is
+    // not notified twice. See lib/pushRouting.ts.
+    const transports = chooseTransports({
+      apnsTokenCount: isApnsConfigured() ? apnsTokens.length : 0,
+      webSubscriptionCount: webSubs.length,
+    });
+
+    if (transports.length === 0) {
       res.status(400).json({ error: "No active push subscriptions" });
       return;
     }
 
     let sent = 0;
-    for (const sub of subs) {
-      const result = await sendPush(sub, {
-        title: "Novara Notifications",
-        body: "Push notifications are working! You'll be reminded when contacts need attention.",
-        tag: "test",
-        url: "/notifications",
-      });
-      if (result === "ok") sent++;
-      else if (result === "gone") {
-        await pool.query(
-          "DELETE FROM push_subscriptions WHERE endpoint = $1",
-          [sub.endpoint],
-        ).catch(() => {});
+
+    if (transports.includes("apns")) {
+      for (const row of apnsTokens) {
+        const environment = isApnsEnvironment(row.environment) ? row.environment : "production";
+        const result = await sendApns({ deviceToken: row.device_token, environment }, payload);
+        if (result === "ok") sent++;
+        else {
+          await pool
+            .query("DELETE FROM apns_tokens WHERE device_token = $1", [row.device_token])
+            .catch(() => {});
+        }
+      }
+    }
+
+    if (transports.includes("web")) {
+      for (const sub of webSubs) {
+        const result = await sendPush(sub, payload);
+        if (result === "ok") sent++;
+        else {
+          await pool
+            .query("DELETE FROM push_subscriptions WHERE endpoint = $1", [sub.endpoint])
+            .catch(() => {});
+        }
       }
     }
 
