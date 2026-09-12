@@ -48,6 +48,10 @@ const config = {
     backgroundColor: "#f9f9f7",
     // Let the web app own the safe-area insets, as it already does for PWA.
     contentInset: "never" as const,
+    // Marks the shell in the User-Agent so the web app can recognise it even
+    // if the Capacitor bridge has not injected window.Capacitor by the time
+    // the first render runs. The web app's isNativeShell() checks both.
+    appendUserAgent: "NovaraApp",
   },
   ...(mode === "remote"
     ? {
