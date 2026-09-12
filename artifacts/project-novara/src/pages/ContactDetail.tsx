@@ -19,7 +19,7 @@ import {
 import { toast } from "sonner";
 import { availableMethods, usablePreferred, openContactMethod, METHOD_LABEL, type ContactMethod } from "@/lib/contactActions";
 import { downloadIcs, googleCalendarUrl } from "@/lib/calendar";
-import { requestNotificationPermission, sendNotification, isDigestEnabled, setDigestEnabled, scheduleDigestCheck } from "@/lib/webNotifications";
+import { requestNotificationPermission, sendNotification, isDigestEnabled, setDigestEnabled, scheduleDigestCheck, isNotificationGranted } from "@/lib/webNotifications";
 import { useCompanyNews } from "@/hooks/useCompanyNews";
 import { useContacts } from "@/hooks/useContacts";
 import { useSettings } from "@/hooks/useSettings";
@@ -35,7 +35,7 @@ export default function ContactDetail() {
   const contact = match && params?.id ? contacts.find(c => c.id === params.id) ?? null : null;
 
   useEffect(() => {
-    setNotifEnabled(Notification?.permission === "granted");
+    setNotifEnabled(isNotificationGranted());
   }, []);
 
   useEffect(() => {
