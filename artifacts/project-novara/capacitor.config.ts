@@ -53,6 +53,15 @@ const config = {
     // the first render runs. The web app's isNativeShell() checks both.
     appendUserAgent: "NovaraApp",
   },
+  plugins: {
+    PushNotifications: {
+      // Show a banner, badge and sound even when Novara is in the foreground.
+      // iOS suppresses foreground notifications by default — and the "Send test
+      // notification" button is always tapped with the app open, so without
+      // this the very first test looks like a delivery failure when it is not.
+      presentationOptions: ["badge", "sound", "alert"],
+    },
+  },
   ...(mode === "remote"
     ? {
         server: {
