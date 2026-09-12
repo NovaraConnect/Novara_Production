@@ -59,6 +59,32 @@ All four must be present. Any missing one leaves native push inert.
 table, `apns_tokens`. It is purely additive — no existing table is altered, and
 nothing reads it unless the `APNS_*` variables are set.
 
+## Sequencing — why the iOS project files are not in this PR
+
+`artifacts/project-novara/ios/` is not tracked on `main`; it lives on the
+PR #11 branch. So the iOS half of this work cannot land here, and it also
+should not be hand-written:
+
+- **Do not hand-edit `CODE_SIGN_ENTITLEMENTS` / `aps-environment` into the
+  project file.** A provisioning profile cannot grant an entitlement the App
+  ID has not been given, so doing it before step 1 makes the next archive fail
+  to sign with an unhelpful error. Adding the capability in Xcode does both
+  halves and regenerates the profile.
+- The CocoaPod for `@capacitor/push-notifications` only appears once this PR's
+  `package.json` is on the branch you build from.
+
+Order of operations:
+
+1. Review and merge this PR → the plugin is in `package.json` on `main`
+2. Do the Apple steps (sections 1 and 2 above)
+3. Rebase PR #11 on `main`, run `cap sync ios`, and commit the resulting
+   `Podfile.lock` / `Pods` and the Xcode-written entitlements
+4. Set the Render variables (section 3) and run the migration (section 4)
+5. Archive, upload, test
+
+Nothing in steps 1 or 4 changes behaviour on its own — the code stays inert
+until all four `APNS_*` variables exist.
+
 ## 5. Build and upload (after review)
 
 The Capacitor plugin adds a CocoaPod, so this needs a fresh build:
