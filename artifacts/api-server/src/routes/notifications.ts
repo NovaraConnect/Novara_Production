@@ -182,6 +182,13 @@ router.post("/notifications/apns-token", requireAuth, async (req: Request, res: 
   const userId = (req as AuthedRequest).userId;
   const { token, environment } = req.body as { token?: string; environment?: string };
 
+  if (!isApnsConfigured()) {
+    // Mirrors /vapid-public-key's behaviour when Web Push is unconfigured.
+    // Also keeps us off apns_tokens, which migration 0002 may not have created.
+    res.status(503).json({ error: "Native push notifications are not configured" });
+    return;
+  }
+
   if (!token || typeof token !== "string") {
     res.status(400).json({ error: "Missing device token" });
     return;
@@ -214,6 +221,13 @@ router.post("/notifications/apns-token", requireAuth, async (req: Request, res: 
 router.delete("/notifications/apns-token", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as AuthedRequest).userId;
   const { token } = req.body as { token?: string };
+
+  if (!isApnsConfigured()) {
+    // Nothing can have been registered, so this is a no-op success rather than
+    // an error — the client is just tidying up.
+    res.json({ ok: true });
+    return;
+  }
 
   try {
     if (token) {
@@ -261,15 +275,21 @@ router.post("/notifications/test", requireAuth, async (req: Request, res: Respon
       "SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1",
       [userId],
     );
-    const { rows: apnsTokens } = await pool.query<{ device_token: string; environment: string }>(
-      "SELECT device_token, environment FROM apns_tokens WHERE user_id = $1",
-      [userId],
-    );
+    // Same reasoning as the scheduler: do not touch apns_tokens unless APNs is
+    // configured, so this route still works before migration 0002 has run.
+    const apnsTokens = isApnsConfigured()
+      ? (
+          await pool.query<{ device_token: string; environment: string }>(
+            "SELECT device_token, environment FROM apns_tokens WHERE user_id = $1",
+            [userId],
+          )
+        ).rows
+      : [];
 
     // Prefer native so a user with both the PWA and the iOS app installed is
     // not notified twice. See lib/pushRouting.ts.
     const transports = chooseTransports({
-      apnsTokenCount: isApnsConfigured() ? apnsTokens.length : 0,
+      apnsTokenCount: apnsTokens.length,
       webSubscriptionCount: webSubs.length,
     });
 

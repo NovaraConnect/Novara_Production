@@ -55,6 +55,12 @@ All four must be present. Any missing one leaves native push inert.
 
 ## 4. Database (needs a migration run)
 
+**Order no longer matters.** Every read and write of `apns_tokens` is behind
+`isApnsConfigured()`, so deploying the API before this migration runs is safe —
+the table is simply never touched. Run it before setting the Render variables
+and native push works the moment they land; run it after and nothing breaks in
+the meantime.
+
 `artifacts/api-server/migrations/0002_add_apns_tokens.sql` creates one new
 table, `apns_tokens`. It is purely additive — no existing table is altered, and
 nothing reads it unless the `APNS_*` variables are set.

@@ -34,15 +34,24 @@ async function runDailyNotifications(): Promise<void> {
         "SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1",
         [user.user_id],
       );
-      const { rows: apnsRows } = await pool.query<{ device_token: string; environment: string }>(
-        "SELECT device_token, environment FROM apns_tokens WHERE user_id = $1",
-        [user.user_id],
-      );
+      // Only read apns_tokens when APNs is actually configured. The table is
+      // created by migration 0002, which may not have run yet on a deployment
+      // that has no APNs keys. Querying a missing table throws, and this whole
+      // function is wrapped in one try/catch — so an unguarded read would abort
+      // the entire nightly run, silently taking Web Push down with it.
+      const apnsRows = isApnsConfigured()
+        ? (
+            await pool.query<{ device_token: string; environment: string }>(
+              "SELECT device_token, environment FROM apns_tokens WHERE user_id = $1",
+              [user.user_id],
+            )
+          ).rows
+        : [];
 
       // Prefer native when the user has the iOS app, so someone running both
       // the PWA and the App Store build is not notified twice.
       const transports = chooseTransports({
-        apnsTokenCount: isApnsConfigured() ? apnsRows.length : 0,
+        apnsTokenCount: apnsRows.length,
         webSubscriptionCount: subs.length,
       });
       if (transports.length === 0) continue;
