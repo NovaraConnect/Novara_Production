@@ -1,4 +1,12 @@
 <svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="180" height="180" rx="36" fill="#2952cc"/>
-<path d="M 38 148 L 38 32 L 142 148 L 142 32" fill="none" stroke="white" stroke-width="27" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="72%">
+      <stop offset="0%" stop-color="#1334A7"/>
+      <stop offset="100%" stop-color="#040E41"/>
+    </radialGradient>
+  </defs>
+  <rect width="180" height="180" rx="36" fill="url(#glow)"/>
+  <!-- Bold N, drawn as an outline so it needs no font. Matches the app icon:
+       cap height 31% of the canvas, centred. -->
+  <path d="M62 118 V62 H74 L106 100 V62 H118 V118 H106 L74 80 V118 Z" fill="#ffffff"/>
 </svg>
