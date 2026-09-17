@@ -133,13 +133,6 @@ html, body, #root {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Header top padding: safe-area inset + a comfortable 24px of breathing room
-   below the notch/Dynamic Island. On devices with no inset (Safari/desktop)
-   this resolves to exactly 24px, matching the prior spacing. */
-.pt-safe-header {
-  padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
-}
-
 /* Bottom padding for scroll containers so the last card clears the fixed
    bottom nav (64px bar) plus the iOS home-indicator safe area. Uses
    env(safe-area-inset-bottom) so it adapts across devices (0 on desktop). */
