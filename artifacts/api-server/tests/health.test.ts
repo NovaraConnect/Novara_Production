@@ -1,10 +1,32 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import request from "supertest";
 import { app } from "./testApp";
+import { pool } from "../src/db";
 
 describe("health endpoint", () => {
-  it("reports ok and a connected database when Postgres is reachable", async () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("reports ok without touching the database", async () => {
     const res = await request(app).get("/api/healthz");
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("ok");
+    expect(res.body).not.toHaveProperty("databaseConnected");
+  });
+
+  // The incident this guards: /api/healthz used to run SELECT 1, Render polls
+  // it every ~5 seconds, and Neon bills per hour of compute uptime. The probe
+  // alone kept the database awake around the clock and burned the whole
+  // monthly compute allowance, taking production down mid-month.
+  it("issues no query at all, so the probe cannot keep the database awake", async () => {
+    const query = vi.spyOn(pool, "query");
+    await request(app).get("/api/healthz");
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("reports database connectivity on the explicit deep check", async () => {
+    const res = await request(app).get("/api/healthz/db");
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("ok");
     expect(res.body.databaseConnected).toBe(true);
