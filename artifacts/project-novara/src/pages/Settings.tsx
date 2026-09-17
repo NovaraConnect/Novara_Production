@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,6 +20,15 @@ function labelMonths(m: number) {
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function Settings() {
+  // Arriving from the Dashboard prompt via /settings#career-profile should
+  // land on the editor, not the top of a long page. wouter does not scroll to
+  // a hash by itself.
+  useEffect(() => {
+    if (window.location.hash !== "#career-profile") return;
+    const target = document.getElementById("career-profile");
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   const [, setLocation] = useLocation();
   const { settings, updateSettings } = useSettings();
   const { user } = useUser();
@@ -178,7 +187,7 @@ export default function Settings() {
         </section>
 
         {/* Career Profile */}
-        <section>
+        <section id="career-profile" className="scroll-mt-24">
           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Career Profile</p>
           <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm space-y-6">
 

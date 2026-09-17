@@ -20,6 +20,7 @@ import Feedback from "@/pages/Feedback";
 import DemoDashboard from "@/pages/DemoDashboard";
 import DemoContactDetail from "@/pages/DemoContactDetail";
 import LandingPage from "@/pages/LandingPage";
+import UxPreview from "@/pages/UxPreview";
 import PitchPage from "@/pages/PitchPage";
 import NotFound from "@/pages/not-found";
 import SignInPage from "@/pages/SignIn";
@@ -212,6 +213,7 @@ function Router() {
       <Route path="/feedback" component={() => <ProtectedRoute component={Feedback} />} />
       <Route path="/try/contacts/:id" component={DemoContactDetail} />
       <Route path="/try" component={DemoDashboard} />
+      <Route path="/ux" component={UxPreview} />
       <Route path="/demo" component={LandingPage} />
       <Route path="/pitch" component={PitchPage} />
       <Route component={NotFound} />

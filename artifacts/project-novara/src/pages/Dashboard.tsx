@@ -3,7 +3,7 @@ import { computeHealthScore, computeStatus, getDaysPastDue, formatDate, statusBo
 import { BottomNav } from "@/components/BottomNav";
 import { ContactCard } from "@/components/ContactCard";
 import { OnboardingTour } from "@/components/OnboardingTour";
-import { Plus, Loader2, Users, Clock, Info, ChevronRight } from "lucide-react";
+import { Plus, Loader2, Users, Clock, Info, ChevronRight, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useContacts } from "@/hooks/useContacts";
 import { useSettings } from "@/hooks/useSettings";
@@ -101,6 +101,28 @@ export default function Dashboard() {
             </div>
           </div>
         </Link>
+        {/* Career goals drive every priority suggestion in the app, and nothing
+            ever asked for them — they sat behind Settings with no prompt, so
+            the app quietly ran with every contact on its base priority. This
+            card appears only while they are unset and disappears the moment
+            they are, so it needs no dismiss. */}
+        {settings && settings.careerGoals.length === 0 && !settings.careerStatement.trim() && (
+          <Link
+            href="/settings#career-profile"
+            className="block mb-4 rounded-2xl border border-primary/15 bg-primary/[0.06] p-4 transition-colors hover:bg-primary/10"
+          >
+            <div className="flex items-center gap-2.5">
+              <Target className="w-6 h-6 text-primary shrink-0" />
+              <p className="flex-1 text-[15px] font-bold text-primary">Set your career goals</p>
+              <ChevronRight className="w-4 h-4 text-primary/60 shrink-0" aria-hidden="true" />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+              Novara raises the priority of contacts who can help you get there, and lets the rest
+              settle. Until they are set, every contact keeps its base priority.
+            </p>
+          </Link>
+        )}
+
         {overdueContacts.length > 0 && (
           <div className="mb-4">
             <Link href="/contacts" className="flex items-center gap-2 mb-2 group">
