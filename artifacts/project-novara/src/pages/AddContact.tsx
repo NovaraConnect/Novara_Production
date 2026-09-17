@@ -274,6 +274,14 @@ export default function AddContact() {
             {/* QR Code Scanner */}
             <QRScanner onExtracted={handleQRScanned} />
 
+            {/* Divider between the no-typing options and the form itself. */}
+            <div className="flex items-center gap-3 mt-5 mb-4">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground shrink-0">
+                Or enter manually
+              </span>
+              <span className="h-px flex-1 bg-border" />
+            </div>
+
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
 

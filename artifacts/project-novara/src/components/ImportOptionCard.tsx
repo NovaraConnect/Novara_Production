@@ -1,49 +1,76 @@
 import type { LucideIcon } from "lucide-react";
 import { ChevronRight } from "lucide-react";
 
+/** LinkedIn's own mark, so the import option is recognisable at a glance.
+ *  Drawn inline rather than loaded, and only used to label the feature. */
+export function LinkedInGlyph() {
+  return (
+    <span
+      className="w-7 h-7 rounded-md bg-[#0A66C2] text-white flex items-center justify-center shrink-0"
+      aria-hidden="true"
+    >
+      <span className="text-[13px] font-bold leading-none tracking-tight">in</span>
+    </span>
+  );
+}
+
 /**
  * The shell around each "get a contact in without typing" option on Add
  * Contact — business card, LinkedIn screenshot, QR code.
  *
  * The three used to look like three different features: two tinted panels
  * with uppercase labels and a bare outline button with no card at all. They
- * now share the row pattern the rest of the app already uses (icon tile,
- * title, one line of explanation, chevron), so Add Contact reads as one set
- * of choices rather than a pile of controls.
+ * are now one set — tinted card, coloured title beside its icon, a line of
+ * explanation across the full width, chevron on the right.
  *
- * Presentation only — every scanner keeps its own behaviour and passes its
- * status UI and buttons as children.
+ * Presentation only. Each scanner keeps its own behaviour and passes its
+ * status UI and buttons as children. Pass `onClick` for an option that has no
+ * button of its own, which makes the whole card the target.
  */
 export function ImportOptionCard({
   icon: Icon,
   iconNode,
   title,
   description,
+  onClick,
   children,
 }: {
-  /** Lucide icon for the tile. Ignored when `iconNode` is given. */
   icon?: LucideIcon;
-  /** For brand marks that are not Lucide icons (the LinkedIn "in"). */
+  /** For marks that are not Lucide icons — see LinkedInGlyph. */
   iconNode?: React.ReactNode;
   title: string;
   description: string;
-  children: React.ReactNode;
+  onClick?: () => void;
+  children?: React.ReactNode;
 }) {
-  return (
-    <div className="mb-4 bg-card border border-border/50 rounded-2xl shadow-sm overflow-hidden">
-      <div className="flex items-start gap-3 p-4 pb-3">
-        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-          {iconNode ?? (Icon ? <Icon className="w-5 h-5 text-primary" /> : null)}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-foreground">{title}</p>
-          <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{description}</p>
-        </div>
-        {/* Affordance only: the buttons below are the real targets, so this is
-            hidden from screen readers rather than announced as a control. */}
-        <ChevronRight className="w-4 h-4 text-muted-foreground/60 shrink-0 mt-0.5" aria-hidden="true" />
+  const header = (
+    <>
+      <div className="flex items-center gap-2.5">
+        {iconNode ?? (Icon ? <Icon className="w-6 h-6 text-primary shrink-0" /> : null)}
+        <p className="flex-1 text-[15px] font-bold text-primary">{title}</p>
+        <ChevronRight className="w-4 h-4 text-primary/60 shrink-0" aria-hidden="true" />
       </div>
-      <div className="px-4 pb-4">{children}</div>
+      <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{description}</p>
+    </>
+  );
+
+  const shell = "mb-3 rounded-2xl border border-primary/15 bg-primary/[0.06] p-4";
+
+  // An option with no button of its own is one big target; one with buttons
+  // keeps them as the targets, so the card stays a plain container.
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={`${shell} w-full text-left transition-colors hover:bg-primary/10`}>
+        {header}
+        {children}
+      </button>
+    );
+  }
+
+  return (
+    <div className={shell}>
+      {header}
+      {children ? <div className="mt-3">{children}</div> : null}
     </div>
   );
 }

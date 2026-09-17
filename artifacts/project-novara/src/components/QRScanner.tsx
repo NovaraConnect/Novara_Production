@@ -263,19 +263,9 @@ export function QRScanner({ onExtracted }: QRScannerProps) {
       <ImportOptionCard
         icon={QrCode}
         title="Scan QR Code"
-        description="Share your QR code or scan someone else's to exchange details."
+        description="Scan your business contact's QR code."
+        {...(status === "idle" ? { onClick: openScanner } : {})}
       >
-        {status === "idle" && (
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full h-10 gap-2 border-primary/30 text-primary hover:bg-primary/10 rounded-xl text-sm font-semibold"
-            onClick={openScanner}
-          >
-            <QrCode className="w-4 h-4" />
-            Open scanner
-          </Button>
-        )}
 
         {status === "scanning" && !modalOpen && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">

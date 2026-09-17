@@ -225,7 +225,7 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
             <Button
               type="button"
               variant="outline"
-              className="flex-1 h-10 gap-2 border-primary/30 text-primary hover:bg-primary/10 rounded-xl text-sm font-semibold"
+              className="flex-1 h-11 gap-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-sm font-semibold shadow-sm"
               onClick={() => cameraRef.current?.click()}
             >
               <Camera className="w-4 h-4" />
@@ -234,7 +234,7 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
             <Button
               type="button"
               variant="outline"
-              className="flex-1 h-10 gap-2 border-primary/30 text-primary hover:bg-primary/10 rounded-xl text-sm font-semibold"
+              className="flex-1 h-11 gap-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-sm font-semibold shadow-sm"
               onClick={() => libraryRef.current?.click()}
             >
               <ImageIcon className="w-4 h-4" />
