@@ -92,7 +92,7 @@ export default function DemoDashboard() {
       <header className="pt-10 pb-6 px-6 bg-card border-b border-border/50">
         <div>
           <h1 className="font-serif text-3xl font-bold tracking-tight text-foreground">
-            Project Novara
+            Novara
           </h1>
           <p className="text-sm text-muted-foreground mt-1 tracking-wide">
             Demo · 7 sample contacts loaded

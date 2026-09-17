@@ -10,7 +10,7 @@ export default function Home() {
       <header className="pt-12 pb-6 px-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <NovaraMark size={32} />
-          <span className="font-serif text-lg font-bold text-foreground">Project Novara</span>
+          <span className="font-serif text-lg font-bold text-foreground">Novara</span>
         </div>
         <Link href="/sign-in">
           <Button variant="ghost" size="sm" className="text-sm font-medium">Sign in</Button>

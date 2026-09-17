@@ -100,7 +100,7 @@ export default function Settings() {
         {/* App identity */}
         <section className="text-center space-y-3">
           <NovaraMark size={80} className="mx-auto mb-4 shadow-sm" />
-          <h2 className="font-serif text-2xl font-bold text-foreground">Project Novara</h2>
+          <h2 className="font-serif text-2xl font-bold text-foreground">Novara</h2>
           {user && (
             <p className="text-sm text-muted-foreground">
               Signed in as <span className="font-medium text-foreground">{user.primaryEmailAddress?.emailAddress}</span>
