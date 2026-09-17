@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { isInstalledExperience } from "@/lib/installPrompt";
+import { isInstalledExperience, isNativeShell } from "@/lib/installPrompt";
 import {
   Bell,
   BellOff,
@@ -91,6 +91,9 @@ export default function Notifications() {
     !(window as unknown as { MSStream?: unknown }).MSStream;
 
   const isStandalone = isInstalledExperience();
+  // Inside the iOS app the notification switch lives in iOS Settings, not in
+  // any browser, so several strings below have to say something different.
+  const nativeApp = isNativeShell();
 
   async function handleToggle(enabled: boolean) {
     if (enabled) {
@@ -99,7 +102,11 @@ export default function Notifications() {
       setEnabling(false);
       if (ok) toast.success("Notifications enabled");
       else if (permission === "denied")
-        toast.error("Notifications are blocked. Allow them in browser settings.");
+        toast.error(
+          nativeApp
+            ? "Notifications are blocked. Allow them in iOS Settings → Novara → Notifications."
+            : "Notifications are blocked. Allow them in browser settings.",
+        );
     } else {
       await unsubscribe();
       toast.info("Notifications disabled");
@@ -192,7 +199,9 @@ export default function Notifications() {
                   {isSubscribed
                     ? "Active on this device"
                     : permission === "denied"
-                    ? "Blocked — update in browser settings"
+                    ? nativeApp
+                      ? "Blocked — allow in iOS Settings → Novara"
+                      : "Blocked — update in browser settings"
                     : "Get reminded when contacts need attention"}
                 </p>
               </div>
@@ -302,11 +311,15 @@ export default function Notifications() {
               },
               {
                 icon: <Smartphone size={14} className="text-primary" />,
-                text: "Works on Android Chrome and iPhone (installed PWA, iOS 16.4+).",
+                text: nativeApp
+                  ? "Delivered to this iPhone through Apple's push service."
+                  : "Works on Android Chrome and iPhone (installed PWA, iOS 16.4+).",
               },
               {
                 icon: <Check size={14} className="text-primary" />,
-                text: "If you later publish to the App Store, server logic is fully reusable with FCM/APNs.",
+                text: nativeApp
+                  ? "Turn them off any time here, or in iOS Settings → Novara → Notifications."
+                  : "Turn them off any time here, or in your browser's site settings.",
               },
             ].map((item, i) => (
               <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
