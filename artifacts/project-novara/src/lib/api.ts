@@ -191,14 +191,20 @@ export interface Features {
   linkedinScreenshotImport: boolean;
 }
 
-/** Non-secret capability flags. Defaults everything off if the call fails, so
- *  the UI degrades gracefully (features stay hidden) rather than erroring. */
-export async function fetchFeatures(getToken: GetAuthToken): Promise<Features> {
+const FEATURES_CACHE_KEY = "novara.features.lastKnown";
+
+/** The flags from the last successful /api/features call, if any.
+ *
+ *  Used when the API cannot be reached, so an outage does not silently strip
+ *  working features out of the UI — which is exactly what happened when the
+ *  database ran out of compute: every flag read as false and the LinkedIn
+ *  importer disappeared from Add Contact, while the unflagged business-card
+ *  scanner next to it kept working. */
+export function readCachedFeatures(): Features | null {
   try {
-    const res = await apiFetch(getToken, "/api/features");
-    if (!res.ok)
-      return { aiEnrich: false, cardAiParse: false, linkedinAiParse: false, linkedinScreenshotImport: false };
-    const data = await res.json();
+    const raw = localStorage.getItem(FEATURES_CACHE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
     return {
       aiEnrich: !!data?.aiEnrich,
       cardAiParse: !!data?.cardAiParse,
@@ -206,8 +212,35 @@ export async function fetchFeatures(getToken: GetAuthToken): Promise<Features> {
       linkedinScreenshotImport: !!data?.linkedinScreenshotImport,
     };
   } catch {
-    return { aiEnrich: false, cardAiParse: false, linkedinAiParse: false, linkedinScreenshotImport: false };
+    return null;
   }
+}
+
+/** Non-secret capability flags.
+ *
+ *  THROWS when the flags cannot be fetched. It deliberately does not fall back
+ *  to all-false: "we could not ask the server" is not the same answer as "the
+ *  server said no", and callers need to tell them apart. A real `false` from a
+ *  reachable server still turns a feature off, remotely and immediately. */
+export async function fetchFeatures(getToken: GetAuthToken): Promise<Features> {
+  const res = await apiFetch(getToken, "/api/features");
+  if (!res.ok) throw new Error(`Failed to fetch features: ${res.status}`);
+
+  const data = await res.json();
+  const features: Features = {
+    aiEnrich: !!data?.aiEnrich,
+    cardAiParse: !!data?.cardAiParse,
+    linkedinAiParse: !!data?.linkedinAiParse,
+    linkedinScreenshotImport: !!data?.linkedinScreenshotImport,
+  };
+
+  try {
+    localStorage.setItem(FEATURES_CACHE_KEY, JSON.stringify(features));
+  } catch {
+    // Private mode or a full quota — the flags just will not survive a reload.
+  }
+
+  return features;
 }
 
 // ── Optional AI enrichment ───────────────────────────────────────────────────
