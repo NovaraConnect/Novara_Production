@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { ImportOptionCard } from "@/components/ImportOptionCard";
 import { Image as ImageIcon, Loader2, X, ScanText, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -99,14 +100,11 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
   const reset = () => setStatus("idle");
 
   return (
-    <div className="mb-6 rounded-2xl border border-primary/25 bg-primary/5 p-4">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-3">
-        <ScanText className="w-4 h-4 text-primary shrink-0" />
-        <span className="text-xs font-semibold uppercase tracking-widest text-primary">
-          Import from LinkedIn screenshot
-        </span>
-      </div>
+    <ImportOptionCard
+      icon={ScanText}
+      title="Import from LinkedIn screenshot"
+      description="Upload a screenshot of a profile. Novara reads the visible text to prefill a draft you can review."
+    >
 
       {/* ── Processing ── */}
       {status === "processing" && (
@@ -167,11 +165,7 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
       {/* ── Idle ── */}
       {status === "idle" && (
         <>
-          <p className="text-xs text-muted-foreground mb-3">
-            Upload a screenshot of a LinkedIn profile you already have. Novara reads the visible
-            text to prefill a draft you can review and edit before saving. Novara doesn't connect
-            to LinkedIn or access private data.
-          </p>
+
           <Button
             type="button"
             variant="outline"
@@ -181,6 +175,9 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
             <ImageIcon className="w-4 h-4" />
             Choose screenshot
           </Button>
+          <p className="text-[11px] text-muted-foreground/70 mt-2">
+            Novara doesn't connect to LinkedIn or access private data.
+          </p>
         </>
       )}
 
@@ -193,6 +190,6 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
         onChange={handleFileChange}
         aria-hidden
       />
-    </div>
+    </ImportOptionCard>
   );
 }

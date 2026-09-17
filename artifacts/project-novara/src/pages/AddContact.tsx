@@ -263,7 +263,6 @@ export default function AddContact() {
           <>
             {/* Business Card Scanner */}
             <BusinessCardScanner onExtracted={handleCardScanned} />
-            <p className="text-xs text-muted-foreground text-center -mt-4 mb-2">For best results — good lighting, card fills the frame, avoid glare. First scan might take 5–15 seconds</p>
 
             {/* LinkedIn Screenshot Import — hidden unless the deployment enables
                 LINKEDIN_SCREENSHOT_IMPORT, so it can be switched off without a
@@ -273,9 +272,7 @@ export default function AddContact() {
             )}
 
             {/* QR Code Scanner */}
-            <div className="mb-6">
-              <QRScanner onExtracted={handleQRScanned} />
-            </div>
+            <QRScanner onExtracted={handleQRScanned} />
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
