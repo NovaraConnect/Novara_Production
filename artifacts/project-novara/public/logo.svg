@@ -1,7 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
-  <rect width="80" height="80" rx="22" fill="#3B5BDB" fill-opacity="0.12"/>
-  <rect width="80" height="80" rx="22" stroke="#3B5BDB" stroke-opacity="0.25" stroke-width="1.5"/>
-  <text x="50%" y="56%" dominant-baseline="middle" text-anchor="middle"
-    font-family="Georgia, 'Times New Roman', serif"
-    font-size="42" font-weight="700" fill="#3B5BDB">N</text>
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="novaraGlow" cx="50%" cy="50%" r="72%">
+      <stop offset="0%" stop-color="#1334A7"/>
+      <stop offset="100%" stop-color="#040E41"/>
+    </radialGradient>
+  </defs>
+  <rect width="180" height="180" rx="36" fill="url(#novaraGlow)"/>
+  <!-- Same outline as favicon.svg and components/NovaraMark.tsx. -->
+  <path d="M62 118 V62 H74 L106 100 V62 H118 V118 H106 L74 80 V118 Z" fill="#ffffff"/>
 </svg>

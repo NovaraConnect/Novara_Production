@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Users, RefreshCw, Newspaper, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { NovaraMark } from "@/components/NovaraMark";
 
 export default function Home() {
   return (
@@ -8,9 +9,7 @@ export default function Home() {
       {/* Header */}
       <header className="pt-12 pb-6 px-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20">
-            <span className="font-serif text-base font-bold text-primary">N</span>
-          </div>
+          <NovaraMark size={32} />
           <span className="font-serif text-lg font-bold text-foreground">Project Novara</span>
         </div>
         <Link href="/sign-in">
@@ -20,9 +19,7 @@ export default function Home() {
 
       {/* Hero */}
       <main className="flex-1 px-6 flex flex-col items-center justify-center text-center gap-6 py-10">
-        <div className="w-24 h-24 bg-primary/10 rounded-3xl mx-auto flex items-center justify-center border border-primary/20 shadow-sm mb-2">
-          <span className="font-serif text-5xl font-bold text-primary">N</span>
-        </div>
+        <NovaraMark size={96} className="mx-auto mb-2 shadow-sm" />
 
         <div className="space-y-3 max-w-[320px]">
           <h1 className="font-serif text-3xl font-bold tracking-tight text-foreground leading-tight">

@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { NovaraMark } from "@/components/NovaraMark";
 
 const PRIMARY = "#2952cc";
 
@@ -80,9 +81,7 @@ export default function LandingPage() {
       <nav style={{ background: "#f5f5f0", borderBottom: "1px solid #e8e8e0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 24px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 32, height: 32, background: `${PRIMARY}18`, border: `1px solid ${PRIMARY}33`, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <span style={{ fontFamily: "Georgia, serif", fontWeight: 700, fontSize: 16, color: PRIMARY }}>N</span>
-            </div>
+            <NovaraMark size={32} />
             <span style={{ fontFamily: "Georgia, serif", fontWeight: 700, fontSize: 18, color: "#1a1a1a" }}>Novara</span>
           </div>
           <Link href="/">
@@ -221,9 +220,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer style={{ background: "#1a1a1a", color: "#aaa", padding: "32px 24px", textAlign: "center" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 12 }}>
-          <div style={{ width: 26, height: 26, background: `${PRIMARY}30`, border: `1px solid ${PRIMARY}40`, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontFamily: "Georgia, serif", fontWeight: 700, fontSize: 13, color: "#8fa8e8" }}>N</span>
-          </div>
+          <NovaraMark size={26} />
           <span style={{ fontFamily: "Georgia, serif", fontWeight: 700, fontSize: 15, color: "#ddd" }}>Novara</span>
         </div>
         <p style={{ fontSize: 13, margin: 0 }}>© 2026 Novara. Built for ambitious professionals.</p>

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useSettings } from "@/hooks/useSettings";
 import { useClerk, useUser } from "@clerk/react";
 import { UserSettings } from "@/types/contact";
+import { NovaraMark } from "@/components/NovaraMark";
 
 const DOWNGRADE_OPTIONS: UserSettings["autoDowngradeAfterMonths"][] = [3, 6, 9, 12];
 
@@ -99,9 +100,7 @@ export default function Settings() {
 
         {/* App identity */}
         <section className="text-center space-y-3">
-          <div className="w-20 h-20 bg-primary/10 rounded-3xl mx-auto flex items-center justify-center border border-primary/20 shadow-sm mb-4">
-            <span className="font-serif text-3xl font-bold text-primary">N</span>
-          </div>
+          <NovaraMark size={80} className="mx-auto mb-4 shadow-sm" />
           <h2 className="font-serif text-2xl font-bold text-foreground">Project Novara</h2>
           {user && (
             <p className="text-sm text-muted-foreground">
