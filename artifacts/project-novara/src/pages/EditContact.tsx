@@ -163,7 +163,6 @@ export default function EditContact() {
           followUpCadenceDays: values.followUpCadenceDays as Contact["followUpCadenceDays"],
         } as any
       });
-      toast.success("Contact updated");
       setLocation(`/contacts/${contact.id}`);
     } catch {
       toast.error("Failed to update contact.");
@@ -429,7 +428,7 @@ export default function EditContact() {
                     <span className="text-sm font-semibold text-foreground">First reach-out</span>
                   </div>
                   {initialSuggestion && initialSuggestion.days !== watchedInitial && (
-                    <button type="button" onClick={() => { form.setValue("initialFollowUpDays", initialSuggestion.days); toast.success(`First follow-up set to ${labelDays(initialSuggestion.days)}`); }} className="flex items-center gap-1 text-xs text-primary hover:underline">
+                    <button type="button" onClick={() => form.setValue("initialFollowUpDays", initialSuggestion.days)} className="flex items-center gap-1 text-xs text-primary hover:underline">
                       <Wand2 className="w-3 h-3" />Suggest {labelDays(initialSuggestion.days)}
                     </button>
                   )}

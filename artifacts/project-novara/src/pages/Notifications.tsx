@@ -100,8 +100,7 @@ export default function Notifications() {
       setEnabling(true);
       const ok = await requestAndSubscribe();
       setEnabling(false);
-      if (ok) toast.success("Notifications enabled");
-      else if (permission === "denied")
+      if (!ok && permission === "denied")
         toast.error(
           nativeApp
             ? "Notifications are blocked. Allow them in iOS Settings → Novara → Notifications."
@@ -109,7 +108,6 @@ export default function Notifications() {
         );
     } else {
       await unsubscribe();
-      toast.info("Notifications disabled");
     }
   }
 

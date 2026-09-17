@@ -86,7 +86,6 @@ export default function Settings() {
   const handleDowngradeChange = async (months: UserSettings["autoDowngradeAfterMonths"]) => {
     try {
       await updateSettings.mutateAsync({ autoDowngradeAfterMonths: months });
-      toast.success(`Auto-downgrade set to ${labelMonths(months)}`);
     } catch { toast.error("Failed to update setting"); }
   };
 

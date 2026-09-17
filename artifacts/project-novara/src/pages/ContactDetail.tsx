@@ -73,7 +73,6 @@ export default function ContactDetail() {
   const handleMarkContacted = async () => {
     try {
       await markContacted.mutateAsync(contact.id);
-      toast.success("Interaction recorded!");
     } catch {
       toast.error("Failed to record interaction.");
     }
@@ -146,7 +145,6 @@ export default function ContactDetail() {
   const handleDelete = async () => {
     try {
       await removeContact.mutateAsync(contact.id);
-      toast.success("Contact deleted");
       setLocation("/contacts");
     } catch {
       toast.error("Failed to delete contact.");
@@ -171,7 +169,6 @@ export default function ContactDetail() {
       setDigestEnabled(true);
       scheduleDigestCheck(() => contacts.filter(c => new Date(c.nextFollowUpDate) <= new Date()).length);
       sendNotification("Novara notifications enabled ✓", "You'll get a daily digest of overdue follow-ups at 9 AM.");
-      toast.success("Notifications enabled — daily digest at 9 AM");
     } else {
       toast.error("Notifications blocked — allow them in browser settings");
     }
@@ -343,7 +340,7 @@ export default function ContactDetail() {
                     <Bell className="w-4 h-4" />Send test reminder now
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => { setDigestEnabled(false); setNotifEnabled(false); toast.success("Notifications disabled"); }}
+                    onClick={() => { setDigestEnabled(false); setNotifEnabled(false); }}
                     className="gap-2 cursor-pointer text-destructive focus:text-destructive"
                   >
                     Turn off notifications
