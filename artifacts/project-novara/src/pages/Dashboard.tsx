@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { computeHealthScore, computeStatus, getDaysPastDue, formatDate, statusBorderColor } from "@/lib/utils";
+import { computeHealthScore, computeStatus, getDaysPastDue, formatDate } from "@/lib/utils";
 import { BottomNav } from "@/components/BottomNav";
 import { ContactCard } from "@/components/ContactCard";
 import { OnboardingTour } from "@/components/OnboardingTour";
@@ -137,11 +137,13 @@ export default function Dashboard() {
             <div className="space-y-3">
               {overdueContacts.map(contact => {
                 const daysPast = getDaysPastDue(contact);
-                const status = computeStatus(contact);
                 return (
-                  <div key={contact.id} className={`border-l-4 ${statusBorderColor(status)} rounded-r-xl overflow-hidden`}>
-                    <ContactCard contact={contact} showOverdueBadge overdaysPast={daysPast} />
-                  </div>
+                  <ContactCard
+                    key={contact.id}
+                    contact={contact}
+                    showOverdueBadge
+                    overdaysPast={daysPast}
+                  />
                 );
               })}
             </div>
