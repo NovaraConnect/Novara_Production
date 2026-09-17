@@ -218,7 +218,6 @@ export default function AddContact() {
         initialFollowUpDays: values.initialFollowUpDays as Contact["initialFollowUpDays"],
         followUpCadenceDays: values.followUpCadenceDays as Contact["followUpCadenceDays"],
       } as any);
-      toast.success("Contact added successfully");
       setLocation("/contacts");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
