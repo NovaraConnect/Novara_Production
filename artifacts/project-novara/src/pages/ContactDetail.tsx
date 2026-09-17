@@ -186,7 +186,7 @@ export default function ContactDetail() {
 
   return (
     <div className="mobile-container pb-12 flex flex-col min-h-[100dvh] bg-background">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md pt-safe pb-4 px-4 flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md pt-safe pb-4 px-6 flex items-center justify-between">
         <Button variant="ghost" size="icon" onClick={() => window.history.back()} data-testid="button-back">
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -220,7 +220,7 @@ export default function ContactDetail() {
         </div>
       </header>
 
-      <main className="flex-1 px-6 py-4">
+      <main className="flex-1 px-4 py-4">
         {/* Header */}
         <div className="mb-8">
           <h1 className="font-serif text-3xl font-bold tracking-tight text-foreground mb-1 leading-tight">
@@ -354,7 +354,7 @@ export default function ContactDetail() {
         <div className="space-y-4">
           {/* Relationship details card */}
           <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Relationship Details</h3>
+            <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Relationship Details</h3>
 
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-full bg-secondary/80 flex items-center justify-center shrink-0">
@@ -423,7 +423,7 @@ export default function ContactDetail() {
           {/* Profile card (industry / function / interests) */}
           {hasProfile && (
             <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Profile</h3>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Profile</h3>
 
               {contact.industry && (
                 <div className="flex items-start gap-3">
@@ -471,7 +471,7 @@ export default function ContactDetail() {
           <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-3">
               <Newspaper className="w-4 h-4 text-primary" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Conversation Starters</h3>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Conversation Starters</h3>
             </div>
             <p className="text-xs text-muted-foreground mb-4">Use recent {contact.company} news to reconnect naturally.</p>
 
@@ -515,7 +515,7 @@ export default function ContactDetail() {
           {/* Notes & Links */}
           {(contact.notes || contact.linkedinUrl || contact.email || contact.phone) && (
             <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Notes & Links</h3>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Notes & Links</h3>
               {contact.linkedinUrl && (
                 <a href={contact.linkedinUrl.startsWith("http") ? contact.linkedinUrl : `https://${contact.linkedinUrl}`}
                   target="_blank" rel="noopener noreferrer"

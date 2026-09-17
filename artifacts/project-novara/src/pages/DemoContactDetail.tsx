@@ -61,7 +61,7 @@ export default function DemoContactDetail() {
         <div className="w-10" />
       </header>
 
-      <main className="flex-1 px-6 py-4">
+      <main className="flex-1 px-4 py-4">
         {/* Profile header */}
         <div id="demo-profile" className="mb-8">
           <h1 className="font-serif text-3xl font-bold tracking-tight text-foreground mb-1 leading-tight">
@@ -110,7 +110,7 @@ export default function DemoContactDetail() {
         <div className="space-y-4">
           {/* Relationship details */}
           <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
               Relationship Details
             </h3>
 
@@ -195,7 +195,7 @@ export default function DemoContactDetail() {
           <div id="demo-news" className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-3">
               <Newspaper className="w-4 h-4 text-primary" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 Conversation Starters
               </h3>
             </div>
@@ -245,7 +245,7 @@ export default function DemoContactDetail() {
           {/* Notes & Links */}
           {(contact.notes || contact.linkedinUrl) && (
             <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 Notes & Links
               </h3>
               {contact.linkedinUrl && (

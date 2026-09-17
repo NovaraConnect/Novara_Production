@@ -95,7 +95,7 @@ export default function Settings() {
         <h1 className="font-serif text-2xl font-bold tracking-tight text-foreground">Settings</h1>
       </header>
 
-      <main className="flex-1 px-6 py-8 flex flex-col gap-8">
+      <main className="flex-1 px-4 py-8 flex flex-col gap-8">
 
         {/* App identity */}
         <section className="text-center space-y-3">
