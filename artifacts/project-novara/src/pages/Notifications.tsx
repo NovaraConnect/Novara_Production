@@ -120,7 +120,7 @@ export default function Notifications() {
 
   return (
     <div className="mobile-container pb-24 flex flex-col min-h-[100dvh]">
-      <header className="sticky top-0 bg-background/95 backdrop-blur-sm border-b border-border/50 px-4 py-3 flex items-center gap-3 z-10">
+      <header className="sticky top-0 bg-background/95 backdrop-blur-sm border-b border-border/50 px-4 pt-safe pb-3 flex items-center gap-3 z-10">
         <button
           onClick={() => setLocation("/settings")}
           className="p-2 -ml-2 rounded-xl text-muted-foreground hover:bg-secondary transition-colors"
