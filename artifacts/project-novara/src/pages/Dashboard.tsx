@@ -54,10 +54,10 @@ export default function Dashboard() {
   }
   return (
     <div className="min-h-screen bg-background pb-nav">
-      <div className="px-4 pt-safe-header pb-4">
-        <div className="flex items-center justify-between mb-6">
+      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border/50 pt-safe pb-4 px-6">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">
+            <h1 className="font-serif text-2xl font-bold tracking-tight text-foreground">
               {user?.firstName ? `Hi, ${user.firstName}` : "Dashboard"}
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">Your network at a glance</p>
@@ -69,6 +69,9 @@ export default function Dashboard() {
             </Button>
           </Link>
         </div>
+      </header>
+
+      <div className="px-4 py-4">
         <div className="bg-card border border-border rounded-2xl p-4 mb-4">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-medium text-muted-foreground">Network Health</span>

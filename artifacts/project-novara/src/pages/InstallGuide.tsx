@@ -48,7 +48,7 @@ export default function InstallGuide() {
 
   return (
     <div className="min-h-screen bg-[#f9f9f7] flex flex-col">
-      <header className="sticky top-0 bg-[#f9f9f7]/95 backdrop-blur-sm border-b border-gray-100 px-4 py-3 flex items-center gap-3 z-10">
+      <header className="sticky top-0 bg-[#f9f9f7]/95 backdrop-blur-sm border-b border-gray-100 px-4 pt-safe pb-3 flex items-center gap-3 z-10">
         <button
           onClick={() => setLocation(-1 as unknown as string)}
           className="p-2 -ml-2 rounded-xl text-gray-500 hover:bg-gray-100 transition-colors"
