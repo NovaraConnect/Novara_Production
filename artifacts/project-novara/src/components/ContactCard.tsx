@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "./StatusBadge";
 import { ImportanceBadge } from "./ImportanceBadge";
-import { formatDate, computeStatus, getDaysPastDue } from "@/lib/utils";
+import { formatDate, computeStatus, getDaysPastDue, statusBorderColor } from "@/lib/utils";
 import { CalendarDays, MapPin, Newspaper, TrendingUp, TrendingDown } from "lucide-react";
 import { useCompanyNews } from "@/hooks/useCompanyNews";
 
@@ -29,7 +29,11 @@ export function ContactCard({ contact, showOverdueBadge, overdaysPast }: Contact
   const daysPast = overdaysPast ?? getDaysPastDue(contact);
   return (
     <Link href={`/contacts/${contact.id}`}>
-      <Card className="overflow-hidden border-border/50 shadow-sm hover:shadow-md transition-all duration-200 bg-card hover:-translate-y-0.5 cursor-pointer">
+      {/* The coloured edge used to be applied by the Dashboard's overdue list,
+          which meant the same contact had an accent there and none in
+          Contacts. It belongs to the card: status is a property of the
+          contact, not of the list it happens to be in. */}
+      <Card className={`overflow-hidden border-border/50 border-l-4 ${statusBorderColor(status)} shadow-sm hover:shadow-md transition-all duration-200 bg-card hover:-translate-y-0.5 cursor-pointer`}>
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-2 mb-2">
             <div className="flex-1 min-w-0">

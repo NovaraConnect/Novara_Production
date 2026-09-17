@@ -223,7 +223,7 @@ export default function EditContact() {
         <h1 className="font-serif text-xl font-bold tracking-tight text-foreground">Edit Contact</h1>
       </header>
 
-      <main className="flex-1 px-6 py-6">
+      <main className="flex-1 px-4 py-6">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
@@ -248,9 +248,9 @@ export default function EditContact() {
             )} />
 
             {/* Contact Profile for dynamic priority */}
-            <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-4">
+            <div className="rounded-2xl border border-border/50 bg-card shadow-sm p-5 space-y-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Contact Profile</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Contact Profile</p>
                 <p className="text-xs text-muted-foreground">Used to match against your career goals and adjust priority automatically.</p>
               </div>
 
@@ -299,8 +299,8 @@ export default function EditContact() {
             </div>
 
             {/* Priority section */}
-            <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority</p>
+            <div className="rounded-2xl border border-border/50 bg-card shadow-sm p-5 space-y-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Priority</p>
 
               <FormField control={form.control} name="importance" render={({ field }) => (
                 <FormItem>
@@ -418,8 +418,8 @@ export default function EditContact() {
               </FormItem>
             )} />
 
-            <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-5">
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow-up Timing</p>
+            <div className="rounded-2xl border border-border/50 bg-card shadow-sm p-5 space-y-5">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Follow-up Timing</p>
 
               <div>
                 <div className="flex items-center justify-between mb-2">

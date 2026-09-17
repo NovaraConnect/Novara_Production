@@ -2,10 +2,18 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import {
   UserPlus, Clock, Activity, CheckCircle2, Newspaper,
-  Sparkles, X, ChevronRight, ArrowRight,
+  Sparkles, X, ChevronRight, ArrowRight, Target,
 } from "lucide-react";
 
 const STEPS = [
+  {
+    icon: Target,
+    title: "Tell Novara your goals",
+    description:
+      "Your career goals decide who matters most. Contacts whose industry, role or interests match them rise in priority; the rest settle. Set them in Settings — it takes a minute and everything below works better for it.",
+    color: "bg-indigo-50 text-indigo-600",
+    href: "/settings#career-profile",
+  },
   {
     icon: UserPlus,
     title: "Add your first contact",
@@ -142,6 +150,25 @@ export function OnboardingTour({ onComplete }: OnboardingTourProps) {
                   className="flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-semibold px-4 py-2 rounded-xl hover:bg-primary/90 active:scale-[0.97] transition-all"
                 >
                   Add first contact
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : current.href ? (
+              <div className="flex gap-2">
+                <button
+                  onClick={handleNext}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-xl border border-border"
+                >
+                  Later
+                </button>
+                <button
+                  onClick={() => {
+                    onComplete();
+                    setLocation(current.href as string);
+                  }}
+                  className="flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-semibold px-4 py-2 rounded-xl hover:bg-primary/90 active:scale-[0.97] transition-all"
+                >
+                  Set goals
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>

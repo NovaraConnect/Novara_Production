@@ -113,7 +113,7 @@ export default function Feedback() {
         <h1 className="font-serif text-xl font-bold tracking-tight text-foreground">Send Feedback</h1>
       </header>
 
-      <main className="flex-1 px-6 py-6">
+      <main className="flex-1 px-4 py-6">
         <p className="text-sm text-muted-foreground mb-6">
           Found a bug, have a feature idea, or just want to tell us something? We read every submission.
         </p>

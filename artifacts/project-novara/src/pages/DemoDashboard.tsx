@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { computeHealthScore, computeStatus, formatDate } from "@/lib/utils";
+import { computeHealthScore, computeStatus, formatDate, statusBorderColor } from "@/lib/utils";
 import { BottomNav } from "@/components/BottomNav";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ImportanceBadge } from "@/components/ImportanceBadge";
@@ -14,7 +14,7 @@ import { Contact } from "@/types/contact";
 function DemoContactCard({ contact }: { contact: Contact }) {
   return (
     <Link href={`/try/contacts/${contact.id}`}>
-      <Card className="overflow-hidden border-border/50 shadow-sm hover:shadow-md transition-all duration-200 bg-card hover:-translate-y-0.5 cursor-pointer">
+      <Card className={`overflow-hidden border-border/50 border-l-4 ${statusBorderColor(computeStatus(contact))} shadow-sm hover:shadow-md transition-all duration-200 bg-card hover:-translate-y-0.5 cursor-pointer`}>
         <CardContent className="p-5 pb-4">
           <div className="flex justify-between items-start mb-3">
             <div>

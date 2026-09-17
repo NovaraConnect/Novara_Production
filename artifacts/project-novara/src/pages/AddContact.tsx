@@ -240,7 +240,7 @@ export default function AddContact() {
         <h1 className="font-serif text-xl font-bold tracking-tight text-foreground">Add Contact</h1>
       </header>
 
-      <main className="flex-1 px-6 py-6">
+      <main className="flex-1 px-4 py-6">
         {/* Beta contact limit wall */}
         {atLimit && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
@@ -263,7 +263,6 @@ export default function AddContact() {
           <>
             {/* Business Card Scanner */}
             <BusinessCardScanner onExtracted={handleCardScanned} />
-            <p className="text-xs text-muted-foreground text-center -mt-4 mb-2">For best results — good lighting, card fills the frame, avoid glare. First scan might take 5–15 seconds</p>
 
             {/* LinkedIn Screenshot Import — hidden unless the deployment enables
                 LINKEDIN_SCREENSHOT_IMPORT, so it can be switched off without a
@@ -273,8 +272,14 @@ export default function AddContact() {
             )}
 
             {/* QR Code Scanner */}
-            <div className="mb-6">
-              <QRScanner onExtracted={handleQRScanned} />
+            <QRScanner onExtracted={handleQRScanned} />
+
+            {/* Divider between the no-typing options and the form itself. */}
+            <div className="flex items-center gap-3 mt-5 mb-4">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground shrink-0">
+                Or enter manually
+              </span>
+              <span className="h-px flex-1 bg-border" />
             </div>
 
             <Form {...form}>
@@ -356,9 +361,9 @@ export default function AddContact() {
               <div className="space-y-5 pt-1">
 
                 {/* Contact Profile */}
-                <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-4">
+                <div className="rounded-2xl border border-border/50 bg-card shadow-sm p-5 space-y-4">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Contact Profile</p>
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Contact Profile</p>
                     <p className="text-xs text-muted-foreground">Used to match against your career goals and adjust priority automatically.</p>
                   </div>
 
@@ -464,9 +469,9 @@ export default function AddContact() {
                 )} />
 
                 {/* Follow-up Timing */}
-                <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-5">
+                <div className="rounded-2xl border border-border/50 bg-card shadow-sm p-5 space-y-5">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Follow-up Timing</p>
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Follow-up Timing</p>
                     <p className="text-xs text-muted-foreground">AI adjusts both windows based on how you met and how important this contact is.</p>
                   </div>
 

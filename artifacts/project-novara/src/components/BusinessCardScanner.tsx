@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { ImportOptionCard } from "@/components/ImportOptionCard";
 import { Camera, Image as ImageIcon, Loader2, X, ScanLine, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -153,14 +154,11 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
   const reset = () => setStatus("idle");
 
   return (
-    <div className="mb-6 rounded-2xl border border-primary/25 bg-primary/5 p-4">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-3">
-        <ScanLine className="w-4 h-4 text-primary shrink-0" />
-        <span className="text-xs font-semibold uppercase tracking-widest text-primary">
-          Scan Business Card
-        </span>
-      </div>
+    <ImportOptionCard
+      icon={ScanLine}
+      title="Scan Business Card"
+      description="Take a photo or upload an image to auto-fill contact fields."
+    >
 
       {/* ── Processing ── */}
       {status === "processing" && (
@@ -223,14 +221,11 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
       {/* ── Idle: two buttons ── */}
       {status === "idle" && (
         <>
-          <p className="text-xs text-muted-foreground mb-3">
-            Take a photo or upload an image to auto-fill contact fields.
-          </p>
           <div className="flex gap-2">
             <Button
               type="button"
               variant="outline"
-              className="flex-1 h-10 gap-2 border-primary/30 text-primary hover:bg-primary/10 rounded-xl text-sm font-semibold"
+              className="flex-1 h-11 gap-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-sm font-semibold shadow-sm"
               onClick={() => cameraRef.current?.click()}
             >
               <Camera className="w-4 h-4" />
@@ -239,15 +234,16 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
             <Button
               type="button"
               variant="outline"
-              className="flex-1 h-10 gap-2 border-primary/30 text-primary hover:bg-primary/10 rounded-xl text-sm font-semibold"
+              className="flex-1 h-11 gap-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-sm font-semibold shadow-sm"
               onClick={() => libraryRef.current?.click()}
             >
               <ImageIcon className="w-4 h-4" />
               Choose Photo
             </Button>
           </div>
-          <p className="text-[11px] text-muted-foreground/70 mt-2">
-            If the camera doesn't open, use <span className="font-medium">Choose Photo</span> to pick from your library instead.
+          <p className="text-[11px] text-muted-foreground/70 mt-2 leading-relaxed">
+            Good lighting, card filling the frame. First scan takes 5–15 seconds. If the camera
+            doesn't open, use <span className="font-medium">Choose Photo</span>.
           </p>
         </>
       )}
@@ -272,6 +268,6 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
         onChange={handleFileChange}
         aria-hidden
       />
-    </div>
+    </ImportOptionCard>
   );
 }

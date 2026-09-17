@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,6 +20,15 @@ function labelMonths(m: number) {
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function Settings() {
+  // Arriving from the Dashboard prompt via /settings#career-profile should
+  // land on the editor, not the top of a long page. wouter does not scroll to
+  // a hash by itself.
+  useEffect(() => {
+    if (window.location.hash !== "#career-profile") return;
+    const target = document.getElementById("career-profile");
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   const [, setLocation] = useLocation();
   const { settings, updateSettings } = useSettings();
   const { user } = useUser();
@@ -95,7 +104,7 @@ export default function Settings() {
         <h1 className="font-serif text-2xl font-bold tracking-tight text-foreground">Settings</h1>
       </header>
 
-      <main className="flex-1 px-6 py-8 flex flex-col gap-8">
+      <main className="flex-1 px-4 py-8 flex flex-col gap-8">
 
         {/* App identity */}
         <section className="text-center space-y-3">
@@ -108,34 +117,42 @@ export default function Settings() {
           )}
         </section>
 
-        {/* Account */}
-        <section className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm space-y-3">
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Account</p>
-          <Button
-            variant="outline"
-            className="w-full gap-2"
-            onClick={async () => {
-              try {
-                await updateSettings.mutateAsync({ hasSeenTutorial: false });
-                setLocation("/dashboard");
-                toast.success("Tutorial reset — it'll appear on the Dashboard");
-              } catch {
-                toast.error("Failed to reset tutorial");
-              }
-            }}
-            disabled={updateSettings.isPending}
-          >
-            <BookOpen className="w-4 h-4" />
-            Replay Tutorial
-          </Button>
-          <Button
-            variant="outline"
-            className="w-full gap-2 text-destructive border-destructive/20 hover:bg-destructive/5"
-            onClick={() => signOut({ redirectUrl: `${basePath}/` })}
-          >
-            <LogOut className="w-4 h-4" />
-            Sign out
-          </Button>
+        {/* Account — same row pattern as Notifications, Support and Mobile App
+            below, so the whole screen is one list rather than buttons in one
+            card and rows in the next. */}
+        <section>
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Account</p>
+          <div className="bg-card border border-border/50 rounded-2xl shadow-sm overflow-hidden divide-y divide-border/50">
+            <button
+              onClick={async () => {
+                try {
+                  await updateSettings.mutateAsync({ hasSeenTutorial: false });
+                  setLocation("/dashboard");
+                  toast.success("Tutorial reset — it'll appear on the Dashboard");
+                } catch {
+                  toast.error("Failed to reset tutorial");
+                }
+              }}
+              disabled={updateSettings.isPending}
+              className="w-full p-4 flex items-center gap-4 hover:bg-secondary/30 transition-colors text-left disabled:opacity-60"
+            >
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <BookOpen className="w-5 h-5 text-primary" />
+              </div>
+              <p className="flex-1 text-sm font-semibold text-foreground">Replay Tutorial</p>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
+            </button>
+            <button
+              onClick={() => signOut({ redirectUrl: `${basePath}/` })}
+              className="w-full p-4 flex items-center gap-4 hover:bg-destructive/5 transition-colors text-left"
+            >
+              <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
+                <LogOut className="w-5 h-5 text-destructive" />
+              </div>
+              <p className="flex-1 text-sm font-semibold text-destructive">Sign out</p>
+              <ChevronRight className="w-4 h-4 text-destructive/60" aria-hidden="true" />
+            </button>
+          </div>
         </section>
 
         {/* Auto-downgrade cadence setting */}
@@ -170,7 +187,7 @@ export default function Settings() {
         </section>
 
         {/* Career Profile */}
-        <section>
+        <section id="career-profile" className="scroll-mt-24">
           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Career Profile</p>
           <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm space-y-6">
 

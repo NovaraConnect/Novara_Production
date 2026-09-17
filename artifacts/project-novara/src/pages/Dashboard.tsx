@@ -1,10 +1,9 @@
-import { useState } from "react";
 import { Link } from "wouter";
-import { computeHealthScore, computeStatus, getDaysPastDue, formatDate, statusBorderColor } from "@/lib/utils";
+import { computeHealthScore, computeStatus, getDaysPastDue, formatDate } from "@/lib/utils";
 import { BottomNav } from "@/components/BottomNav";
 import { ContactCard } from "@/components/ContactCard";
 import { OnboardingTour } from "@/components/OnboardingTour";
-import { Plus, Loader2, X, Users, AlertCircle } from "lucide-react";
+import { Plus, Loader2, Users, Clock, Info, ChevronRight, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useContacts } from "@/hooks/useContacts";
 import { useSettings } from "@/hooks/useSettings";
@@ -14,13 +13,6 @@ export default function Dashboard() {
   const { contacts, isLoading } = useContacts();
   const { settings, isLoading: settingsLoading, updateSettings } = useSettings();
   const { user } = useUser();
-  const [bannerDismissed, setBannerDismissed] = useState(() =>
-    localStorage.getItem("novara_hs_banner_v1") === "true"
-  );
-  const dismissBanner = () => {
-    localStorage.setItem("novara_hs_banner_v1", "true");
-    setBannerDismissed(true);
-  };
   const connectedContacts = contacts.filter(c => c.connectionStatus === "connected");
   const pipelineCount = contacts.filter(c => c.connectionStatus === "pipeline").length;
   const healthScore = computeHealthScore(connectedContacts);
@@ -58,7 +50,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-serif text-2xl font-bold tracking-tight text-foreground">
-              {user?.firstName ? `Hi, ${user.firstName}` : "Dashboard"}
+              {user?.firstName ? `Hi, ${user.firstName}` : "Novara"}
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">Your network at a glance</p>
           </div>
@@ -72,14 +64,19 @@ export default function Dashboard() {
       </header>
 
       <div className="px-4 py-4">
-        <div className="bg-card border border-border rounded-2xl p-4 mb-4">
+        <Link
+          href="/contacts"
+          className="block bg-card border border-border/50 shadow-sm rounded-2xl p-4 mb-4 transition-colors hover:bg-secondary/20"
+        >
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-medium text-muted-foreground">Network Health</span>
-            {!bannerDismissed && (
-              <button onClick={dismissBanner} className="text-muted-foreground hover:text-foreground">
-                <X className="h-4 w-4" />
-              </button>
-            )}
+            <span className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+              Network Health
+              <Info
+                className="h-3.5 w-3.5 text-muted-foreground/60"
+                aria-label="Share of your connected contacts still inside their follow-up window"
+              />
+            </span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </div>
           <div className="flex items-end gap-2 mb-3">
             <span className="text-4xl font-bold text-foreground">{healthScore}</span>
@@ -103,13 +100,36 @@ export default function Dashboard() {
               <div className="text-xs text-red-600">Dormant</div>
             </div>
           </div>
-        </div>
+        </Link>
+        {/* Career goals drive every priority suggestion in the app, and nothing
+            ever asked for them — they sat behind Settings with no prompt, so
+            the app quietly ran with every contact on its base priority. This
+            card appears only while they are unset and disappears the moment
+            they are, so it needs no dismiss. */}
+        {settings && settings.careerGoals.length === 0 && !settings.careerStatement.trim() && (
+          <Link
+            href="/settings#career-profile"
+            className="block mb-4 rounded-2xl border border-primary/15 bg-primary/[0.06] p-4 transition-colors hover:bg-primary/10"
+          >
+            <div className="flex items-center gap-2.5">
+              <Target className="w-6 h-6 text-primary shrink-0" />
+              <p className="flex-1 text-[15px] font-bold text-primary">Set your career goals</p>
+              <ChevronRight className="w-4 h-4 text-primary/60 shrink-0" aria-hidden="true" />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+              Novara raises the priority of contacts who can help you get there, and lets the rest
+              settle. Until they are set, every contact keeps its base priority.
+            </p>
+          </Link>
+        )}
+
         {overdueContacts.length > 0 && (
           <div className="mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertCircle className="h-4 w-4 text-orange-500" />
-              <h2 className="text-sm font-semibold text-foreground">Overdue Follow-ups</h2>
-            </div>
+            <Link href="/contacts" className="flex items-center gap-2 mb-2 group">
+              <Clock className="h-4 w-4 text-orange-500" />
+              <h2 className="flex-1 text-sm font-semibold text-foreground">Overdue Follow-ups</h2>
+              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" aria-hidden="true" />
+            </Link>
             <div className="bg-orange-50 border border-orange-100 rounded-xl px-3 py-2 mb-3 flex items-center justify-between">
               <span className="text-xs text-orange-700 font-medium">{overdueContacts.length} follow-up{overdueContacts.length > 1 ? "s" : ""} overdue</span>
               <span className="text-xs text-orange-600">Oldest: {maxOverdueDays} day{maxOverdueDays !== 1 ? "s" : ""}</span>
@@ -117,11 +137,13 @@ export default function Dashboard() {
             <div className="space-y-3">
               {overdueContacts.map(contact => {
                 const daysPast = getDaysPastDue(contact);
-                const status = computeStatus(contact);
                 return (
-                  <div key={contact.id} className={`border-l-4 ${statusBorderColor(status)} rounded-r-xl overflow-hidden`}>
-                    <ContactCard contact={contact} showOverdueBadge overdaysPast={daysPast} />
-                  </div>
+                  <ContactCard
+                    key={contact.id}
+                    contact={contact}
+                    showOverdueBadge
+                    overdaysPast={daysPast}
+                  />
                 );
               })}
             </div>

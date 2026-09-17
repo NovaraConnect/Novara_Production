@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { ImportOptionCard } from "@/components/ImportOptionCard";
 import { QrCode, X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -259,19 +260,12 @@ export function QRScanner({ onExtracted }: QRScannerProps) {
 
   return (
     <>
-      {/* ── Trigger button ── */}
-      <div className="mt-3">
-        {status === "idle" && (
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full h-10 gap-2 border-primary/30 text-primary hover:bg-primary/10 rounded-xl text-sm font-semibold"
-            onClick={openScanner}
-          >
-            <QrCode className="w-4 h-4" />
-            Scan QR Code
-          </Button>
-        )}
+      <ImportOptionCard
+        icon={QrCode}
+        title="Scan QR Code"
+        description="Scan your business contact's QR code."
+        {...(status === "idle" ? { onClick: openScanner } : {})}
+      >
 
         {status === "scanning" && !modalOpen && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
@@ -303,7 +297,7 @@ export function QRScanner({ onExtracted }: QRScannerProps) {
             </button>
           </div>
         )}
-      </div>
+      </ImportOptionCard>
 
       {/* ── Camera modal ── */}
       {modalOpen && (

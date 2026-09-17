@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
-import { Image as ImageIcon, Loader2, X, ScanText, CheckCircle2, AlertCircle } from "lucide-react";
+import { ImportOptionCard, LinkedInGlyph } from "@/components/ImportOptionCard";
+import { Image as ImageIcon, Loader2, X, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { MAX_FILE_BYTES, recognizeImageText } from "@/lib/imageOcr";
@@ -99,14 +100,11 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
   const reset = () => setStatus("idle");
 
   return (
-    <div className="mb-6 rounded-2xl border border-primary/25 bg-primary/5 p-4">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-3">
-        <ScanText className="w-4 h-4 text-primary shrink-0" />
-        <span className="text-xs font-semibold uppercase tracking-widest text-primary">
-          Import from LinkedIn screenshot
-        </span>
-      </div>
+    <ImportOptionCard
+      iconNode={<LinkedInGlyph />}
+      title="Import from LinkedIn Screenshot"
+      description="Upload a screenshot of a LinkedIn profile. Novara reads the visible text to prefill a draft you can review."
+    >
 
       {/* ── Processing ── */}
       {status === "processing" && (
@@ -167,20 +165,19 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
       {/* ── Idle ── */}
       {status === "idle" && (
         <>
-          <p className="text-xs text-muted-foreground mb-3">
-            Upload a screenshot of a LinkedIn profile you already have. Novara reads the visible
-            text to prefill a draft you can review and edit before saving. Novara doesn't connect
-            to LinkedIn or access private data.
-          </p>
+
           <Button
             type="button"
             variant="outline"
-            className="w-full h-10 gap-2 border-primary/30 text-primary hover:bg-primary/10 rounded-xl text-sm font-semibold"
+            className="w-full h-11 gap-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-sm font-semibold shadow-sm"
             onClick={() => libraryRef.current?.click()}
           >
             <ImageIcon className="w-4 h-4" />
-            Choose screenshot
+            Choose Screenshot
           </Button>
+          <p className="text-[11px] text-muted-foreground/70 mt-2">
+            Novara doesn't connect to LinkedIn or access private data.
+          </p>
         </>
       )}
 
@@ -193,6 +190,6 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
         onChange={handleFileChange}
         aria-hidden
       />
-    </div>
+    </ImportOptionCard>
   );
 }
