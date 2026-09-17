@@ -49,6 +49,8 @@ export interface ScoreBreakdown {
   industryTermsFound: string[];
   junkTermsFound: string[];
   junkDominated: boolean;
+  /** Crime/casualty/filler signals that disqualify an article outright. */
+  unsuitableSignals: string[];
   tier: Tier;
   score: number;
 }
@@ -113,6 +115,47 @@ const JUNK_TERMS = new Set([
   "swears", "swear", "obsessed", "viral", "tiktok", "raves", "raved",
   "wrinkle", "wrinkles", "ageless", "flawless", "fans", "celeb", "gorgeous",
 ]);
+
+// Stories that mention the company but are not something you would open a
+// conversation with — crime, casualties, disasters, and "company name appears
+// in a wholly unrelated context" filler.
+//
+// This is a hard gate rather than a score penalty: a piece about someone being
+// injured is not a better conversation starter for being strongly on-topic.
+// Novara's own feed offered "Career criminal accused of stolen Tesla rampage
+// that injured woman" and "Quote of the day by Nikola Tesla" as ways to
+// reconnect with a recruiter.
+//
+// Deliberately NOT here: lawsuit, probe, investigation, recall, fraud,
+// scandal, layoffs. Those are real company news a professional might discuss,
+// and they are already scored on their merits.
+const UNSUITABLE_TERMS = new Set([
+  // crime
+  "crime", "crimes", "criminal", "criminals", "arrest", "arrested", "arrests",
+  "indicted", "convicted", "sentenced", "manslaughter", "homicide", "murder",
+  "murdered", "theft", "stolen", "robbery", "burglary", "carjacking",
+  "kidnapping", "hijacked", "smuggling", "trafficking",
+  // violence and casualties
+  "killed", "kills", "killing", "dead", "death", "deaths", "dies", "died",
+  "fatal", "fatally", "injured", "injuries", "injury", "victim", "victims",
+  "assault", "assaulted", "attack", "attacked", "rampage", "shooting",
+  "gunman", "stabbing", "stabbed", "terror", "terrorist",
+  // accidents and disasters
+  "crash", "crashed", "crashes", "collision", "wreck", "explosion", "blast",
+  "wildfire", "earthquake", "hurricane", "evacuated", "hospitalized",
+  "fire", "fires", "blaze", "burned", "burning", "destroys", "destroyed",
+  "derailed", "sinking", "capsized",
+  // distress
+  "suicide", "overdose", "abuse", "harassment", "assaults",
+]);
+
+// Filler that mentions a company or founder's name without being about the
+// company at all — the Nikola Tesla case. Matched as phrases against the
+// title, since single words here would be too blunt.
+const UNSUITABLE_PHRASES = [
+  "quote of the day", "quotes of the day", "word of the day", "on this day",
+  "horoscope", "obituary", "birth anniversary", "died on this",
+];
 
 // Generic industry/role tokens that must NOT count as an "industry match" —
 // they match almost anything (a shopping piece says "product", a "Product
@@ -200,6 +243,26 @@ function findIndustryTerms(text: string, industry: string, role: string): string
   return [...new Set(industryWords.filter((w) => textWords.has(w)))];
 }
 
+/**
+ * Crime, casualty and filler signals.
+ *
+ * Words matching the company's own name are ignored, the same way junk terms
+ * are: a contact at a firm called "Blast" should not have every story about
+ * them suppressed.
+ */
+function findUnsuitableSignals(text: string, title: string, companyLower: string): string[] {
+  const companyTokens = new Set(tokenize(companyLower));
+  const found = new Set<string>();
+  for (const w of tokenize(text)) {
+    if (UNSUITABLE_TERMS.has(w) && !companyTokens.has(w)) found.add(w);
+  }
+  const titleLower = title.toLowerCase();
+  for (const phrase of UNSUITABLE_PHRASES) {
+    if (titleLower.includes(phrase)) found.add(phrase);
+  }
+  return [...found];
+}
+
 function findJunkTerms(text: string, companyLower: string): string[] {
   const companyTokens = new Set(tokenize(companyLower));
   const found = new Set<string>();
@@ -239,6 +302,7 @@ export function scoreArticle(article: RankableArticle, ctx: RankContext): ScoreB
   const hasStrongContext = nearbyStrong.length > 0;
 
   const junkTermsFound = findJunkTerms(fullText, companyLower);
+  const unsuitableSignals = findUnsuitableSignals(fullText, article.title ?? "", companyLower);
   // "Celebrity shopping / affiliate / coupon" fluff: multiple junk signals and
   // no strong business context near the company. A substantive company story
   // (proper-noun name next to real context terms) has hasStrongContext = true,
@@ -256,7 +320,12 @@ export function scoreArticle(article: RankableArticle, ctx: RankContext): ScoreB
 
   let tier: Tier;
 
-  if (junkDominated) {
+  if (unsuitableSignals.length > 0) {
+    // Crime, casualties, disasters, or the company name appearing in filler.
+    // Checked before everything else: being strongly on-topic does not make a
+    // story about someone getting hurt a way to reopen a conversation.
+    tier = "discard";
+  } else if (junkDominated) {
     // Product/affiliate/celebrity-shopping content without business substance.
     tier = "discard";
   } else if (
@@ -296,6 +365,7 @@ export function scoreArticle(article: RankableArticle, ctx: RankContext): ScoreB
     industryTermsFound,
     junkTermsFound,
     junkDominated,
+    unsuitableSignals,
     tier,
     score,
   };
