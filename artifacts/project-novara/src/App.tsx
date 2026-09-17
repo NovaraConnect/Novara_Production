@@ -231,7 +231,7 @@ function ClerkProviderWithRoutes() {
       signUpUrl={`${basePath}/sign-up`}
       localization={{
         signIn: {
-          start: { title: "Welcome back", subtitle: "Sign in to Project Novara" },
+          start: { title: "Welcome back", subtitle: "Sign in to Novara" },
         },
         signUp: {
           start: { title: "Create your account", subtitle: "Start managing your network" },
