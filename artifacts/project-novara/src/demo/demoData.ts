@@ -1,7 +1,20 @@
 import { Contact, UserSettings } from "@/types/contact";
 
-// Demo is "frozen" at June 14, 2026
-// All dates are relative to that reference point
+// The demo used to be frozen at 2026-06-14, with every date written out in
+// full. That aged badly: opened three months later, every contact had rotted
+// to Cold and the Network Health score read 11/100 — the opposite of what the
+// demo is meant to show, and the tour narration ("66/100, 2 cooling") no
+// longer matched what was on screen.
+//
+// Dates are now offsets from whenever the demo is opened, so it always tells
+// the same story: Sarah due today, Marc and Priya overdue, the rest on track.
+const DAY_MS = 86_400_000;
+
+function daysFromToday(days: number): string {
+  const d = new Date(Date.now() + days * DAY_MS);
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString();
+}
 
 export const DEMO_CONTACTS: Contact[] = [
   {
@@ -24,11 +37,11 @@ export const DEMO_CONTACTS: Contact[] = [
     initialFollowUpDays: 3,
     followUpCadenceDays: 30,
     cadenceOverride: false,
-    firstContactDate: "2025-12-01T00:00:00.000Z",
-    lastInteractionDate: "2026-05-20T00:00:00.000Z",
-    nextFollowUpDate: "2026-06-14T00:00:00.000Z",
+    firstContactDate: daysFromToday(-195),
+    lastInteractionDate: daysFromToday(-25),
+    nextFollowUpDate: daysFromToday(0),
     notes: "Discussed engineering leadership roles opening in Q3. She mentioned they're expanding the ML team. Follow up about positions — she prefers a quick LinkedIn message first.",
-    createdAt: "2025-12-01T00:00:00.000Z",
+    createdAt: daysFromToday(-195),
   },
   {
     id: "demo-marc",
@@ -47,11 +60,11 @@ export const DEMO_CONTACTS: Contact[] = [
     initialFollowUpDays: 3,
     followUpCadenceDays: 60,
     cadenceOverride: false,
-    firstContactDate: "2025-09-15T00:00:00.000Z",
-    lastInteractionDate: "2026-03-30T00:00:00.000Z",
-    nextFollowUpDate: "2026-06-11T00:00:00.000Z",
+    firstContactDate: daysFromToday(-272),
+    lastInteractionDate: daysFromToday(-76),
+    nextFollowUpDate: daysFromToday(-3),
     notes: "Building a professional network in beauty-tech. Potential collaboration on consumer insights data. Reach out about the new L'Oréal Tech Incubator program.",
-    createdAt: "2025-09-15T00:00:00.000Z",
+    createdAt: daysFromToday(-272),
   },
   {
     id: "demo-priya",
@@ -71,11 +84,11 @@ export const DEMO_CONTACTS: Contact[] = [
     initialFollowUpDays: 3,
     followUpCadenceDays: 60,
     cadenceOverride: false,
-    firstContactDate: "2025-11-20T00:00:00.000Z",
-    lastInteractionDate: "2026-04-01T00:00:00.000Z",
-    nextFollowUpDate: "2026-06-12T00:00:00.000Z",
+    firstContactDate: daysFromToday(-206),
+    lastInteractionDate: daysFromToday(-74),
+    nextFollowUpDate: daysFromToday(-2),
     notes: "Focuses on climate tech and AI governance investments. She mentioned interest in my work on sustainable infrastructure. Strong YC ecosystem connection.",
-    createdAt: "2025-11-20T00:00:00.000Z",
+    createdAt: daysFromToday(-206),
   },
   {
     id: "demo-james",
@@ -96,11 +109,11 @@ export const DEMO_CONTACTS: Contact[] = [
     initialFollowUpDays: 3,
     followUpCadenceDays: 30,
     cadenceOverride: false,
-    firstContactDate: "2026-01-10T00:00:00.000Z",
-    lastInteractionDate: "2026-06-01T00:00:00.000Z",
-    nextFollowUpDate: "2026-07-01T00:00:00.000Z",
+    firstContactDate: daysFromToday(-155),
+    lastInteractionDate: daysFromToday(-13),
+    nextFollowUpDate: daysFromToday(17),
     notes: "",
-    createdAt: "2026-01-10T00:00:00.000Z",
+    createdAt: daysFromToday(-155),
   },
   {
     id: "demo-alex",
@@ -121,11 +134,11 @@ export const DEMO_CONTACTS: Contact[] = [
     initialFollowUpDays: 3,
     followUpCadenceDays: 30,
     cadenceOverride: false,
-    firstContactDate: "2026-02-14T00:00:00.000Z",
-    lastInteractionDate: "2026-05-25T00:00:00.000Z",
-    nextFollowUpDate: "2026-06-24T00:00:00.000Z",
+    firstContactDate: daysFromToday(-120),
+    lastInteractionDate: daysFromToday(-20),
+    nextFollowUpDate: daysFromToday(10),
     notes: "",
-    createdAt: "2026-02-14T00:00:00.000Z",
+    createdAt: daysFromToday(-120),
   },
   {
     id: "demo-emma",
@@ -146,11 +159,11 @@ export const DEMO_CONTACTS: Contact[] = [
     initialFollowUpDays: 2,
     followUpCadenceDays: 90,
     cadenceOverride: false,
-    firstContactDate: "2024-06-01T00:00:00.000Z",
-    lastInteractionDate: "2026-01-20T00:00:00.000Z",
-    nextFollowUpDate: "2026-07-15T00:00:00.000Z",
+    firstContactDate: daysFromToday(-743),
+    lastInteractionDate: daysFromToday(-145),
+    nextFollowUpDate: daysFromToday(31),
     notes: "Strategy consultant focused on digital transformation in financial services. Could be valuable for consulting referrals. Last talked at the alumni mixer in January.",
-    createdAt: "2024-06-01T00:00:00.000Z",
+    createdAt: daysFromToday(-743),
   },
   {
     id: "demo-lea",
@@ -171,11 +184,11 @@ export const DEMO_CONTACTS: Contact[] = [
     initialFollowUpDays: 3,
     followUpCadenceDays: 90,
     cadenceOverride: false,
-    firstContactDate: "2024-09-01T00:00:00.000Z",
-    lastInteractionDate: "2026-01-10T00:00:00.000Z",
-    nextFollowUpDate: "2026-07-20T00:00:00.000Z",
+    firstContactDate: daysFromToday(-651),
+    lastInteractionDate: daysFromToday(-155),
+    nextFollowUpDate: daysFromToday(36),
     notes: "Leading digital transformation at LVMH. Interested in luxury brand innovation and AI personalisation. Met briefly at the summit keynote.",
-    createdAt: "2024-09-01T00:00:00.000Z",
+    createdAt: daysFromToday(-651),
   },
 ];
 
@@ -198,19 +211,19 @@ export const TESLA_NEWS: DemoHeadline[] = [
   {
     title: "Tesla Reports Record Q2 2026 Deliveries, Beating Analyst Expectations by 8%",
     source: "Reuters",
-    publishedAt: "2026-06-12T10:00:00Z",
+    publishedAt: daysFromToday(-2),
     url: "https://www.reuters.com/",
   },
   {
     title: "Tesla's Autonomous Robotaxi Service Expands to 12 New Cities Across North America",
     source: "TechCrunch",
-    publishedAt: "2026-06-09T14:30:00Z",
+    publishedAt: daysFromToday(-5),
     url: "https://techcrunch.com/",
   },
   {
     title: "Tesla Accelerates Hiring Push for AI and Robotics Engineers Ahead of 2027 Product Cycle",
     source: "Bloomberg",
-    publishedAt: "2026-06-07T08:00:00Z",
+    publishedAt: daysFromToday(-7),
     url: "https://www.bloomberg.com/",
   },
 ];
