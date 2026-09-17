@@ -77,8 +77,16 @@ const CONTEXT_TERMS = new Set([
   "employees", "workforce", "headcount", "layoffs",
   "headquartered", "headquarters", "hq", "offices",
   "startup", "platform", "product", "service", "app",
-  "deal", "agreement", "contract", "signed",
-  "expansion", "strategy", "initiative", "milestone",
+  "deal", "agreement", "contract", "contracts", "signed",
+  "expansion", "expands", "expanding", "strategy", "strategic", "initiative", "milestone",
+  "quarter", "quarterly", "results", "reports", "reported", "guidance",
+  "forecast", "outlook", "shareholders", "dividend",
+  "unveils", "unveiled", "introduces", "introduced", "rollout", "rolling",
+  "factory", "plant", "facility", "facilities", "opens",
+  "supplier", "suppliers", "production", "manufacturing", "logistics",
+  "restructuring", "spinoff", "subsidiary", "stake", "divests", "divested",
+  "buyback", "patent", "trademark", "regulator", "regulators", "regulatory",
+  "compliance", "approval", "certification", "customers", "clients", "integration",
   "company", "firm", "corporation", "inc", "llc", "ltd", "corp",
 ]);
 
@@ -97,8 +105,20 @@ const STRONG_CONTEXT = new Set([
   "partnership", "partners", "collaboration", "collaborates",
   "ipo", "nasdaq", "nyse", "valuation",
   "investors", "investment", "backed", "venture",
-  "layoffs", "expansion",
-  "deal", "agreement", "contract", "signed", "milestone",
+  "layoffs", "expansion", "expands", "expanding",
+  "deal", "agreement", "contract", "contracts", "signed", "milestone",
+  // results and outlook
+  "quarter", "quarterly", "results", "reports", "reported", "guidance",
+  "forecast", "outlook", "shareholders", "dividend", "shares", "stock",
+  // operations
+  "unveils", "unveiled", "introduces", "introduced", "rollout", "rolling",
+  "factory", "plant", "facility", "facilities", "headquarters", "opens",
+  "supplier", "suppliers", "production", "manufacturing", "logistics",
+  // corporate
+  "strategy", "strategic", "restructuring", "spinoff", "subsidiary",
+  "stake", "divests", "divested", "buyback", "patent", "trademark",
+  "regulator", "regulators", "regulatory", "compliance", "approval",
+  "certification", "customers", "clients", "platform", "integration",
 ]);
 
 // Shopping / affiliate / coupon / celebrity-lifestyle signals. Business words
@@ -318,6 +338,12 @@ export function scoreArticle(article: RankableArticle, ctx: RankContext): ScoreB
   if (industryMatch) score += 2;
   score -= junkTermsFound.length; // down-rank shopping/celebrity noise
 
+  // Business relevance is required, not merely assumed from a name match.
+  // A story used to reach "medium" on nothing but a properly-capitalised
+  // company name, which is how sport, trivia and local-interest pieces that
+  // happen to mention a company arrived in a professional's feed. A headline
+  // now has to carry a business signal (STRONG_CONTEXT) or be on-topic for
+  // the contact's industry.
   let tier: Tier;
 
   if (unsuitableSignals.length > 0) {
@@ -337,7 +363,9 @@ export function scoreArticle(article: RankableArticle, ctx: RankContext): ScoreB
     tier = "discard";
   } else if (companyInTitle && hasStrongContext && capSignal === "proper") {
     tier = "high";
-  } else if (companyInTitle && capSignal === "proper") {
+  } else if (companyInTitle && industryMatch) {
+    // On-topic for the contact's industry counts as business relevance even
+    // without one of the STRONG_CONTEXT verbs.
     tier = "medium";
   } else if (companyInTitle && hasStrongContext) {
     tier = "medium";

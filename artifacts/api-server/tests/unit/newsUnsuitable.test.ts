@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
 import { scoreArticle, selectHeadlines, type RankableArticle, type RankContext } from "../../src/lib/newsRanking";
 
 const TESLA: RankContext = { company: "Tesla", industry: "automotive", role: "Product Manager" };
@@ -80,5 +81,57 @@ describe("news: unsuitable stories never become conversation starters", () => {
     const headlines = selectHeadlines(articles, TESLA);
     expect(headlines).toHaveLength(1);
     expect(headlines[0]?.title).toContain("record Q3 deliveries");
+  });
+});
+
+describe("news: a name match alone is not business news", () => {
+  // These carry no crime or filler signal at all — they are simply not about
+  // the company as a business. Before the business-relevance requirement they
+  // scored "medium" on a properly-capitalised name and were shown.
+  it.each([
+    "Tesla wins the community fun run sponsorship trophy",
+    "Ten things you never knew about Tesla",
+    "Tesla spotted filming in downtown Los Angeles",
+    "Local school names its robotics team after Tesla",
+  ])("discards: %s", (title) => {
+    const b = scoreArticle(art(title), TESLA);
+    expect(b.unsuitableSignals).toEqual([]);   // not caught by the crime gate
+    expect(b.tier).toBe("discard");            // caught by requiring substance
+  });
+
+  it.each([
+    "Tesla reports record quarterly results and raises guidance",
+    "Tesla unveils new manufacturing plant in Texas",
+    "Tesla signs supplier agreement for battery cells",
+    "Tesla stock climbs after regulatory approval",
+  ])("keeps: %s", (title) => {
+    expect(scoreArticle(art(title), TESLA).tier).not.toBe("discard");
+  });
+
+  it("still keeps an on-topic industry story without a strong verb", () => {
+    const b = scoreArticle(art("Tesla automotive division tops delivery rankings"), TESLA);
+    expect(b.tier).not.toBe("discard");
+  });
+});
+
+describe("news: list invariants", () => {
+  // STRONG_CONTEXT is documented as a subset of CONTEXT_TERMS. A word missing
+  // from CONTEXT_TERMS is never collected by the proximity pass, so adding it
+  // to STRONG_CONTEXT alone silently does nothing — which is exactly what
+  // happened when this vocabulary was first added.
+  it("every strong term is also a context term", () => {
+    const src = readFileSync(
+      new URL("../../src/lib/newsRanking.ts", import.meta.url),
+      "utf8",
+    );
+    const list = (name: string) => {
+      const body = src.split(`const ${name} = new Set([`)[1]?.split("]);")[0] ?? "";
+      return new Set([...body.matchAll(/"([^"]+)"/g)].map((m) => m[1]));
+    };
+    const context = list("CONTEXT_TERMS");
+    const strong = list("STRONG_CONTEXT");
+    expect(strong.size).toBeGreaterThan(0);
+    const orphans = [...strong].filter((w) => !context.has(w));
+    expect(orphans).toEqual([]);
   });
 });
