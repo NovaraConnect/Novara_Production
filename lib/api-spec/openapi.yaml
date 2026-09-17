@@ -15,11 +15,35 @@ paths:
     get:
       operationId: healthCheck
       tags: [health]
-      summary: Health check
-      description: Returns server health status
+      summary: Liveness check
+      description: >-
+        Process health and required env vars. Does not touch the database, so it is
+        safe to poll frequently.
       responses:
         "200":
           description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /healthz/db:
+    get:
+      operationId: healthCheckDatabase
+      tags: [health]
+      summary: Readiness check, including the database
+      description: >-
+        Queries Postgres and caches the result for 30 seconds. Wakes a scale-to-zero
+        database, so use it for manual checks and deploy verification rather than as a
+        polling probe.
+      responses:
+        "200":
+          description: Database reachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+        "503":
+          description: Database unreachable
           content:
             application/json:
               schema:

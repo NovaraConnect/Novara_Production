@@ -96,8 +96,11 @@ anywhere in the repository. See `11-Testing.md` for full coverage detail and rec
 ## Debugging
 
 - **Backend:** structured logs via `pino` (JSON in production, `pino-pretty` colorized locally).
-  `GET /api/healthz` is the fastest way to check DB connectivity and required env vars without
-  digging through logs.
+  `GET /api/healthz` reports process health and required env vars. It deliberately does NOT
+  touch Postgres: Render polls it every few seconds, and a query there keeps a scale-to-zero
+  database awake permanently (which once burned a whole month's Neon compute allowance and
+  took production down). For connectivity use `GET /api/healthz/db`, which queries Postgres
+  and caches the result for 30s — by hand or in deploy checks, never as a polling probe.
 - **Frontend:** standard Vite dev server + React DevTools. The `@replit/vite-plugin-runtime-error-modal`
   plugin surfaces runtime errors as an in-browser overlay. `@replit/vite-plugin-cartographer` and
   `@replit/vite-plugin-dev-banner` are conditionally loaded only when both `NODE_ENV !== "production"`
