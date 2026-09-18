@@ -25,6 +25,7 @@ import {
   type FormSnapshot,
 } from "@/lib/linkedinImportDraft";
 import { QRScanner, type ScannedQRContact } from "@/components/QRScanner";
+import { NativeContactImport } from "@/components/NativeContactImport";
 import { useFeatures } from "@/hooks/useFeatures";
 
 const INITIAL_OPTIONS: Contact["initialFollowUpDays"][] = [1, 2, 3];
@@ -140,7 +141,7 @@ export default function AddContact() {
     setCadenceOverridden(false);
   }, [form]);
 
-  const handleCardScanned = useCallback((data: ScannedContact) => {
+  const handleCardScanned = useCallback((data: ScannedContact & { linkedinUrl?: string }) => {
     const opts = { shouldDirty: true, shouldTouch: true } as const;
     if (data.firstName) form.setValue("firstName", data.firstName, opts);
     if (data.lastName) form.setValue("lastName", data.lastName, opts);
@@ -148,6 +149,9 @@ export default function AddContact() {
     if (data.role) form.setValue("role", data.role, opts);
     if (data.email) form.setValue("email", data.email, opts);
     if (data.phone) form.setValue("phone", data.phone, opts);
+    // Only ever set by the native Contacts import, which can read a LinkedIn
+    // URL off an address-book entry. A card scan never produces one.
+    if (data.linkedinUrl) form.setValue("linkedinUrl", data.linkedinUrl, opts);
     // Website (only ever set by the optional AI parser) → append to notes,
     // without clobbering anything already typed.
     if (data.website) {
@@ -222,7 +226,7 @@ export default function AddContact() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("limit") || msg.includes("403")) {
-        toast.error(`You've reached the ${FREE_TIER_LIMIT}-contact limit for the beta.`);
+        toast.error(`You've reached the ${FREE_TIER_LIMIT}-contact limit.`);
       } else {
         toast.error("Failed to save contact. Please try again.");
       }
@@ -241,16 +245,16 @@ export default function AddContact() {
       </header>
 
       <main className="flex-1 px-4 py-6">
-        {/* Beta contact limit wall */}
+        {/* Contact limit wall */}
         {atLimit && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full bg-cooling-soft border border-cooling/25 flex items-center justify-center">
               <span className="text-2xl">🎯</span>
             </div>
             <div>
-              <p className="text-base font-bold text-foreground mb-1">You've hit the beta limit</p>
+              <p className="text-base font-bold text-foreground mb-1">You've reached the contact limit</p>
               <p className="text-sm text-muted-foreground max-w-[280px]">
-                The beta supports up to {FREE_TIER_LIMIT} contacts. More capacity is coming — thanks for being an early user!
+                Novara currently supports up to {FREE_TIER_LIMIT} contacts. More capacity is coming soon.
               </p>
             </div>
             <Button variant="outline" className="rounded-xl" onClick={() => window.history.back()}>
@@ -261,6 +265,10 @@ export default function AddContact() {
 
         {!atLimit && (
           <>
+            {/* Import from the iPhone's own Contacts. Renders nothing in a
+                browser, and nothing in an app build without the native picker. */}
+            <NativeContactImport onExtracted={handleCardScanned} />
+
             {/* Business Card Scanner */}
             <BusinessCardScanner onExtracted={handleCardScanned} />
 
@@ -603,7 +611,7 @@ export default function AddContact() {
                           ))}
                         </div>
                       </FormControl>
-                      {missing && <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5">{missing}</p>}
+                      {missing && <p className="text-xs text-cooling mt-1.5">{missing}</p>}
                       <FormMessage />
                     </FormItem>
                   );

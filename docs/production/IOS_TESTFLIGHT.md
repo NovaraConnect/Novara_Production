@@ -152,13 +152,15 @@ reviewable in a diff and they survive a `cap sync`:
 |---|---|---|
 | Bundle identifier | `group.novaraconnect.app` | `PRODUCT_BUNDLE_IDENTIFIER` |
 | Display name | Novara | `CFBundleDisplayName` |
-| Version / build | 1.0.0 / 1 | `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` |
-| Deployment target | iOS 14.0 (Capacitor 7's floor) | `IPHONEOS_DEPLOYMENT_TARGET` |
+| Version / build | 1.0.0 / 7 | `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` |
+| Deployment target | iOS 15.0 | `IPHONEOS_DEPLOYMENT_TARGET` |
 | Orientation | portrait only, matching the PWA manifest | `UISupportedInterfaceOrientations` |
 | Device family | iPhone only | `TARGETED_DEVICE_FAMILY` |
 | Signing style | Automatic | `CODE_SIGN_STYLE` |
 | Camera permission | `NSCameraUsageDescription` | `Info.plist` |
 | Photo library permission | `NSPhotoLibraryUsageDescription` | `Info.plist` |
+| Contacts permission | `NSContactsUsageDescription` | `Info.plist` |
+| Export compliance | `ITSAppUsesNonExemptEncryption` = false | `Info.plist` |
 
 Both usage strings are required — iOS terminates the app on first camera or
 photo-library access if they are missing. Their wording is accurate about what
@@ -184,6 +186,59 @@ committed: it is account-specific, and Xcode writes it on first selection.
   screenshot set back.
 - `UISupportedInterfaceOrientations~ipad` was removed from `Info.plist` for the
   same reason — with no iPad target it was dead configuration.
+
+---
+
+## The native layer
+
+The shell is no longer only a web view. `ios/App/App/Native/` holds a small
+native layer that exists for one reason: **App Store Review Guideline 4.2**,
+which rejects apps that are a repackaged website. Everything in it wraps the
+existing web app rather than reimplementing any of it.
+
+| File | What it does |
+|---|---|
+| `NovaraSection.swift` | The four tab-bar sections and the path→section map. Mirrors `src/components/BottomNav.tsx` exactly. |
+| `NovaraRootViewController.swift` | The shell: native `UITabBar`, one child web view, launch/offline/failure states, haptics. |
+| `NovaraWebViewController.swift` | `CAPBridgeViewController` subclass. Injects the bridge script, hosts the message handler, watches for failed loads. |
+| `NovaraBridgeScript.swift` | The injected JavaScript. Installs `window.NovaraNative`. |
+| `NovaraContactImport.swift` | `CNContactPickerViewController` → one contact → the web app. |
+| `NovaraCardScanner.swift` | VisionKit document scanner + Vision on-device OCR → text → the web app. |
+| `NovaraStatusView.swift`, `NovaraTheme.swift` | The native states, in the web app's own colours. |
+
+### The rule that keeps it safe: ONE web view, never reloaded
+
+Selecting a tab calls `NovaraNative.navigate(path)`, which drives the existing
+wouter router with `pushState` + a `popstate` event. It is the same client-side
+route change the web nav already performed. Nothing reloads, so the Clerk
+session, the React Query cache and any half-typed form survive every tab switch.
+
+### Release ordering — read this before shipping
+
+The shell loads `https://app.novaraconnect.group`, so **the binary and the web
+app ship separately**. The bridge script is written to work against the web app
+*as already deployed*, which means the order is forgiving but not free:
+
+1. **Deploy the web app first.** It adds `src/lib/nativeBridge.ts`, the native
+   Contacts import, the native scan button and the push deep-link listener.
+2. **Then upload the build.**
+
+If you do it the other way round, the app still works: the tab bar, the offline
+states and the deep link that the *native* side owns are all live immediately.
+What is missing until the web deploy lands is the native Contacts import and the
+native scan button — both are feature-detected and simply do not render — and
+the injected script hides the web app's own bottom nav in the meantime so there
+is never a double navigation.
+
+Every web-side entry point is feature-detected (`canPickNativeContact()`,
+`canScanNativeCard()`), so an older installed build never shows a button it
+cannot fulfil.
+
+### Debugging the bridge
+
+Safari → Develop → Simulator/device → the Novara page. `window.NovaraNative`
+is the whole API surface. `NovaraNative.navigate('/contacts')` from the console
+drives the shell exactly as a tab tap does.
 
 ## Step 4 — TestFlight
 

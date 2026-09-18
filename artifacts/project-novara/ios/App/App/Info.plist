@@ -20,19 +20,32 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- Novara uses only HTTPS/TLS, which is exempt encryption. Declaring it
+	     here answers the export-compliance question at build time instead of
+	     blocking every single upload in App Store Connect. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSContactsUsageDescription</key>
+	<string>Novara asks for Contacts access only if a contact you pick cannot be read from the picker alone. Novara never reads or uploads your address book — only the single contact you choose, and only after you review it.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Novara uses the camera so you can scan business cards and prefill contact details.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Novara lets you choose screenshots or business card images from your photo library to prefill contact details.</string>
+	<!-- Novara is a dark product, so the whole app is pinned to the dark
+	     appearance. This does three things at once: the LaunchScreen's
+	     systemBackgroundColor resolves dark instead of flashing white, the
+	     status bar draws light glyphs over the navy UI, and every system
+	     surface we present (the Contacts picker, the document scanner,
+	     alerts) comes up dark rather than jarringly light. -->
+	<key>UIUserInterfaceStyle</key>
+	<string>Dark</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
-	<key>UIMainStoryboardFile</key>
-	<string>Main</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<string>arm64</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>

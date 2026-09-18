@@ -90,7 +90,7 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
     if (parseInt(countRow.count, 10) >= FREE_TIER_LIMIT) {
       res.status(403).json({
         error: "Contact limit reached",
-        message: `You've reached the ${FREE_TIER_LIMIT}-contact limit for the beta. More spots are coming soon!`,
+        message: `You've reached the ${FREE_TIER_LIMIT}-contact limit. More capacity is coming soon.`,
         code: "CONTACT_LIMIT_REACHED",
       });
       return;

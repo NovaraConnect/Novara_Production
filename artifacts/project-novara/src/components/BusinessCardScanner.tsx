@@ -8,6 +8,7 @@ import { mergeCardResult } from "@/lib/cardMerge";
 import { useFeatures } from "@/hooks/useFeatures";
 import { useAuth } from "@clerk/react";
 import { apiFetch } from "@/lib/api";
+import { canScanNativeCard, scanNativeCard, haptic } from "@/lib/nativeBridge";
 
 // Re-exported so existing importers (e.g. AddContact) keep working unchanged.
 export type { ScannedContact };
@@ -60,6 +61,9 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
   const libraryRef = useRef<HTMLInputElement>(null);
   const { cardAiParse } = useFeatures();
   const { getToken } = useAuth();
+  // Feature-detected, not just "is this iOS": an older TestFlight build has the
+  // web view but not the native scanner, and must keep the camera-roll path.
+  const hasNativeScanner = canScanNativeCard();
 
   // Optional: refine the deterministic parse with the AI text parser. Sends the
   // OCR TEXT ONLY (never the image), and falls back to `deterministic` on any
@@ -83,6 +87,57 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
       return deterministic;
     } catch {
       return deterministic;
+    }
+  };
+
+  // Everything that happens once SOME engine has produced text. Shared by the
+  // browser's tesseract.js path and the iOS app's Vision path, so the parser,
+  // the optional AI refinement and the review-before-save contract are
+  // identical no matter where the characters came from.
+  const applyRecognizedText = async (text: string): Promise<void> => {
+    if (!text || text.trim().length < 5) {
+      setStatus("error");
+      toast.error("No text found — try a clearer photo or fill in manually.");
+      return;
+    }
+
+    const extracted = extractContactFields(text);
+    const hasData =
+      extracted.firstName ||
+      extracted.email ||
+      extracted.phone ||
+      extracted.company;
+
+    if (!hasData) {
+      setStatus("error");
+      toast.error("Couldn't read the card clearly — please fill in manually.");
+      return;
+    }
+
+    const finalData = await refineWithAi(text, extracted);
+
+    setStatus("done");
+    onExtracted(finalData);
+    haptic("success");
+    toast.success("Card scanned — review and edit the pre-filled fields below");
+  };
+
+  // Native iOS capture: VisionKit's document scanner plus on-device Vision OCR.
+  // Replaces the capture and the OCR engine only — the parsed result goes
+  // through applyRecognizedText() exactly as a browser scan does.
+  const handleNativeScan = async () => {
+    try {
+      const result = await scanNativeCard();
+      if (result.cancelled) return;
+      setStatus("processing");
+      await applyRecognizedText(result.text ?? "");
+    } catch (err) {
+      setStatus("error");
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Couldn't scan the card — please fill in manually.",
+      );
     }
   };
 
@@ -113,30 +168,7 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
       const { data: { text } } = await worker.recognize(preprocessed);
       await worker.terminate();
 
-      if (!text || text.trim().length < 5) {
-        setStatus("error");
-        toast.error("No text found — try a clearer photo or fill in manually.");
-        return;
-      }
-
-      const extracted = extractContactFields(text);
-      const hasData =
-        extracted.firstName ||
-        extracted.email ||
-        extracted.phone ||
-        extracted.company;
-
-      if (!hasData) {
-        setStatus("error");
-        toast.error("Couldn't read the card clearly — please fill in manually.");
-        return;
-      }
-
-      const finalData = await refineWithAi(text, extracted);
-
-      setStatus("done");
-      onExtracted(finalData);
-      toast.success("Card scanned — review and edit the pre-filled fields below");
+      await applyRecognizedText(text);
     } catch (err) {
       console.error("[BusinessCardScanner OCR error]", err);
       setStatus("error");
@@ -167,7 +199,7 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
           <div>
             <p className="text-sm font-semibold text-foreground">Reading your card…</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              This takes 5–15 seconds
+              {hasNativeScanner ? "Just a moment" : "This takes 5–15 seconds"}
             </p>
           </div>
         </div>
@@ -177,12 +209,12 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
       {status === "done" && (
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+            <CheckCircle2 className="w-4 h-4 text-warm shrink-0 mt-0.5" />
             <div>
               <span className="text-sm font-medium text-foreground">
                 Fields pre-filled below
               </span>
-              <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
+              <p className="text-xs text-cooling mt-0.5">
                 Scans aren't always perfect — please check every field for accuracy before saving.
               </p>
             </div>
@@ -226,10 +258,11 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
               type="button"
               variant="outline"
               className="flex-1 h-11 gap-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-sm font-semibold shadow-sm"
-              onClick={() => cameraRef.current?.click()}
+              onClick={hasNativeScanner ? handleNativeScan : () => cameraRef.current?.click()}
+              data-testid="button-scan-card"
             >
               <Camera className="w-4 h-4" />
-              Take Photo
+              {hasNativeScanner ? "Scan Card" : "Take Photo"}
             </Button>
             <Button
               type="button"
@@ -241,9 +274,12 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
               Choose Photo
             </Button>
           </div>
-          <p className="text-[11px] text-muted-foreground/70 mt-2 leading-relaxed">
-            Good lighting, card filling the frame. First scan takes 5–15 seconds. If the camera
-            doesn't open, use <span className="font-medium">Choose Photo</span>.
+          <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+            {hasNativeScanner
+              ? "Hold the card in the frame — Novara finds the edges and reads it on your iPhone. You can scan both sides."
+              : "Good lighting, card filling the frame. First scan takes 5–15 seconds. If the camera doesn't open, use "}
+            {!hasNativeScanner && <span className="font-medium">Choose Photo</span>}
+            {!hasNativeScanner && "."}
           </p>
         </>
       )}

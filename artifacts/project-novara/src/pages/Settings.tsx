@@ -3,13 +3,25 @@ import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Bell, Save, Check, X, Plus, LogOut, RefreshCw, Smartphone, ChevronRight, BookOpen, Target } from "lucide-react";
+import { Bell, Save, Check, X, Plus, LogOut, RefreshCw, Smartphone, ChevronRight, BookOpen, Target, Trash2, Bug, Lightbulb } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { useSettings } from "@/hooks/useSettings";
-import { useClerk, useUser } from "@clerk/react";
+import { useAuth, useClerk, useUser } from "@clerk/react";
 import { UserSettings } from "@/types/contact";
 import { NovaraMark } from "@/components/NovaraMark";
+import { isNativeShell } from "@/lib/installPrompt";
+import { deleteAccount } from "@/lib/api";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const DOWNGRADE_OPTIONS: UserSettings["autoDowngradeAfterMonths"][] = [3, 6, 9, 12];
 
@@ -33,6 +45,32 @@ export default function Settings() {
   const { settings, updateSettings } = useSettings();
   const { user } = useUser();
   const { signOut } = useClerk();
+  const { getToken } = useAuth();
+
+  // Inside the iOS app, "install this on your phone" is nonsense — they are
+  // already in the installed app — and pointing at a non-App-Store install
+  // route is exactly the kind of thing App Review objects to.
+  const nativeApp = isNativeShell();
+
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Account deletion, required by App Store Review Guideline 5.1.1(v) for any
+  // app that lets people create an account. Irreversible, so it is behind a
+  // confirmation and worded so nobody can tap it by accident.
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await deleteAccount(getToken);
+      setConfirmingDelete(false);
+      toast.success("Your account and all its data have been deleted.");
+      await signOut({ redirectUrl: `${basePath}/` });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete your account.");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const [statement, setStatement] = useState(settings.careerStatement);
   const [saved, setSaved] = useState(false);
@@ -107,8 +145,8 @@ export default function Settings() {
       <main className="flex-1 px-4 py-8 flex flex-col gap-8">
 
         {/* App identity */}
-        <section className="text-center space-y-3">
-          <NovaraMark size={80} className="mx-auto mb-4 shadow-sm" />
+        <section className="brand-glow text-center space-y-3">
+          <NovaraMark size={80} className="mx-auto mb-4" />
           <h2 className="font-serif text-2xl font-bold text-foreground">Novara</h2>
           {user && (
             <p className="text-sm text-muted-foreground">
@@ -122,7 +160,7 @@ export default function Settings() {
             card and rows in the next. */}
         <section>
           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Account</p>
-          <div className="bg-card border border-border/50 rounded-2xl shadow-sm overflow-hidden divide-y divide-border/50">
+          <div className="surface-card overflow-hidden divide-y divide-border/60">
             <button
               onClick={async () => {
                 try {
@@ -134,7 +172,7 @@ export default function Settings() {
                 }
               }}
               disabled={updateSettings.isPending}
-              className="w-full p-4 flex items-center gap-4 hover:bg-secondary/30 transition-colors text-left disabled:opacity-60"
+              className="w-full p-4 flex items-center gap-4 hover:bg-elevated transition-colors text-left disabled:opacity-60"
             >
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                 <BookOpen className="w-5 h-5 text-primary" />
@@ -144,7 +182,7 @@ export default function Settings() {
             </button>
             <button
               onClick={() => signOut({ redirectUrl: `${basePath}/` })}
-              className="w-full p-4 flex items-center gap-4 hover:bg-destructive/5 transition-colors text-left"
+              className="w-full p-4 flex items-center gap-4 hover:bg-destructive/10 transition-colors text-left"
             >
               <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
                 <LogOut className="w-5 h-5 text-destructive" />
@@ -152,11 +190,56 @@ export default function Settings() {
               <p className="flex-1 text-sm font-semibold text-destructive">Sign out</p>
               <ChevronRight className="w-4 h-4 text-destructive/60" aria-hidden="true" />
             </button>
+            <button
+              onClick={() => setConfirmingDelete(true)}
+              className="w-full p-4 flex items-center gap-4 hover:bg-destructive/10 transition-colors text-left"
+              data-testid="button-delete-account"
+            >
+              <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-destructive" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-destructive">Delete account</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Permanently removes your contacts and your Novara login
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-destructive/60" aria-hidden="true" />
+            </button>
           </div>
         </section>
 
+        <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete your Novara account?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This permanently deletes your contacts, your career profile, your notification
+                settings and your Novara login. It cannot be undone, and there is no way to
+                recover the data afterwards.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Keep my account</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(event) => {
+                  // Keep the dialog up while the request is in flight, so the
+                  // screen does not flash back to Settings mid-delete.
+                  event.preventDefault();
+                  void handleDeleteAccount();
+                }}
+                disabled={deleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                data-testid="button-confirm-delete-account"
+              >
+                {deleting ? "Deleting…" : "Delete everything"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         {/* Auto-downgrade cadence setting */}
-        <section className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm space-y-4">
+        <section className="surface-card p-5 space-y-4">
           <div className="flex items-start gap-3">
             <RefreshCw className="w-5 h-5 text-primary mt-0.5 shrink-0" />
             <div>
@@ -189,7 +272,7 @@ export default function Settings() {
         {/* Career Profile */}
         <section id="career-profile" className="scroll-mt-24">
           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Career Profile</p>
-          <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm space-y-6">
+          <div className="surface-card p-5 space-y-6">
 
             {/* Career statement */}
             <div className="space-y-3">
@@ -205,7 +288,7 @@ export default function Settings() {
                   data-testid="input-career-statement"
                 />
                 <div className="flex justify-end">
-                  <Button size="sm" onClick={handleSaveStatement} className={saved ? "bg-emerald-600 hover:bg-emerald-700" : ""} data-testid="button-save-statement">
+                  <Button size="sm" onClick={handleSaveStatement} className={saved ? "bg-warm text-[hsl(var(--primary-foreground))] hover:bg-warm/90" : ""} data-testid="button-save-statement">
                     {saved ? <Check className="w-4 h-4 mr-1" /> : <Save className="w-4 h-4 mr-1" />}
                     {saved ? "Saved" : "Save"}
                   </Button>
@@ -226,7 +309,7 @@ export default function Settings() {
               </div>
               <div className="flex flex-wrap gap-2">
                 {(settings.careerGoals ?? []).map((goal) => (
-                  <span key={goal} className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30 text-xs font-semibold px-3 py-1.5 rounded-full">
+                  <span key={goal} className="inline-flex items-center gap-1.5 bg-warm-soft text-warm border border-warm/25 text-xs font-semibold px-3 py-1.5 rounded-full">
                     {goal}
                     <button onClick={() => handleRemoveGoal(goal)} className="hover:text-destructive transition-colors" aria-label={`Remove ${goal}`} disabled={updateSettings.isPending}>
                       <X className="w-3 h-3" />
@@ -234,7 +317,7 @@ export default function Settings() {
                   </span>
                 ))}
                 {showGoalInput ? (
-                  <div className="flex items-center gap-1 border border-emerald-400 rounded-full px-3 py-1 bg-card">
+                  <div className="flex items-center gap-1 border border-warm/50 rounded-full px-3 py-1 bg-input-background">
                     <Input
                       autoFocus value={newGoal}
                       onChange={(e) => setNewGoal(e.target.value)}
@@ -242,12 +325,12 @@ export default function Settings() {
                       placeholder="e.g. Fintech, VC"
                       className="border-0 p-0 h-auto text-xs w-24 focus-visible:ring-0 shadow-none"
                     />
-                    <button onClick={handleAddGoal} className="text-emerald-600" disabled={updateSettings.isPending}><Check className="w-3.5 h-3.5" /></button>
+                    <button onClick={handleAddGoal} className="text-warm" disabled={updateSettings.isPending}><Check className="w-3.5 h-3.5" /></button>
                     <button onClick={() => { setShowGoalInput(false); setNewGoal(""); }} className="text-muted-foreground"><X className="w-3.5 h-3.5" /></button>
                   </div>
                 ) : (
                   <button onClick={() => setShowGoalInput(true)}
-                    className="inline-flex items-center gap-1 border border-dashed border-border text-muted-foreground text-xs font-medium px-3 py-1.5 rounded-full hover:border-emerald-400 hover:text-emerald-600 transition-colors">
+                    className="inline-flex items-center gap-1 border border-dashed border-border text-muted-foreground text-xs font-medium px-3 py-1.5 rounded-full hover:border-warm/60 hover:text-warm transition-colors">
                     <Plus className="w-3 h-3" /> Add goal
                   </button>
                 )}
@@ -265,7 +348,7 @@ export default function Settings() {
           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Notifications</p>
           <button
             onClick={() => setLocation("/notifications")}
-            className="w-full bg-card border border-border/50 rounded-2xl p-4 shadow-sm flex items-center gap-4 hover:bg-secondary/30 transition-colors text-left"
+            className="surface-card w-full p-4 flex items-center gap-4 hover:bg-elevated transition-colors text-left"
           >
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <Bell className="w-5 h-5 text-primary" />
@@ -284,11 +367,11 @@ export default function Settings() {
           <div className="space-y-3">
             <button
               onClick={() => setLocation("/feedback?type=bug")}
-              className="w-full bg-card border border-border/50 rounded-2xl p-4 shadow-sm flex items-center gap-4 hover:bg-secondary/30 transition-colors text-left"
+              className="surface-card w-full p-4 flex items-center gap-4 hover:bg-elevated transition-colors text-left"
               data-testid="nav-report-bug"
             >
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 text-lg">
-                🐞
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Bug className="w-5 h-5 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground">Report a bug</p>
@@ -298,11 +381,11 @@ export default function Settings() {
             </button>
             <button
               onClick={() => setLocation("/feedback?type=feature")}
-              className="w-full bg-card border border-border/50 rounded-2xl p-4 shadow-sm flex items-center gap-4 hover:bg-secondary/30 transition-colors text-left"
+              className="surface-card w-full p-4 flex items-center gap-4 hover:bg-elevated transition-colors text-left"
               data-testid="nav-suggest-feature"
             >
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 text-lg">
-                💡
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Lightbulb className="w-5 h-5 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground">Suggest a feature</p>
@@ -313,12 +396,13 @@ export default function Settings() {
           </div>
         </section>
 
-        {/* Install app */}
+        {/* Install app — browsers and installed PWAs only. */}
+        {!nativeApp && (
         <section>
           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Mobile App</p>
           <button
             onClick={() => setLocation("/install")}
-            className="w-full bg-card border border-border/50 rounded-2xl p-4 shadow-sm flex items-center gap-4 hover:bg-secondary/30 transition-colors text-left"
+            className="surface-card w-full p-4 flex items-center gap-4 hover:bg-elevated transition-colors text-left"
           >
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <Smartphone className="w-5 h-5 text-primary" />
@@ -330,6 +414,7 @@ export default function Settings() {
             <div className="text-muted-foreground">›</div>
           </button>
         </section>
+        )}
 
         <div className="text-center mt-auto pt-4">
           <p className="text-xs text-muted-foreground">Version 2.0.0 · Cloud-synced</p>

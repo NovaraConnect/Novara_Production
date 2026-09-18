@@ -118,6 +118,24 @@ export async function importContactsFromLocalStorage(
   return res.json();
 }
 
+// ── Account ──────────────────────────────────────────────────────────────────
+
+/**
+ * Permanently deletes the signed-in user's contacts, settings, notification
+ * registrations and login.
+ *
+ * Required by App Store Review Guideline 5.1.1(v) for any app that offers
+ * account creation. Irreversible — every caller must confirm first.
+ */
+export async function deleteAccount(getToken: GetAuthToken): Promise<void> {
+  const res = await apiFetch(getToken, "/api/account", { method: "DELETE" });
+  if (res.status === 401) throw new Error("Unauthorized");
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? "Failed to delete your account. Please try again.");
+  }
+}
+
 // ── Settings ─────────────────────────────────────────────────────────────────
 
 export async function fetchSettings(getToken: GetAuthToken): Promise<UserSettings> {

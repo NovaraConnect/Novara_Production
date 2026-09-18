@@ -7,7 +7,23 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // The window is built here rather than from Main.storyboard.
+        //
+        // Capacitor's template storyboard contained a single scene whose view
+        // controller had no view of its own, because CAPBridgeViewController
+        // assigns `view = webView` in loadView(). That is fine for the bridge
+        // controller itself, but the native shell (NovaraRootViewController) is
+        // an ordinary container that needs a real root view, and a storyboard
+        // scene with no `<view>` element loads as a blank black screen.
+        //
+        // Doing it in code also means there is exactly one place that says what
+        // the app's root is, instead of a storyboard that has to be kept in
+        // sync with a class name.
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = NovaraRootViewController()
+        window.backgroundColor = NovaraTheme.background
+        window.makeKeyAndVisible()
+        self.window = window
         return true
     }
 

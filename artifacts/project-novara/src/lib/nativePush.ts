@@ -83,37 +83,57 @@ export async function registerForNativePush(): Promise<NativePushRegistration> {
     );
   }
 
-  const token = await new Promise<string>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error("Timed out waiting for an APNs device token")),
-      REGISTRATION_TIMEOUT_MS,
-    );
+  // The two listeners below are removed once the token has arrived. They used
+  // to be left attached, which meant every trip through Settings added another
+  // pair, and the only thing that ever cleared them was removeAllListeners() in
+  // unregisterNativePush() — which also tore down the unrelated deep-link
+  // listener (see hooks/useNativeDeepLink.ts) and left tapped notifications
+  // going nowhere until the next cold start.
+  const handles: { remove: () => Promise<void> }[] = [];
 
-    void PushNotifications.addListener("registration", (t: { value: string }) => {
-      clearTimeout(timer);
-      resolve(t.value);
-    });
+  try {
+    return {
+      token: await new Promise<string>((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error("Timed out waiting for an APNs device token")),
+          REGISTRATION_TIMEOUT_MS,
+        );
 
-    void PushNotifications.addListener("registrationError", (err: unknown) => {
-      clearTimeout(timer);
-      reject(new Error(`APNs registration failed: ${JSON.stringify(err)}`));
-    });
+        void PushNotifications.addListener("registration", (t: { value: string }) => {
+          clearTimeout(timer);
+          resolve(t.value);
+        }).then((handle) => handles.push(handle));
 
-    void PushNotifications.register();
-  });
+        void PushNotifications.addListener("registrationError", (err: unknown) => {
+          clearTimeout(timer);
+          reject(new Error(`APNs registration failed: ${JSON.stringify(err)}`));
+        }).then((handle) => handles.push(handle));
 
-  return {
-    token,
-    environment: resolveApnsEnvironment(import.meta.env["VITE_APNS_ENVIRONMENT"]),
-  };
+        void PushNotifications.register();
+      }),
+      environment: resolveApnsEnvironment(import.meta.env["VITE_APNS_ENVIRONMENT"]),
+    };
+  } finally {
+    await Promise.allSettled(handles.map((handle) => handle.remove()));
+  }
 }
 
-/** Removes all delivered notifications and listeners. Best-effort. */
+
+/**
+ * Stops this device receiving pushes. Best-effort.
+ *
+ * Deliberately does NOT call removeAllListeners(): the deep-link listener in
+ * hooks/useNativeDeepLink.ts is registered once per app launch, independently
+ * of whether notifications are switched on, and tearing it down here meant
+ * that turning notifications off and on again left every subsequent
+ * notification tap opening the app on whatever screen it was last left on.
+ * registerForNativePush() now cleans up its own listeners instead.
+ */
 export async function unregisterNativePush(): Promise<void> {
   if (!isNativeShell()) return;
   try {
     const { PushNotifications } = await import("@capacitor/push-notifications");
-    await PushNotifications.removeAllListeners();
+    await PushNotifications.unregister();
   } catch {
     // Nothing actionable — the caller still clears the server-side token.
   }

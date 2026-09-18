@@ -27,6 +27,7 @@ import SignInPage from "@/pages/SignIn";
 import SignUpPage from "@/pages/SignUp";
 import InstallPrompt from "@/components/InstallPrompt";
 import { hasSeenInstallPrompt, isInstalledExperience } from "@/lib/installPrompt";
+import { useNativeDeepLink } from "@/hooks/useNativeDeepLink";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
@@ -53,41 +54,41 @@ const clerkAppearance = {
     logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
   },
   variables: {
-    colorPrimary: "#2952cc",
-    colorForeground: "#161d2e",
-    colorMutedForeground: "#6b7280",
-    colorDanger: "#ef4444",
-    colorBackground: "#ffffff",
-    colorInput: "#d9dce6",
-    colorInputForeground: "#161d2e",
-    colorNeutral: "#d9dce6",
+    colorPrimary: "#6F8CFF",
+    colorForeground: "#F4F7FB",
+    colorMutedForeground: "#AAB7CA",
+    colorDanger: "#FF6B7A",
+    colorBackground: "#101C2C",
+    colorInput: "#142234",
+    colorInputForeground: "#F4F7FB",
+    colorNeutral: "#AAB7CA",
     fontFamily: "'Plus Jakarta Sans', sans-serif",
     borderRadius: "0.625rem",
   },
   elements: {
     rootBox: "w-full flex justify-center",
-    cardBox: "bg-white rounded-2xl w-[440px] max-w-full overflow-hidden shadow-xl border border-gray-100",
+    cardBox: "bg-card rounded-2xl w-[440px] max-w-full overflow-hidden shadow-[var(--shadow-raised)] border border-card-border",
     card: "!shadow-none !border-0 !bg-transparent !rounded-none",
     footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
-    headerTitle: "text-[#161d2e] font-bold",
-    headerSubtitle: "text-[#6b7280]",
-    socialButtonsBlockButtonText: "text-[#161d2e] font-medium",
-    formFieldLabel: "text-[#161d2e] font-medium",
-    footerActionLink: "text-[#2952cc] font-semibold",
-    footerActionText: "text-[#6b7280]",
-    dividerText: "text-[#6b7280]",
-    identityPreviewEditButton: "text-[#2952cc]",
-    formFieldSuccessText: "text-emerald-600",
-    alertText: "text-[#161d2e]",
+    headerTitle: "text-[#F4F7FB] font-bold",
+    headerSubtitle: "text-[#AAB7CA]",
+    socialButtonsBlockButtonText: "text-[#F4F7FB] font-medium",
+    formFieldLabel: "text-[#F4F7FB] font-medium",
+    footerActionLink: "text-[#6F8CFF] font-semibold",
+    footerActionText: "text-[#AAB7CA]",
+    dividerText: "text-[#AAB7CA]",
+    identityPreviewEditButton: "text-[#6F8CFF]",
+    formFieldSuccessText: "text-[#55D6A5]",
+    alertText: "text-[#F4F7FB]",
     logoBox: "flex justify-center",
     logoImage: "h-12 w-12 rounded-2xl",
-    socialButtonsBlockButton: "border border-[#d9dce6] hover:bg-gray-50",
-    formButtonPrimary: "bg-[#2952cc] hover:bg-[#1e3fa3] font-semibold",
-    formFieldInput: "border border-[#d9dce6] bg-white text-[#161d2e]",
+    socialButtonsBlockButton: "border border-[#2A3850] hover:bg-[#152235]",
+    formButtonPrimary: "bg-[#6F8CFF] text-[#0A1322] hover:bg-[#5F7CF0] font-semibold",
+    formFieldInput: "border border-[#2A3850] bg-[#142234] text-[#F4F7FB]",
     footerAction: "bg-transparent",
-    dividerLine: "bg-[#d9dce6]",
-    alert: "border border-red-100 bg-red-50",
-    otpCodeFieldInput: "border border-[#d9dce6]",
+    dividerLine: "bg-[#2A3850]",
+    alert: "border border-[#FF6B7A]/25 bg-[#FF6B7A]/10",
+    otpCodeFieldInput: "border border-[#2A3850] bg-[#142234] text-[#F4F7FB]",
     formFieldRow: "",
     main: "",
   },
@@ -221,6 +222,13 @@ function Router() {
   );
 }
 
+/** Notification taps open the contact or screen they are about. No-op in a
+ *  browser. Mounted inside the router so it can navigate. */
+function NativeDeepLinks() {
+  useNativeDeepLink();
+  return null;
+}
+
 function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
 
@@ -246,6 +254,7 @@ function ClerkProviderWithRoutes() {
         <TooltipProvider>
           <ClerkQueryClientCacheInvalidator />
       <PostHogIdentifier />
+          <NativeDeepLinks />
           <Router />
           <InstallPrompt />
           <Toaster />
