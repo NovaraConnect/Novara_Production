@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { useUser } from "@clerk/react";
 
+import { APP_VERSION } from "@/lib/appVersion";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,11 +15,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useFeedback } from "@/hooks/useFeedback";
-
-// Matches the version shown in the Settings footer -- this app has no build-time
-// git commit / package version injected into the frontend bundle, so this is
-// the same "source of truth" already displayed to users elsewhere.
-const APP_VERSION = "2.0.0";
 
 const FEEDBACK_TYPES = [
   { value: "bug", label: "Bug report" },

@@ -133,7 +133,7 @@ export default function Notifications() {
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-base font-semibold text-foreground">Notifications</h1>
+        <h1 className="font-serif text-xl font-bold tracking-tight text-foreground">Notifications</h1>
       </header>
 
       <main className="flex-1 px-4 py-6 space-y-6 max-w-md mx-auto w-full">

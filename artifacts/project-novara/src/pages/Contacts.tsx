@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { Search, Loader2, Users, Plus } from "lucide-react";
+import { Search, SearchX, Loader2, Users, Plus } from "lucide-react";
 import { computeStatus } from "@/lib/utils";
 import { ContactCard } from "@/components/ContactCard";
 import { BottomNav } from "@/components/BottomNav";
@@ -40,11 +40,6 @@ export default function Contacts() {
 
   const connectedCount = contacts.filter(c => c.connectionStatus === "connected").length;
   const pipelineCount = contacts.filter(c => c.connectionStatus === "pipeline").length;
-
-  const noResultsMsg =
-    searchQuery || statusFilter !== "All" || tempFilter !== "All"
-      ? "No contacts match your filters."
-      : "No contacts yet. Add your first one!";
 
   return (
     <div className="mobile-container pb-24 flex flex-col min-h-[100dvh]">
@@ -100,7 +95,10 @@ export default function Contacts() {
                 <TabsTrigger
                   key={s}
                   value={s}
-                  className="rounded-full px-4 py-1.5 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                  // Matches the All/Connected/Pipeline row above: unselected
+                  // options sit in their own subtle pill instead of floating as
+                  // bare text. Selected-state logic is untouched.
+                  className="rounded-full px-4 py-1.5 text-sm bg-subtle text-muted-foreground transition-colors hover:bg-muted data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 >
                   {s}
                 </TabsTrigger>
@@ -133,8 +131,19 @@ export default function Contacts() {
             </Link>
           </div>
         ) : filteredContacts.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-muted-foreground text-sm">{noResultsMsg}</p>
+          /* Deliberately compact: this is a filter dead-end, not onboarding,
+             so it gets an icon, a heading and one line of guidance — and no
+             call to action competing with the filters above. */
+          <div className="flex flex-col items-center gap-3 py-14 text-center">
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-subtle border border-border/60">
+              <SearchX className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">No matches</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Try a different search, or clear your filters.
+              </p>
+            </div>
           </div>
         ) : (
           filteredContacts.map((contact) => (

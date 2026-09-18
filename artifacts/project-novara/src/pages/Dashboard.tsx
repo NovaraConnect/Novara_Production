@@ -78,11 +78,17 @@ export default function Dashboard() {
             </span>
             <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </div>
-          <div className="flex items-end gap-2 mb-3">
+          {/* The serif numeral is the focal point of the module, so it gets its
+              own breathing room. leading-none clips the serif's descender space
+              and pulled the tiles up against the baseline, so the space is put
+              back explicitly (pt-1/pb-5) rather than by loosening leading,
+              which would throw the numeral off its optical centre. The "/100"
+              is nudged to sit on the numeral's baseline rather than the box's. */}
+          <div className="flex items-baseline gap-2 pt-1 pb-5">
             <span className="font-serif text-5xl font-bold leading-none tracking-tight text-foreground tabular-nums">
               {healthScore}
             </span>
-            <span className="mb-1 text-sm text-muted-foreground">/100</span>
+            <span className="text-sm text-muted-foreground">/100</span>
           </div>
           {/* Four tinted wells rather than pastel blocks: the semantic hue is
               carried by the number and a translucent wash, so the tiles read

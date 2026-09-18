@@ -11,6 +11,7 @@ import { useAuth, useClerk, useUser } from "@clerk/react";
 import { UserSettings } from "@/types/contact";
 import { NovaraMark } from "@/components/NovaraMark";
 import { isNativeShell } from "@/lib/installPrompt";
+import { APP_VERSION } from "@/lib/appVersion";
 import { deleteAccount } from "@/lib/api";
 import {
   AlertDialog,
@@ -180,15 +181,20 @@ export default function Settings() {
               <p className="flex-1 text-sm font-semibold text-foreground">Replay Tutorial</p>
               <ChevronRight className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
             </button>
+            {/* Signing out is reversible; deleting the account is not. They used
+                to look identical, which left the only irreversible action in
+                the app with no more weight than ending a session. Sign out is
+                now a neutral row like Replay Tutorial, so red in this card
+                means exactly one thing. */}
             <button
               onClick={() => signOut({ redirectUrl: `${basePath}/` })}
-              className="w-full p-4 flex items-center gap-4 hover:bg-destructive/10 transition-colors text-left"
+              className="w-full p-4 flex items-center gap-4 hover:bg-elevated transition-colors text-left"
             >
-              <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
-                <LogOut className="w-5 h-5 text-destructive" />
+              <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+                <LogOut className="w-5 h-5 text-muted-foreground" />
               </div>
-              <p className="flex-1 text-sm font-semibold text-destructive">Sign out</p>
-              <ChevronRight className="w-4 h-4 text-destructive/60" aria-hidden="true" />
+              <p className="flex-1 text-sm font-semibold text-foreground">Sign out</p>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
             </button>
             <button
               onClick={() => setConfirmingDelete(true)}
@@ -204,7 +210,7 @@ export default function Settings() {
                   Permanently removes your contacts and your Novara login
                 </p>
               </div>
-              <ChevronRight className="w-4 h-4 text-destructive/60" aria-hidden="true" />
+              <ChevronRight className="w-4 h-4 text-destructive" aria-hidden="true" />
             </button>
           </div>
         </section>
@@ -417,7 +423,7 @@ export default function Settings() {
         )}
 
         <div className="text-center mt-auto pt-4">
-          <p className="text-xs text-muted-foreground">Version 2.0.0 · Cloud-synced</p>
+          <p className="text-xs text-muted-foreground">Version {APP_VERSION} · Cloud-synced</p>
         </div>
       </main>
 
