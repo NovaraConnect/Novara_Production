@@ -36,6 +36,20 @@ const mode = process.env["NOVARA_IOS_MODE"] === "bundled" ? "bundled" : "remote"
 
 const PRODUCTION_WEB_URL = "https://app.novaraconnect.group";
 
+// Clerk's Frontend API host. It MUST be allowed to load inside the web view.
+//
+// Signing in is not a single-origin flow: once Clerk has authenticated, it
+// performs a top-level navigation to
+//   https://clerk.novaraconnect.group/v1/client/touch?redirect_url=.../dashboard
+// which sets the session cookie and redirects straight back to the app.
+//
+// Capacitor's default navigation policy cancels ANY top-level navigation away
+// from server.url and hands it to the system browser. Without this entry the
+// shell therefore ejected the Clerk handshake into Safari and left the web view
+// frozen on Clerk's spinner — the user was silently signed in, but the app
+// never moved off the sign-in screen.
+const CLERK_FRONTEND_API_HOST = "clerk.novaraconnect.group";
+
 const config = {
   appId: "group.novaraconnect.app",
   appName: "Novara",
@@ -68,6 +82,8 @@ const config = {
           url: PRODUCTION_WEB_URL,
           // No cleartext: production is HTTPS only.
           cleartext: false,
+          // Keep the Clerk sign-in handshake inside the app. See above.
+          allowNavigation: [CLERK_FRONTEND_API_HOST],
         },
       }
     : {}),
