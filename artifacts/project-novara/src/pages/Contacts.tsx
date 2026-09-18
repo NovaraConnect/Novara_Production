@@ -75,7 +75,7 @@ export default function Contacts() {
                   "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all",
                   isActive
                     ? s === "Pipeline"
-                      ? "bg-violet-600 text-white shadow-sm"
+                      ? "bg-primary text-primary-foreground"
                       : "bg-primary text-primary-foreground shadow-sm"
                     : "bg-muted/60 text-muted-foreground hover:bg-muted",
                 ].join(" ")}
@@ -83,7 +83,7 @@ export default function Contacts() {
                 {s}
                 <span className={[
                   "text-[10px] font-bold px-1.5 py-0.5 rounded-full",
-                  isActive ? "bg-white/20 text-white" : "bg-background text-muted-foreground",
+                  isActive ? "bg-primary-foreground/15 text-primary-foreground" : "bg-subtle text-muted-foreground",
                 ].join(" ")}>
                   {count}
                 </span>

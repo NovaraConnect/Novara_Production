@@ -275,9 +275,9 @@ export function QRScanner({ onExtracted }: QRScannerProps) {
         )}
 
         {status === "done" && (
-          <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800 px-3 py-2.5">
+          <div className="flex items-center justify-between rounded-xl border border-warm/25 bg-warm-soft px-3 py-2.5">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-warm shrink-0" />
               <span className="text-sm font-medium text-foreground">QR contact added — review below</span>
             </div>
             <button type="button" onClick={reset} className="text-muted-foreground hover:text-foreground p-1">
@@ -287,9 +287,9 @@ export function QRScanner({ onExtracted }: QRScannerProps) {
         )}
 
         {status === "error" && (
-          <div className="flex items-start justify-between rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 px-3 py-2.5 gap-2">
+          <div className="flex items-start justify-between rounded-xl border border-cooling/25 bg-cooling-soft px-3 py-2.5 gap-2">
             <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <AlertCircle className="w-4 h-4 text-cooling shrink-0 mt-0.5" />
               <span className="text-sm text-foreground">{errorMsg}</span>
             </div>
             <button type="button" onClick={reset} className="text-muted-foreground hover:text-foreground p-1 shrink-0">

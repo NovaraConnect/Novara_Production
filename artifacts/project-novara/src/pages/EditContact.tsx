@@ -321,21 +321,21 @@ export default function EditContact() {
               {!priorityOverride && (
                 <div className={cn(
                   "rounded-xl p-3 border",
-                  isPrioritized && isUp ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/30" :
-                  isPrioritized && isDown ? "bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30" :
+                  isPrioritized && isUp ? "bg-warm-soft border-warm/25" :
+                  isPrioritized && isDown ? "bg-cold-soft border-cold/25" :
                   "bg-background/60 border-border/40"
                 )}>
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">Current Priority</p>
                       <div className="flex items-center gap-1.5">
-                        {isUp && <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />}
-                        {isDown && <TrendingDown className="w-3.5 h-3.5 text-amber-600" />}
+                        {isUp && <TrendingUp className="w-3.5 h-3.5 text-warm" />}
+                        {isDown && <TrendingDown className="w-3.5 h-3.5 text-cold" />}
                         {!isPrioritized && <Minus className="w-3.5 h-3.5 text-muted-foreground" />}
                         <span className={cn(
                           "text-sm font-semibold",
-                          isUp ? "text-emerald-700 dark:text-emerald-400" :
-                          isDown ? "text-amber-700 dark:text-amber-400" :
+                          isUp ? "text-warm" :
+                          isDown ? "text-cold" :
                           "text-foreground"
                         )}>
                           {currentPriority}
@@ -368,7 +368,7 @@ export default function EditContact() {
                     priorityOverride ? "bg-primary" : "bg-border"
                   )}>
                     <div className={cn(
-                      "absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform",
+                      "absolute top-0.5 w-3 h-3 rounded-full bg-foreground shadow transition-transform",
                       priorityOverride ? "translate-x-4" : "translate-x-0.5"
                     )} />
                   </div>
@@ -542,7 +542,7 @@ export default function EditContact() {
                       ))}
                     </div>
                   </FormControl>
-                  {missing && <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5">{missing}</p>}
+                  {missing && <p className="text-xs text-cooling mt-1.5">{missing}</p>}
                   <FormMessage />
                 </FormItem>
               );

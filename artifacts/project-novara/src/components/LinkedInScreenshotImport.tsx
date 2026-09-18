@@ -121,12 +121,12 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
       {status === "done" && (
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+            <CheckCircle2 className="w-4 h-4 text-warm shrink-0 mt-0.5" />
             <div>
               <span className="text-sm font-medium text-foreground">
                 Draft prefilled below
               </span>
-              <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
+              <p className="text-xs text-cooling mt-0.5">
                 Screenshot reading isn't always perfect — please check every field for accuracy before saving.
               </p>
             </div>
@@ -175,7 +175,7 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
             <ImageIcon className="w-4 h-4" />
             Choose Screenshot
           </Button>
-          <p className="text-[11px] text-muted-foreground/70 mt-2">
+          <p className="text-[11px] text-muted-foreground mt-2">
             Novara doesn't connect to LinkedIn or access private data.
           </p>
         </>

@@ -58,20 +58,52 @@ export function formatDate(dateStr: string | null | undefined): string {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Semantic status styling.
+//
+// Warm / Cooling / Cold / Dormant carry MEANING, not decoration, so their
+// colours live as design tokens (see --warm, --cooling, --cold, --dormant in
+// index.css) and are referenced here rather than spelled out per component.
+// Changing a hue is a one-line change in the token; the mapping of hue to
+// meaning must not change at all.
+// ---------------------------------------------------------------------------
+
+/** Tinted pill: bright readable text on a dark translucent wash. */
 export function statusColor(status: RelationshipStatus): string {
   switch (status) {
-    case "Warm": return "text-emerald-600 bg-emerald-50 border-emerald-200";
-    case "Cooling": return "text-yellow-600 bg-yellow-50 border-yellow-200";
-    case "Cold": return "text-orange-600 bg-orange-50 border-orange-200";
-    case "Dormant": return "text-red-600 bg-red-50 border-red-200";
+    case "Warm": return "text-warm bg-warm-soft border-warm/25";
+    case "Cooling": return "text-cooling bg-cooling-soft border-cooling/25";
+    case "Cold": return "text-cold bg-cold-soft border-cold/25";
+    case "Dormant": return "text-dormant bg-dormant-soft border-dormant/25";
   }
 }
 
+/** The coloured edge on a contact card — the fastest status read in the app. */
 export function statusBorderColor(status: RelationshipStatus): string {
   switch (status) {
-    case "Warm": return "border-l-emerald-400";
-    case "Cooling": return "border-l-yellow-400";
-    case "Cold": return "border-l-orange-400";
-    case "Dormant": return "border-l-red-400";
+    case "Warm": return "border-l-warm";
+    case "Cooling": return "border-l-cooling";
+    case "Cold": return "border-l-cold";
+    case "Dormant": return "border-l-dormant";
+  }
+}
+
+/** Foreground-only, for a status dot or an icon. */
+export function statusTextColor(status: RelationshipStatus): string {
+  switch (status) {
+    case "Warm": return "text-warm";
+    case "Cooling": return "text-cooling";
+    case "Cold": return "text-cold";
+    case "Dormant": return "text-dormant";
+  }
+}
+
+/** Background-only, for the status tiles on the Dashboard. */
+export function statusSoftBg(status: RelationshipStatus): string {
+  switch (status) {
+    case "Warm": return "bg-warm-soft";
+    case "Cooling": return "bg-cooling-soft";
+    case "Cold": return "bg-cold-soft";
+    case "Dormant": return "bg-dormant-soft";
   }
 }

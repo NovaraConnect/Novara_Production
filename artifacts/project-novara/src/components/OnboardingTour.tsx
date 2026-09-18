@@ -11,7 +11,7 @@ const STEPS = [
     title: "Tell Novara your goals",
     description:
       "Your career goals decide who matters most. Contacts whose industry, role or interests match them rise in priority; the rest settle. Set them in Settings — it takes a minute and everything below works better for it.",
-    color: "bg-indigo-50 text-indigo-600",
+    color: "bg-primary/15 text-primary",
     href: "/settings#career-profile",
   },
   {
@@ -19,35 +19,35 @@ const STEPS = [
     title: "Add your first contact",
     description:
       "Tap + to add anyone worth keeping in touch with. Include how you met, their importance, and a follow-up cadence.",
-    color: "bg-blue-50 text-blue-600",
+    color: "bg-priority-medium-soft text-priority-medium",
   },
   {
     icon: Clock,
     title: "Set a follow-up cadence",
     description:
       "Choose how often to reconnect — weekly, monthly, or quarterly. Novara schedules reminders automatically so no relationship goes cold.",
-    color: "bg-violet-50 text-violet-600",
+    color: "bg-priority-high-soft text-priority-high",
   },
   {
     icon: Activity,
     title: "Track your Network Health",
     description:
       "Your score (0–100) shows how well you're maintaining key relationships. Keep it above 70 to stay connected with everyone who matters.",
-    color: "bg-emerald-50 text-emerald-600",
+    color: "bg-warm-soft text-warm",
   },
   {
     icon: CheckCircle2,
     title: "Mark contacts as reached out",
     description:
       "One tap resets the follow-up clock. Novara flags contacts as Warm, Cooling, or Cold — so you always know who needs attention.",
-    color: "bg-amber-50 text-amber-600",
+    color: "bg-cooling-soft text-cooling",
   },
   {
     icon: Newspaper,
     title: "Get conversation starters",
     description:
       "Open any contact to see live news about their company. Walk into every conversation with something relevant to say.",
-    color: "bg-rose-50 text-rose-600",
+    color: "bg-dormant-soft text-dormant",
   },
 ];
 
@@ -79,8 +79,8 @@ export function OnboardingTour({ onComplete }: OnboardingTourProps) {
 
   return (
     <div className="fixed bottom-20 left-0 right-0 z-50 px-3 pb-1">
-      <div className="bg-white border border-border/60 rounded-2xl shadow-xl overflow-hidden max-w-md mx-auto">
-        <div className="h-1 bg-gray-100">
+      <div className="bg-elevated border border-border rounded-2xl shadow-[var(--shadow-raised)] overflow-hidden max-w-md mx-auto">
+        <div className="h-1 bg-subtle">
           <div
             className="h-full bg-primary transition-all duration-500 ease-out"
             style={{ width: `${progressWidth}%` }}
@@ -113,7 +113,7 @@ export function OnboardingTour({ onComplete }: OnboardingTourProps) {
                     ? "bg-primary w-4"
                     : i < step
                     ? "bg-primary/40 w-1.5"
-                    : "bg-gray-200 w-1.5"
+                    : "bg-muted w-1.5"
                 }`}
               />
             ))}

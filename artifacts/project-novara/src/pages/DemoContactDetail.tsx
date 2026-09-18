@@ -75,12 +75,12 @@ export default function DemoContactDetail() {
             <StatusBadge status={computeStatus(contact)} />
             <ImportanceBadge importance={contact.importance} />
             {contact.connectionStatus === "pipeline" && (
-              <span className="inline-flex items-center gap-1 bg-violet-50 text-violet-700 border border-violet-200 rounded-full text-[10px] font-semibold px-2.5 py-1">
+              <span className="inline-flex items-center gap-1 bg-priority-high-soft text-priority-high border border-priority-high/25 rounded-full text-[10px] font-semibold px-2.5 py-1">
                 Pipeline
               </span>
             )}
             {maintenance && (
-              <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-[10px] font-semibold px-2.5 py-1">
+              <span className="inline-flex items-center gap-1 bg-cooling-soft text-cooling border border-cooling/25 rounded-full text-[10px] font-semibold px-2.5 py-1">
                 <RefreshCw className="w-2.5 h-2.5" />
                 Maintenance cadence
               </span>
@@ -95,7 +95,7 @@ export default function DemoContactDetail() {
           disabled={contacting}
           className={`w-full h-14 rounded-xl text-base font-semibold shadow-md active:scale-[0.98] transition-all mb-4 ${
             contacted
-              ? "bg-emerald-600 hover:bg-emerald-600 text-white"
+              ? "bg-warm/20 text-warm border border-warm/30"
               : ""
           }`}
         >
@@ -123,7 +123,7 @@ export default function DemoContactDetail() {
                 <p className="text-sm font-semibold text-foreground">
                   {formatDate(contact.nextFollowUpDate)}
                   {contact.id === "demo-sarah" && (
-                    <span className="ml-2 text-xs text-amber-600 font-semibold">Due today</span>
+                    <span className="ml-2 text-xs text-cooling font-semibold">Due today</span>
                   )}
                 </p>
               </div>
@@ -167,13 +167,13 @@ export default function DemoContactDetail() {
                 <p className="text-xs text-muted-foreground mb-1">Current cadence</p>
                 <p
                   className={`text-sm font-semibold ${
-                    maintenance ? "text-amber-600" : "text-foreground"
+                    maintenance ? "text-cooling" : "text-foreground"
                   }`}
                 >
                   {cadenceLabel}
                 </p>
                 {maintenance && (
-                  <p className="text-xs text-amber-500 mt-0.5">moved to maintenance</p>
+                  <p className="text-xs text-cooling/80 mt-0.5">moved to maintenance</p>
                 )}
               </div>
             </div>
@@ -237,7 +237,7 @@ export default function DemoContactDetail() {
                 ))}
               </ul>
             )}
-            <p className="text-[10px] text-muted-foreground/60 mt-4">
+            <p className="text-[10px] text-muted-foreground mt-4">
               Updates every 6 hours · Google News
             </p>
           </div>

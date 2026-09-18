@@ -57,25 +57,25 @@ export default function InstallPrompt() {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-safe-bottom pb-4 pointer-events-none">
       <div
-        className="pointer-events-auto mx-auto max-w-md bg-white border border-gray-200 rounded-2xl shadow-xl p-4 flex items-center gap-3"
-        style={{ borderLeft: "4px solid #2952cc" }}
+        className="pointer-events-auto mx-auto max-w-md bg-elevated border border-border rounded-2xl shadow-[var(--shadow-raised)] p-4 flex items-center gap-3"
+        style={{ borderLeft: "4px solid hsl(var(--primary))" }}
       >
-        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-[#2952cc]/10 flex items-center justify-center">
+        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
           <img src="/icon-192.png" alt="Novara" className="w-8 h-8 rounded-lg" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900">Install this app on your phone</p>
-          <p className="text-xs text-gray-500 mt-0.5 truncate">Get the full experience — works offline</p>
+          <p className="text-sm font-semibold text-foreground">Install this app on your phone</p>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">Get the full experience — works offline</p>
         </div>
         <button
           onClick={handleInstall}
-          className="flex-shrink-0 bg-[#2952cc] text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-[#1e3fa3] transition-colors"
+          className="flex-shrink-0 bg-primary text-primary-foreground text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-primary/90 transition-colors"
         >
           Install
         </button>
         <button
           onClick={dismiss}
-          className="flex-shrink-0 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+          className="flex-shrink-0 p-1 text-muted-foreground hover:text-foreground transition-colors"
           aria-label="Dismiss"
         >
           <X size={16} />

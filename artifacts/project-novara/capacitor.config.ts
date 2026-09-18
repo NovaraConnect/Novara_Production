@@ -58,8 +58,8 @@ const config = {
   // loads the live site instead of these files.
   webDir: "dist/public",
   ios: {
-    // Matches the app's own background so launch doesn't flash white.
-    backgroundColor: "#f9f9f7",
+    // Matches the app's own background so launch doesn't flash a light frame.
+    backgroundColor: "#08111F",
     // Let the web app own the safe-area insets, as it already does for PWA.
     contentInset: "never" as const,
     // Marks the shell in the User-Agent so the web app can recognise it even

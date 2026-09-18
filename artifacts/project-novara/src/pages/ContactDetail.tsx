@@ -234,18 +234,18 @@ export default function ContactDetail() {
 
             {/* Current Priority badge with trend indicator */}
             <div className="flex items-center gap-1">
-              {isUp && <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />}
-              {isDown && <TrendingDown className="w-3.5 h-3.5 text-amber-500" />}
+              {isUp && <TrendingUp className="w-3.5 h-3.5 text-warm" />}
+              {isDown && <TrendingDown className="w-3.5 h-3.5 text-cold" />}
               <ImportanceBadge importance={currentPriority} />
             </div>
 
             {contact.connectionStatus === "pipeline" && (
-              <span className="inline-flex items-center gap-1 bg-violet-50 text-violet-700 border border-violet-200 rounded-full text-[10px] font-semibold px-2.5 py-1">
+              <span className="inline-flex items-center gap-1 bg-priority-high-soft text-priority-high border border-priority-high/25 rounded-full text-[10px] font-semibold px-2.5 py-1">
                 Pipeline
               </span>
             )}
             {maintenance && (
-              <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-[10px] font-semibold px-2.5 py-1">
+              <span className="inline-flex items-center gap-1 bg-cooling-soft text-cooling border border-cooling/25 rounded-full text-[10px] font-semibold px-2.5 py-1">
                 <RefreshCw className="w-2.5 h-2.5" />
                 Maintenance cadence
               </span>
@@ -266,12 +266,12 @@ export default function ContactDetail() {
                 </>
               ) : isUp ? (
                 <>
-                  <TrendingUp className="w-3 h-3 text-emerald-500 shrink-0" />
+                  <TrendingUp className="w-3 h-3 text-warm shrink-0" />
                   <span>Boosted from <strong>{basePriority}</strong> — aligns with your career goals</span>
                 </>
               ) : (
                 <>
-                  <TrendingDown className="w-3 h-3 text-amber-500 shrink-0" />
+                  <TrendingDown className="w-3 h-3 text-cold shrink-0" />
                   <span>Reduced from <strong>{basePriority}</strong> — limited career goal alignment</span>
                 </>
               )}
@@ -398,11 +398,11 @@ export default function ContactDetail() {
               </div>
               <div className="bg-background/60 rounded-xl p-3">
                 <p className="text-xs text-muted-foreground mb-1">Current cadence</p>
-                <p className={`text-sm font-semibold ${maintenance ? "text-amber-600" : "text-foreground"}`}>
+                <p className={`text-sm font-semibold ${maintenance ? "text-cooling" : "text-foreground"}`}>
                   {cadenceLabel}
                 </p>
                 {maintenance && (
-                  <p className="text-xs text-amber-500 mt-0.5">moved to maintenance</p>
+                  <p className="text-xs text-cooling/80 mt-0.5">moved to maintenance</p>
                 )}
               </div>
             </div>
@@ -481,10 +481,10 @@ export default function ContactDetail() {
               </div>
             )}
             {newsStatus === "empty" && <p className="text-sm text-muted-foreground italic">No strong recent {contact.company} news found.</p>}
-            {newsStatus === "error" && <p className="text-sm text-amber-600 dark:text-amber-400 italic">Couldn't load news right now — please try again shortly.</p>}
-            {newsStatus === "timeout" && <p className="text-sm text-amber-600 dark:text-amber-400 italic">News request timed out. {headlines.length > 0 ? "Showing the last results we had." : "Try again shortly."}</p>}
+            {newsStatus === "error" && <p className="text-sm text-cooling italic">Couldn't load news right now — please try again shortly.</p>}
+            {newsStatus === "timeout" && <p className="text-sm text-cooling italic">News request timed out. {headlines.length > 0 ? "Showing the last results we had." : "Try again shortly."}</p>}
             {newsStatus === "config-missing" && <p className="text-sm text-muted-foreground italic">Company news isn't configured yet.</p>}
-            {newsStatus === "stale" && <p className="text-xs text-amber-600 dark:text-amber-400 mb-2">Showing cached results — couldn't refresh just now.</p>}
+            {newsStatus === "stale" && <p className="text-xs text-cooling mb-2">Showing cached results — couldn't refresh just now.</p>}
 
             {(newsStatus === "ok" || newsStatus === "stale" || (newsStatus === "timeout" && headlines.length > 0)) && headlines.length > 0 && (
               <ul className="space-y-3">
@@ -509,7 +509,7 @@ export default function ContactDetail() {
                 ))}
               </ul>
             )}
-            <p className="text-[10px] text-muted-foreground/60 mt-4">Updates every 6 hours · Google News</p>
+            <p className="text-[10px] text-muted-foreground mt-4">Updates every 6 hours · Google News</p>
           </div>
 
           {/* Notes & Links */}

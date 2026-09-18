@@ -33,14 +33,14 @@ export function ContactCard({ contact, showOverdueBadge, overdaysPast }: Contact
           which meant the same contact had an accent there and none in
           Contacts. It belongs to the card: status is a property of the
           contact, not of the list it happens to be in. */}
-      <Card className={`overflow-hidden border-border/50 border-l-4 ${statusBorderColor(status)} shadow-sm hover:shadow-md transition-all duration-200 bg-card hover:-translate-y-0.5 cursor-pointer`}>
+      <Card className={`overflow-hidden border-card-border border-l-4 ${statusBorderColor(status)} transition-colors duration-200 bg-card hover:bg-elevated cursor-pointer`}>
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-2 mb-2">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-semibold text-foreground truncate">{contact.firstName} {contact.lastName}</h3>
-                {isUp && <TrendingUp className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />}
-                {isDown && <TrendingDown className="h-3.5 w-3.5 text-orange-400 flex-shrink-0" />}
+                {isUp && <TrendingUp className="h-3.5 w-3.5 text-warm flex-shrink-0" />}
+                {isDown && <TrendingDown className="h-3.5 w-3.5 text-cold flex-shrink-0" />}
               </div>
               <p className="text-sm text-muted-foreground truncate">{contact.role}{contact.company ? ` · ${contact.company}` : ""}</p>
             </div>
@@ -51,7 +51,7 @@ export function ContactCard({ contact, showOverdueBadge, overdaysPast }: Contact
           </div>
           {showOverdueBadge && daysPast > 0 && (
             <div className="mb-2">
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-overdue-soft text-overdue border border-overdue/20">
                 Overdue by {daysPast} day{daysPast !== 1 ? "s" : ""}
               </span>
             </div>

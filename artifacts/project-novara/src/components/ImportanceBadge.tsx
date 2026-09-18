@@ -9,11 +9,13 @@ interface ImportanceBadgeProps {
   label?: string;
 }
 
+/** Priority is semantic too: purple = High, blue = Medium, neutral = Low.
+ *  Tokens live in index.css (--priority-*); this is the single mapping. */
 export function priorityColors(level: Level) {
   return {
-    High: "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300",
-    Medium: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300",
-    Low: "bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300",
+    High: "bg-priority-high-soft text-priority-high",
+    Medium: "bg-priority-medium-soft text-priority-medium",
+    Low: "bg-priority-low-soft text-priority-low",
   }[level];
 }
 

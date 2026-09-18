@@ -54,13 +54,13 @@ export function ImportOptionCard({
     </>
   );
 
-  const shell = "mb-3 rounded-2xl border border-primary/15 bg-primary/[0.06] p-4";
+  const shell = "mb-3 rounded-2xl border border-primary/20 bg-primary/[0.07] p-4";
 
   // An option with no button of its own is one big target; one with buttons
   // keeps them as the targets, so the card stays a plain container.
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className={`${shell} w-full text-left transition-colors hover:bg-primary/10`}>
+      <button type="button" onClick={onClick} className={`${shell} w-full text-left transition-colors hover:bg-primary/12`}>
         {header}
         {children}
       </button>

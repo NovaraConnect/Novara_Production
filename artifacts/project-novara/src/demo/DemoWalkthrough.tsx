@@ -133,9 +133,9 @@ export function DemoWalkthrough({ page }: DemoWalkthroughProps) {
 
   return (
     <div className="fixed bottom-20 left-0 right-0 z-40 px-3 pb-1">
-      <div className="bg-white border border-border/60 rounded-2xl shadow-xl overflow-hidden max-w-md mx-auto">
+      <div className="bg-elevated border border-border rounded-2xl shadow-[var(--shadow-raised)] overflow-hidden max-w-md mx-auto">
         {/* Progress bar */}
-        <div className="h-1 bg-gray-100">
+        <div className="h-1 bg-subtle">
           <div
             className="h-full bg-primary transition-all duration-500 ease-out"
             style={{ width: `${progressWidth}%` }}
@@ -170,7 +170,7 @@ export function DemoWalkthrough({ page }: DemoWalkthroughProps) {
                     ? "bg-primary w-4"
                     : s.step < step
                     ? "bg-primary/40 w-1.5"
-                    : "bg-gray-200 w-1.5"
+                    : "bg-muted w-1.5"
                 }`}
               />
             ))}

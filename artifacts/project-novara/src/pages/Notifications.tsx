@@ -31,11 +31,11 @@ function Toggle({
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-        checked ? "bg-primary" : "bg-gray-200"
+        checked ? "bg-primary" : "bg-secondary"
       }`}
     >
       <span
-        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+        className={`inline-block h-5 w-5 transform rounded-full bg-foreground shadow-sm transition-transform ${
           checked ? "translate-x-5" : "translate-x-0.5"
         }`}
       />
@@ -140,11 +140,11 @@ export default function Notifications() {
 
         {/* iOS PWA warning */}
         {isIOS && !isStandalone && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-3">
-            <AlertTriangle size={18} className="text-amber-500 flex-shrink-0 mt-0.5" />
+          <div className="bg-cooling-soft border border-cooling/25 rounded-2xl p-4 flex gap-3">
+            <AlertTriangle size={18} className="text-cooling flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-semibold text-amber-800">Install the app first</p>
-              <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+              <p className="text-sm font-semibold text-cooling">Install the app first</p>
+              <p className="text-xs text-cooling/85 mt-1 leading-relaxed">
                 Push notifications on iPhone require the app to be installed to your Home Screen.{" "}
                 <button
                   onClick={() => setLocation("/install")}
@@ -159,15 +159,15 @@ export default function Notifications() {
 
         {/* Not supported */}
         {!isSupported && !loading && (
-          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex gap-3">
-            <BellOff size={18} className="text-gray-400 flex-shrink-0 mt-0.5" />
+          <div className="surface-elevated p-4 flex gap-3">
+            <BellOff size={18} className="text-muted-foreground flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-semibold text-gray-700">Not supported</p>
+              <p className="text-sm font-semibold text-foreground">Not supported</p>
               {/* The old copy said "Try Chrome or Firefox", which is wrong on
                   iOS: every iOS browser runs the same WebKit engine, so
                   switching cannot help. The native app never reaches this
                   block at all — it uses APNs and reports itself supported. */}
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {isIOS
                   ? "On iPhone, push notifications need iOS 16.4 or later and Novara added to your Home Screen. Switching browsers won't help — they all use the same engine on iOS."
                   : "This browser doesn't support push notifications. Chrome, Edge and Firefox do."}
@@ -182,7 +182,7 @@ export default function Notifications() {
             <div className="flex items-center gap-3">
               <div
                 className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                  isSubscribed ? "bg-primary/10" : "bg-gray-100"
+                  isSubscribed ? "bg-primary/15" : "bg-secondary"
                 }`}
               >
                 {isSubscribed ? (

@@ -129,21 +129,21 @@ export default function DemoDashboard() {
 
         {/* Stats Row */}
         <section className="grid grid-cols-3 gap-3">
-          <div className="flex flex-col items-center p-3 bg-emerald-50 rounded-xl border border-emerald-100">
-            <span className="text-xl font-bold text-emerald-700">{stats.Warm}</span>
-            <span className="text-[10px] font-semibold tracking-wider uppercase text-emerald-600/80 mt-1">
+          <div className="flex flex-col items-center p-3 bg-warm-soft rounded-xl border border-warm/20">
+            <span className="text-xl font-bold text-warm">{stats.Warm}</span>
+            <span className="text-[10px] font-semibold tracking-wider uppercase text-warm mt-1">
               Warm
             </span>
           </div>
-          <div className="flex flex-col items-center p-3 bg-amber-50 rounded-xl border border-amber-100">
-            <span className="text-xl font-bold text-amber-700">{stats.Cooling}</span>
-            <span className="text-[10px] font-semibold tracking-wider uppercase text-amber-600/80 mt-1">
+          <div className="flex flex-col items-center p-3 bg-cooling-soft rounded-xl border border-cooling/20">
+            <span className="text-xl font-bold text-cooling">{stats.Cooling}</span>
+            <span className="text-[10px] font-semibold tracking-wider uppercase text-cooling mt-1">
               Cooling
             </span>
           </div>
-          <div className="flex flex-col items-center p-3 bg-blue-50 rounded-xl border border-blue-100">
-            <span className="text-xl font-bold text-blue-700">{stats.Cold}</span>
-            <span className="text-[10px] font-semibold tracking-wider uppercase text-blue-600/80 mt-1">
+          <div className="flex flex-col items-center p-3 bg-cold-soft rounded-xl border border-cold/20">
+            <span className="text-xl font-bold text-cold">{stats.Cold}</span>
+            <span className="text-[10px] font-semibold tracking-wider uppercase text-cold mt-1">
               Cold
             </span>
           </div>
