@@ -23,6 +23,7 @@ import LandingPage from "@/pages/LandingPage";
 import UxPreview from "@/pages/UxPreview";
 import PitchPage from "@/pages/PitchPage";
 import NotFound from "@/pages/not-found";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import SignInPage from "@/pages/SignIn";
 import SignUpPage from "@/pages/SignUp";
 import InstallPrompt from "@/components/InstallPrompt";
@@ -245,6 +246,10 @@ function Router() {
       <Route path="/contacts/:id" component={() => <ProtectedRoute component={ContactDetail} />} />
       <Route path="/settings" component={() => <ProtectedRoute component={Settings} />} />
       <Route path="/install" component={InstallGuide} />
+      {/* Public and unauthenticated on purpose: this is the URL given to
+          Apple in App Store Connect, and a reviewer has to be able to read
+          it without an account. Do not wrap it in ProtectedRoute. */}
+      <Route path="/privacy" component={PrivacyPolicy} />
       <Route path="/notifications" component={() => <ProtectedRoute component={Notifications} />} />
       <Route path="/feedback" component={() => <ProtectedRoute component={Feedback} />} />
       <Route path="/try/contacts/:id" component={DemoContactDetail} />
