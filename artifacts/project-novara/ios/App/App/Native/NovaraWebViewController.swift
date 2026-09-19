@@ -15,6 +15,9 @@ protocol NovaraWebViewControllerDelegate: AnyObject {
                        respond: @escaping (Result<Any, Error>) -> Void)
     /// The web layer asked for haptic feedback tied to a user action.
     func webController(_ controller: NovaraWebViewController, didRequestHaptic style: String)
+    /// The web layer's theme changed, and the native chrome should follow.
+    func webController(_ controller: NovaraWebViewController,
+                       didRequestInterfaceStyle style: UIUserInterfaceStyle)
     /// The page itself failed to load (DNS, offline, server down).
     func webController(_ controller: NovaraWebViewController, didFailToLoadWith error: Error)
 }
@@ -179,6 +182,19 @@ extension NovaraWebViewController: WKScriptMessageHandler {
 
         case "haptic":
             novaraDelegate?.webController(self, didRequestHaptic: body["style"] as? String ?? "selection")
+
+        case "theme":
+            // "system" becomes .unspecified so iOS follows the device itself.
+            // Anything unrecognised defaults to dark, for the same reason the
+            // injected script does: every build before bridge version 2 was
+            // dark-only, so that is the safe degradation.
+            let style: UIUserInterfaceStyle
+            switch body["theme"] as? String {
+            case "light": style = .light
+            case "system": style = .unspecified
+            default: style = .dark
+            }
+            novaraDelegate?.webController(self, didRequestInterfaceStyle: style)
 
         case "openAppSettings":
             if let url = URL(string: UIApplication.openSettingsURLString) {

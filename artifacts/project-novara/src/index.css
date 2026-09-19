@@ -82,20 +82,107 @@
 }
 
 /* ===========================================================================
-   Novara dark theme.
+   Novara theme palettes.
    ---------------------------------------------------------------------------
-   Novara is a dark product, not a light product with a dark mode, so the navy
-   palette lives in :root and .dark is an alias of it. Two reasons:
-     • the tokens resolve correctly whether or not the .dark class is present,
-       so there is no flash of light chrome before React mounts;
-     • index.html still sets class="dark" on <html>, which switches on the
-       ~40 `dark:` variants already written into components, and lets Clerk's
-       shadcn theme and Sonner pick up dark styling for free.
+   :root is LIGHT, .dark is the navy theme. Neither inherits from the other:
+   both blocks define every token, because a token that exists in only one
+   palette silently leaks across the themes (the dark block used to omit the
+   status colours and inherit them from a navy :root — that stops working the
+   moment :root is light).
+
    Core shadcn tokens stay as HSL triples so `/50` opacity modifiers keep
    working (border-border/50 is used widely). Semantic status colours are
    literal values because they are used as-is.
+
+   The status colours are NOT the same values in both themes. Dark uses bright
+   pastels that carry on navy; on white those drop to ~2:1 and become
+   unreadable, so light uses deeper, more saturated equivalents. Every pair
+   below was checked against its own surface at >= 4.5:1.
    =========================================================================== */
 :root {
+  color-scheme: light;
+
+  /* Warm paper, the app's original light ground. */
+  --background: 40 30% 97%;
+  --foreground: 220 25% 12%;
+
+  --border: 220 15% 88%;
+  --input: 220 15% 88%;
+  --ring: 228 60% 40%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 220 25% 12%;
+  --card-border: 220 15% 92%;
+
+  /* Raised surface, for modules sitting on top of a card. On light the step
+     is a faint cool tint rather than a lighter grey — there is nothing above
+     white to go to. */
+  --elevated: 220 24% 97%;
+  /* Recessed surface, for wells and inactive pills. */
+  --subtle: 220 18% 94%;
+
+  --input-background: 0 0% 100%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 25% 12%;
+  --popover-border: 220 15% 92%;
+
+  /* Deep periwinkle: the same brand hue as the dark theme's #6F8CFF, dropped
+     to a lightness that carries white text (8.8:1). */
+  --primary: 228 60% 40%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 220 15% 94%;
+  --secondary-foreground: 220 25% 12%;
+
+  --muted: 220 15% 94%;
+  /* 43%, not the original 45%: at 45% this failed against --muted (4.39:1). */
+  --muted-foreground: 220 10% 43%;
+
+  --accent: 220 15% 94%;
+  --accent-foreground: 220 25% 12%;
+
+  --destructive: 0 72% 48%;
+  --destructive-foreground: 0 0% 100%;
+
+  /* ---- button chrome the Replit scaffold referenced but never defined ---- */
+  --primary-border: 228 60% 34%;
+  --secondary-border: 220 15% 86%;
+  --destructive-border: 0 72% 40%;
+  --button-outline: hsl(220 15% 82%);
+
+  /* Hover/pressed overlay. Dark tints with white, light tints with ink —
+     a white overlay on a white button is invisible. */
+  --elevate-tint: 220 40% 12%;
+
+  /* ---- semantic status: meaning-carrying, do not repurpose -------------- */
+  --warm: #0E7C5A;
+  --warm-soft: rgba(16, 185, 129, 0.14);
+  --cooling: #8A6100;
+  --cooling-soft: rgba(255, 193, 7, 0.18);
+  --cold: #B44708;
+  --cold-soft: rgba(255, 111, 60, 0.14);
+  --dormant: #C1213A;
+  --dormant-soft: rgba(255, 80, 100, 0.13);
+
+  --priority-high: #6D3BD6;
+  --priority-high-soft: rgba(139, 92, 246, 0.14);
+  --priority-medium: #1D5FD0;
+  --priority-medium-soft: rgba(59, 130, 246, 0.13);
+  --priority-low: #5A6879;
+  --priority-low-soft: rgba(148, 163, 184, 0.16);
+
+  --overdue: #C42B21;
+  --overdue-soft: rgba(248, 81, 73, 0.13);
+
+  /* Restrained depth: a hairline lift, not a floating card. */
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-raised: 0 8px 24px -12px rgba(16, 24, 40, 0.18);
+}
+
+.dark {
+  color-scheme: dark;
+
   /* App background — deep navy, never pure black. */
   --background: 216 59% 8%;
   --foreground: 214 47% 97%;
@@ -110,9 +197,7 @@
   --card-foreground: 214 47% 97%;
   --card-border: 214 27% 20%;
 
-  /* Raised surface, for modules sitting on top of a card. */
   --elevated: 215 43% 15%;
-  /* Recessed surface, for wells and inactive pills. */
   --subtle: 215 50% 10%;
 
   --input-background: 214 44% 14%;
@@ -138,13 +223,13 @@
   --destructive: 353 85% 66%;
   --destructive-foreground: 217 55% 9%;
 
-  /* ---- button chrome the Replit scaffold referenced but never defined ---- */
   --primary-border: 228 90% 64%;
   --secondary-border: 214 24% 26%;
   --destructive-border: 353 60% 45%;
   --button-outline: hsl(214 24% 28%);
 
-  /* ---- semantic status: meaning-carrying, do not repurpose -------------- */
+  --elevate-tint: 0 0% 100%;
+
   --warm: #55D6A5;
   --warm-soft: rgba(32, 201, 151, 0.14);
   --cooling: #FFD35A;
@@ -164,45 +249,8 @@
   --overdue: #FF7B72;
   --overdue-soft: rgba(248, 81, 73, 0.14);
 
-  /* Restrained depth: a hairline lift, not a floating card. */
   --shadow-card: 0 1px 2px rgba(3, 8, 17, 0.4);
   --shadow-raised: 0 6px 20px -8px rgba(3, 8, 17, 0.7);
-}
-
-/* .dark is an alias, so both selectors resolve to the same theme. */
-.dark {
-  --background: 216 59% 8%;
-  --foreground: 214 47% 97%;
-  --border: 214 27% 20%;
-  --input: 214 26% 24%;
-  --ring: 228 100% 72%;
-
-  --card: 214 47% 12%;
-  --card-foreground: 214 47% 97%;
-  --card-border: 214 27% 20%;
-
-  --elevated: 215 43% 15%;
-  --subtle: 215 50% 10%;
-  --input-background: 214 44% 14%;
-
-  --popover: 215 43% 15%;
-  --popover-foreground: 214 47% 97%;
-  --popover-border: 214 24% 28%;
-
-  --primary: 228 100% 72%;
-  --primary-foreground: 217 55% 9%;
-
-  --secondary: 215 40% 17%;
-  --secondary-foreground: 214 47% 97%;
-
-  --muted: 215 40% 17%;
-  --muted-foreground: 217 16% 62%;
-
-  --accent: 215 43% 20%;
-  --accent-foreground: 214 47% 97%;
-
-  --destructive: 353 85% 66%;
-  --destructive-foreground: 217 55% 9%;
 }
 
 @layer base {
@@ -258,10 +306,10 @@ html, body, #root {
     z-index: 0;
   }
   .hover-elevate:hover::after {
-    background: hsl(0 0% 100% / 0.06);
+    background: hsl(var(--elevate-tint) / 0.06);
   }
   .active-elevate-2:active::after {
-    background: hsl(0 0% 100% / 0.11);
+    background: hsl(var(--elevate-tint) / 0.11);
   }
   /* Keep the label above the overlay. */
   .hover-elevate > *,

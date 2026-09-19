@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
+import ThemeSetting from "@/components/ThemeSetting";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -348,6 +349,8 @@ export default function Settings() {
 
           </div>
         </section>
+
+        <ThemeSetting />
 
         {/* Notifications */}
         <section>

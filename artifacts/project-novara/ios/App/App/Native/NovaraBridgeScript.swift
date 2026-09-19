@@ -31,7 +31,12 @@ enum NovaraBridgeScript {
 
     /// Bumped whenever the message contract below changes, so the web side can
     /// feature-detect instead of assuming.
-    static let version = 1
+    ///
+    /// 2 — added `setTheme`, so the web app's light/dark choice can drive the
+    ///     status bar and tab bar. Build 7 and earlier are version 1 and are
+    ///     pinned to dark; the web side hides the Appearance control there
+    ///     rather than offering one the shell cannot honour.
+    static let version = 2
 
     static let source: String = """
     (function () {
@@ -115,6 +120,16 @@ enum NovaraBridgeScript {
         pickContact: function () { return request('pickContact'); },
         scanCard: function () { return request('scanCard'); },
         openSettings: function () { post({ name: 'openAppSettings' }); },
+        setTheme: function (choice) {
+          // The CHOICE, not the resolved theme: 'system' maps to iOS's own
+          // .unspecified, so a System user follows the device from the first
+          // frame instead of whatever it happened to resolve to last launch.
+          // Both sides resolve 'system' from the same device setting, so they
+          // cannot disagree. Anything unexpected degrades to dark, which is
+          // what every build before this one did.
+          var known = choice === 'light' || choice === 'dark' || choice === 'system';
+          post({ name: 'theme', theme: known ? choice : 'dark' });
+        },
         _settle: settle,
         _emit: emit
       };

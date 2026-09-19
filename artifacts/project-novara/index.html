@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
@@ -7,9 +7,48 @@
     <meta name="description" content="Your personal relationship CRM for ambitious professionals. Stay in touch with the people who matter." />
     <meta name="robots" content="index, follow" />
 
-    <!-- PWA theme -->
+    <!-- PWA theme. content is rewritten below to match the active theme. -->
     <meta name="theme-color" content="#08111F" />
     <meta name="application-name" content="Novara" />
+
+    <!-- ===================================================================
+         Theme, applied BEFORE first paint.
+
+         The palette is driven by the `.dark` class on <html>. If that class
+         were only set once React mounted, every light-mode user would see a
+         navy flash on every cold start, and every dark-mode user a white one.
+         So the choice is read and applied here, inline and synchronously.
+
+         This is a deliberate duplicate of src/lib/theme.ts — it cannot import
+         it, because it has to run before the bundle does. The storage key,
+         the default and the resolution rule must be kept in step with that
+         module; it carries a matching note.
+         =================================================================== -->
+    <script>
+      (function () {
+        var STORAGE_KEY = "novara.theme";
+        var DARK_BG = "#08111F";
+        var LIGHT_BG = "#FAF8F5";
+        try {
+          var stored = null;
+          try { stored = window.localStorage.getItem(STORAGE_KEY); } catch (e) {}
+          if (stored !== "light" && stored !== "dark" && stored !== "system") {
+            stored = "system"; // follow the device unless told otherwise
+          }
+          var dark =
+            stored === "dark" ||
+            (stored === "system" &&
+              window.matchMedia &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.toggle("dark", dark);
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute("content", dark ? DARK_BG : LIGHT_BG);
+        } catch (e) {
+          // A theme is never worth a blank page: fall through to the
+          // stylesheet's own :root, which is light.
+        }
+      })();
+    </script>
 
     <!-- iOS PWA -->
     <meta name="apple-mobile-web-app-capable" content="yes" />

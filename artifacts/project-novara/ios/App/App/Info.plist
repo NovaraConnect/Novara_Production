@@ -39,8 +39,6 @@
 	     status bar draws light glyphs over the navy UI, and every system
 	     surface we present (the Contacts picker, the document scanner,
 	     alerts) comes up dark rather than jarringly light. -->
-	<key>UIUserInterfaceStyle</key>
-	<string>Dark</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>

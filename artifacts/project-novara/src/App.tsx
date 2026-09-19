@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { ClerkProvider, SignIn, SignUp, Show, useAuth } from "@clerk/react";
 import { shadcn } from "@clerk/themes";
 import { Switch, Route, Redirect, useLocation, Router as WouterRouter } from "wouter";
@@ -28,6 +28,7 @@ import SignUpPage from "@/pages/SignUp";
 import InstallPrompt from "@/components/InstallPrompt";
 import { hasSeenInstallPrompt, isInstalledExperience } from "@/lib/installPrompt";
 import { useNativeDeepLink } from "@/hooks/useNativeDeepLink";
+import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
@@ -45,15 +46,22 @@ if (!clerkPubKey) {
   throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY");
 }
 
-const clerkAppearance = {
-  theme: shadcn,
-  cssLayerName: "clerk",
-  options: {
-    logoPlacement: "inside" as const,
-    logoLinkUrl: basePath || "/",
-    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
-  },
-  variables: {
+/* ---------------------------------------------------------------------------
+   Clerk's appearance, per theme.
+
+   Clerk renders sign-in and sign-up itself, so if this stayed pinned to navy
+   the auth screens would be the one dark corner of a light app.
+
+   Two halves, for two different reasons:
+     • `variables` are real colour values, because Clerk derives hover and
+       disabled shades from them arithmetically — a `var(--token)` here would
+       defeat that maths. So there is one literal set per theme, and the light
+       values are the hex forms of the same palette tokens.
+     • `elements` are Tailwind classes, so they use semantic tokens and need
+       no per-theme variant at all.
+   --------------------------------------------------------------------------- */
+const clerkVariablesByTheme = {
+  dark: {
     colorPrimary: "#6F8CFF",
     colorForeground: "#F4F7FB",
     colorMutedForeground: "#AAB7CA",
@@ -62,37 +70,64 @@ const clerkAppearance = {
     colorInput: "#142234",
     colorInputForeground: "#F4F7FB",
     colorNeutral: "#AAB7CA",
-    fontFamily: "'Plus Jakarta Sans', sans-serif",
-    borderRadius: "0.625rem",
   },
-  elements: {
-    rootBox: "w-full flex justify-center",
-    cardBox: "bg-card rounded-2xl w-[440px] max-w-full overflow-hidden shadow-[var(--shadow-raised)] border border-card-border",
-    card: "!shadow-none !border-0 !bg-transparent !rounded-none",
-    footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
-    headerTitle: "text-[#F4F7FB] font-bold",
-    headerSubtitle: "text-[#AAB7CA]",
-    socialButtonsBlockButtonText: "text-[#F4F7FB] font-medium",
-    formFieldLabel: "text-[#F4F7FB] font-medium",
-    footerActionLink: "text-[#6F8CFF] font-semibold",
-    footerActionText: "text-[#AAB7CA]",
-    dividerText: "text-[#AAB7CA]",
-    identityPreviewEditButton: "text-[#6F8CFF]",
-    formFieldSuccessText: "text-[#55D6A5]",
-    alertText: "text-[#F4F7FB]",
-    logoBox: "flex justify-center",
-    logoImage: "h-12 w-12 rounded-2xl",
-    socialButtonsBlockButton: "border border-[#2A3850] hover:bg-[#152235]",
-    formButtonPrimary: "bg-[#6F8CFF] text-[#0A1322] hover:bg-[#5F7CF0] font-semibold",
-    formFieldInput: "border border-[#2A3850] bg-[#142234] text-[#F4F7FB]",
-    footerAction: "bg-transparent",
-    dividerLine: "bg-[#2A3850]",
-    alert: "border border-[#FF6B7A]/25 bg-[#FF6B7A]/10",
-    otpCodeFieldInput: "border border-[#2A3850] bg-[#142234] text-[#F4F7FB]",
-    formFieldRow: "",
-    main: "",
+  light: {
+    colorPrimary: "#2941A3",
+    colorForeground: "#171C26",
+    colorMutedForeground: "#636A79",
+    colorDanger: "#D32222",
+    colorBackground: "#FFFFFF",
+    colorInput: "#FFFFFF",
+    colorInputForeground: "#171C26",
+    colorNeutral: "#636A79",
   },
-};
+} as const;
+
+function clerkAppearanceFor(resolved: "light" | "dark") {
+  return {
+    theme: shadcn,
+    cssLayerName: "clerk",
+    options: {
+      logoPlacement: "inside" as const,
+      logoLinkUrl: basePath || "/",
+      logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
+    },
+    variables: {
+      ...clerkVariablesByTheme[resolved],
+      fontFamily: "'Plus Jakarta Sans', sans-serif",
+      borderRadius: "0.625rem",
+    },
+    elements: {
+      rootBox: "w-full flex justify-center",
+      cardBox:
+        "bg-card rounded-2xl w-[440px] max-w-full overflow-hidden shadow-[var(--shadow-raised)] border border-card-border",
+      card: "!shadow-none !border-0 !bg-transparent !rounded-none",
+      footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
+      headerTitle: "text-foreground font-bold",
+      headerSubtitle: "text-muted-foreground",
+      socialButtonsBlockButtonText: "text-foreground font-medium",
+      formFieldLabel: "text-foreground font-medium",
+      footerActionLink: "text-primary font-semibold",
+      footerActionText: "text-muted-foreground",
+      dividerText: "text-muted-foreground",
+      identityPreviewEditButton: "text-primary",
+      formFieldSuccessText: "text-warm",
+      alertText: "text-foreground",
+      logoBox: "flex justify-center",
+      logoImage: "h-12 w-12 rounded-2xl",
+      socialButtonsBlockButton: "border border-border hover:bg-elevated",
+      formButtonPrimary:
+        "bg-primary text-primary-foreground hover:bg-primary/90 font-semibold",
+      formFieldInput: "border border-input bg-input-background text-foreground",
+      footerAction: "bg-transparent",
+      dividerLine: "bg-border",
+      alert: "border border-destructive/25 bg-destructive/10",
+      otpCodeFieldInput: "border border-input bg-input-background text-foreground",
+      formFieldRow: "",
+      main: "",
+    },
+  };
+}
 
 const queryClient = new QueryClient();
 
@@ -231,12 +266,15 @@ function NativeDeepLinks() {
 
 function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
+  const { resolved } = useTheme();
+  // Rebuilt when the theme flips so Clerk's own screens follow the app.
+  const appearance = useMemo(() => clerkAppearanceFor(resolved), [resolved]);
 
   return (
     <ClerkProvider
       publishableKey={clerkPubKey}
       proxyUrl={clerkProxyUrl}
-      appearance={clerkAppearance}
+      appearance={appearance}
       signInUrl={`${basePath}/sign-in`}
       signUpUrl={`${basePath}/sign-up`}
       localization={{
@@ -266,9 +304,11 @@ function ClerkProviderWithRoutes() {
 
 function App() {
   return (
-    <WouterRouter base={basePath}>
-      <ClerkProviderWithRoutes />
-    </WouterRouter>
+    <ThemeProvider>
+      <WouterRouter base={basePath}>
+        <ClerkProviderWithRoutes />
+      </WouterRouter>
+    </ThemeProvider>
   );
 }
 

@@ -63,6 +63,10 @@ final class NovaraRootViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        // Before any subview exists, so the very first frame is already in the
+        // right theme. The web app re-asserts this as soon as it mounts.
+        applyInterfaceStyle(Self.rememberedInterfaceStyle(), remember: false)
+
         view.backgroundColor = NovaraTheme.background
 
         webController.novaraDelegate = self
@@ -296,6 +300,51 @@ final class NovaraRootViewController: UIViewController {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.offlineGracePeriod, execute: work)
     }
 
+    // MARK: - Interface style
+
+    /// Where the last-used style is remembered between launches.
+    private static let interfaceStyleKey = "novara.interfaceStyle"
+
+    /// The style to use before the web app has told us anything.
+    ///
+    /// Defaults to `.unspecified` — follow the device — because the web app's
+    /// own default is "system", and because the stored value is the user's
+    /// CHOICE rather than a resolved theme. A returning user who picked Light
+    /// or Dark gets it straight away instead of a flash of the other theme
+    /// while the page loads, which is the same problem index.html's inline
+    /// script solves on the web side.
+    private static func rememberedInterfaceStyle() -> UIUserInterfaceStyle {
+        switch UserDefaults.standard.string(forKey: interfaceStyleKey) {
+        case "light": return .light
+        case "dark": return .dark
+        default: return .unspecified
+        }
+    }
+
+    /// Points the whole shell at `style`.
+    ///
+    /// Every colour in NovaraTheme is dynamic, so this one assignment repaints
+    /// the tab bar, the launch state view and the connection banner, and moves
+    /// the status bar between dark and light text. Nothing else to update.
+    private func applyInterfaceStyle(_ style: UIUserInterfaceStyle, remember: Bool = true) {
+        if remember {
+            let value = style == .light ? "light" : (style == .dark ? "dark" : nil)
+            if let value {
+                UserDefaults.standard.set(value, forKey: Self.interfaceStyleKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: Self.interfaceStyleKey)
+            }
+        }
+
+        guard overrideUserInterfaceStyle != style else { return }
+        overrideUserInterfaceStyle = style
+        // The web view is a child controller and inherits the trait, but the
+        // window owns the area behind the safe-area insets during rotation and
+        // the scroll bounce, so it is set too.
+        view.window?.overrideUserInterfaceStyle = style
+        setNeedsStatusBarAppearanceUpdate()
+    }
+
     // MARK: - Device features
 
     private func presentContactPicker(respond: @escaping (Result<Any, Error>) -> Void) {
@@ -399,6 +448,11 @@ extension NovaraRootViewController: NovaraWebViewControllerDelegate {
         case "light": UIImpactFeedbackGenerator(style: .light).impactOccurred()
         default: selectionFeedback.selectionChanged()
         }
+    }
+
+    func webController(_ controller: NovaraWebViewController,
+                       didRequestInterfaceStyle style: UIUserInterfaceStyle) {
+        applyInterfaceStyle(style)
     }
 
     func webController(_ controller: NovaraWebViewController, didFailToLoadWith error: Error) {

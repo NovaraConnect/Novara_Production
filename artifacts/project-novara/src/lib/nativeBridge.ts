@@ -45,6 +45,10 @@ export interface NativeCardScan {
 
 export type HapticStyle = "selection" | "success" | "warning" | "error" | "light";
 
+/** What the user picked. Mirrors ThemeChoice in lib/theme.ts, restated here so
+ *  the bridge's surface does not depend on the theme module. */
+export type NativeThemeChoice = "system" | "light" | "dark";
+
 interface NovaraNativeBridge {
   version: number;
   platform: string;
@@ -55,6 +59,7 @@ interface NovaraNativeBridge {
   pickContact?(): Promise<NativeContactPayload>;
   scanCard?(): Promise<NativeCardScan>;
   openSettings?(): void;
+  setTheme?(choice: NativeThemeChoice): void;
 }
 
 function bridge(): NovaraNativeBridge | null {
@@ -118,4 +123,43 @@ export function openNativeSettings(): void {
   } catch {
     // Same reasoning as above.
   }
+}
+
+/**
+ * Tells the native shell which theme the user chose, so the status bar, the
+ * tab bar and the scroll bounce area match the page.
+ *
+ * Sends the CHOICE, not the resolved theme: "system" maps to iOS's own
+ * .unspecified, so the shell follows the device directly rather than being
+ * pinned to whatever it resolved to when the page last loaded.
+ *
+ * Fire-and-forget and feature-detected: build 7 and earlier are hard-locked to
+ * dark by UIUserInterfaceStyle in Info.plist and have no setTheme, so on those
+ * builds this is a no-op — which is why the Settings control is hidden there
+ * rather than offered and ignored (see canSetNativeTheme).
+ */
+export function setNativeTheme(choice: NativeThemeChoice): void {
+  try {
+    bridge()?.setTheme?.(choice);
+  } catch {
+    // Chrome matching is never worth an exception.
+  }
+}
+
+/** True when this build of the app can follow the web app's theme. */
+export function canSetNativeTheme(): boolean {
+  return hasNativeBridge() && typeof bridge()?.setTheme === "function";
+}
+
+/**
+ * Whether to offer the theme control at all.
+ *
+ * In a browser there is no native chrome to mismatch, so the choice is always
+ * safe. Inside the app it is only safe when the binary can follow along: on
+ * build 7 the shell is pinned dark, so a user choosing light would get a
+ * light page under a light-on-light status bar. Better to not offer the
+ * control than to offer one that half works.
+ */
+export function canOfferThemeChoice(): boolean {
+  return !isNativeShell() || canSetNativeTheme();
 }
