@@ -60,6 +60,13 @@
   --color-dormant: var(--dormant);
   --color-dormant-soft: var(--dormant-soft);
 
+  /* Decorative edge accents. See the note in :root — these are for the card
+     stripe only and must never be used for text. */
+  --color-warm-accent: var(--warm-accent);
+  --color-cooling-accent: var(--cooling-accent);
+  --color-cold-accent: var(--cold-accent);
+  --color-dormant-accent: var(--dormant-accent);
+
   --color-priority-high: var(--priority-high);
   --color-priority-high-soft: var(--priority-high-soft);
   --color-priority-medium: var(--priority-medium);
@@ -158,12 +165,27 @@
   /* ---- semantic status: meaning-carrying, do not repurpose -------------- */
   --warm: #0E7C5A;
   --warm-soft: rgba(16, 185, 129, 0.14);
-  --cooling: #8A6100;
-  --cooling-soft: rgba(255, 193, 7, 0.18);
+  /* Hue 50, not 42: a truer yellow. It is still dark, because yellow that is
+     light enough to look like yellow cannot be read on white — see the accent
+     tokens below for where the real yellow lives. */
+  --cooling: #806A00;
+  --cooling-soft: rgba(250, 204, 21, 0.22);
   --cold: #B44708;
   --cold-soft: rgba(255, 111, 60, 0.14);
   --dormant: #C1213A;
   --dormant-soft: rgba(255, 80, 100, 0.13);
+
+  /* ---- decorative status accents -------------------------------------- *
+   * The coloured edge on a contact card ONLY. Every card also carries the
+   * status as a text badge, so the stripe is redundant rather than the sole
+   * indicator — which frees it from the contrast floor the text has to meet.
+   * That matters most for Cooling: any yellow dark enough to read as text is
+   * gold or olive, so the stripe is where Cooling gets to actually be yellow.
+   * Do not use these for text.                                             */
+  --warm-accent: #10B981;
+  --cooling-accent: #FACC15;
+  --cold-accent: #F97316;
+  --dormant-accent: #F43F5E;
 
   --priority-high: #6D3BD6;
   --priority-high-soft: rgba(139, 92, 246, 0.14);
@@ -238,6 +260,14 @@
   --cold-soft: rgba(255, 111, 60, 0.14);
   --dormant: #FF6B7A;
   --dormant-soft: rgba(255, 80, 100, 0.14);
+
+  /* On navy the status colours are already bright enough to read as
+     themselves, so the accents are the same values — the dark theme is
+     visually unchanged by the split. */
+  --warm-accent: #55D6A5;
+  --cooling-accent: #FFD35A;
+  --cold-accent: #FF8A55;
+  --dormant-accent: #FF6B7A;
 
   --priority-high: #B99AFF;
   --priority-high-soft: rgba(139, 92, 246, 0.18);

@@ -78,13 +78,21 @@ export function statusColor(status: RelationshipStatus): string {
   }
 }
 
-/** The coloured edge on a contact card — the fastest status read in the app. */
+/**
+ * The coloured edge on a contact card — the fastest status read in the app.
+ *
+ * Uses the -accent tokens, not the text ones. The stripe sits beside a badge
+ * that spells the status out, so it is a reinforcement rather than the only
+ * signal, and does not have to meet the contrast floor that text does. On the
+ * light theme that is the difference between a gold stripe and a yellow one:
+ * any yellow dark enough to read as text is gold or olive.
+ */
 export function statusBorderColor(status: RelationshipStatus): string {
   switch (status) {
-    case "Warm": return "border-l-warm";
-    case "Cooling": return "border-l-cooling";
-    case "Cold": return "border-l-cold";
-    case "Dormant": return "border-l-dormant";
+    case "Warm": return "border-l-warm-accent";
+    case "Cooling": return "border-l-cooling-accent";
+    case "Cold": return "border-l-cold-accent";
+    case "Dormant": return "border-l-dormant-accent";
   }
 }
 
