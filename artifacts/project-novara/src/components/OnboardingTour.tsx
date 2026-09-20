@@ -52,7 +52,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  Activity, UserPlus, Sparkles, Newspaper, BellRing, Send,
+  Activity, UserPlus, Sparkles, Newspaper, BellRing, Send, CalendarClock,
   ArrowRight, ChevronRight, type LucideIcon,
 } from "lucide-react";
 
@@ -120,22 +120,35 @@ const STEPS: Step[] = [
   {
     title: "Add someone the moment you meet",
     description:
-      "Scan their business card, or pull them straight from your iPhone contacts. It takes seconds, right there at the event.",
+      "Scan a business card, import from your iPhone contacts, drop in a LinkedIn screenshot or scan a QR code. Seconds, right there at the event.",
     video: "/onboarding/5-add.mp4",
     poster: "/onboarding/5-add.jpg",
     icon: UserPlus,
     tone: "bg-priority-high-soft text-priority-high",
-    focus: { x: 4, y: 9, w: 92, h: 42 },
+    // All four ways in, not just the top two: LinkedIn and QR are part of
+    // the point that adding someone is never the slow bit.
+    focus: { x: 4, y: 9, w: 92, h: 73 },
   },
   {
     title: "Then let Novara remember",
     description:
-      "Every contact gets their own rhythm. Novara sets the next date and reminds you when it comes round.",
+      "Every contact gets their own rhythm, and Novara sets the next date the moment you reach out.",
     video: "/onboarding/6-remember.mp4",
     poster: "/onboarding/6-remember.jpg",
-    icon: BellRing,
+    icon: CalendarClock,
     tone: "bg-primary/15 text-primary",
     focus: { x: 4, y: 28, w: 92, h: 32 },
+  },
+  {
+    title: "It tells you when it's time",
+    description:
+      "A reminder arrives on the day, naming who it is and why now. Tap it and you land straight on them.",
+    video: "/onboarding/7-notify.mp4",
+    poster: "/onboarding/7-notify.jpg",
+    icon: BellRing,
+    tone: "bg-warm-soft text-warm",
+    // The banner itself, which sits at the very top of the frame.
+    focus: { x: 3, y: 1, w: 94, h: 10 },
   },
 ];
 
