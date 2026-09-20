@@ -52,7 +52,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  Activity, UserPlus, Sparkles, Newspaper, BellRing, Target,
+  Activity, UserPlus, Sparkles, Newspaper, BellRing, Send,
   ArrowRight, ChevronRight, type LucideIcon,
 } from "lucide-react";
 
@@ -67,62 +67,75 @@ interface Step {
   /** Shown when the clip fails, or when the user prefers reduced motion. */
   icon: LucideIcon;
   tone: string;
+  /** The one thing in the clip the copy is about, as a percentage rectangle
+   *  of the video frame. Everything outside it dims. Omit for no spotlight. */
+  focus?: { x: number; y: number; w: number; h: number };
 }
 
+// The product loop, in order: you meet someone, Novara remembers them,
+// understands the relationship, tells you when it needs attention, gives you
+// something to say, lets you act on it, and reminds you again later. Each beat
+// carries ONE idea, and each names the thing its clip is pointing at.
 const STEPS: Step[] = [
   {
-    title: "Your network, at a glance",
+    title: "Know where you stand",
     description:
-      "Everyone who matters to your career in one place, with today's follow-ups already at the top.",
-    video: "/onboarding/01-dashboard.mp4",
-    poster: "/onboarding/01-dashboard.jpg",
+      "Novara keeps the state of every relationship for you — warm, cooling, cold — so you never have to remember it yourself.",
+    video: "/onboarding/1-network.mp4",
+    poster: "/onboarding/1-network.jpg",
     icon: Activity,
     tone: "bg-primary/15 text-primary",
+    focus: { x: 4, y: 10, w: 92, h: 22 },
   },
   {
-    title: "Start with your goals",
+    title: "See who needs you today",
     description:
-      "Tell Novara what you're working towards. Contacts who match rise in priority, and the rest quietly settle.",
-    video: "/onboarding/02-goals.mp4",
-    poster: "/onboarding/02-goals.jpg",
-    icon: Target,
-    tone: "bg-priority-high-soft text-priority-high",
-  },
-  {
-    title: "Add people in seconds",
-    description:
-      "Scan a business card, import from your iPhone contacts, or drop in a LinkedIn profile. Novara fills in the rest.",
-    video: "/onboarding/03-add.mp4",
-    poster: "/onboarding/03-add.jpg",
-    icon: UserPlus,
-    tone: "bg-priority-medium-soft text-priority-medium",
-  },
-  {
-    title: "Watch for the ones slipping",
-    description:
-      "Everyone drifts from Warm to Cooling to Cold as time passes, so you see who needs you before they're gone.",
-    video: "/onboarding/04-status.mp4",
-    poster: "/onboarding/04-status.jpg",
+      "Instead of wondering who you have not spoken to lately, Novara puts them at the top and tells you how overdue they are.",
+    video: "/onboarding/2-attention.mp4",
+    poster: "/onboarding/2-attention.jpg",
     icon: Sparkles,
     tone: "bg-cooling-soft text-cooling",
+    focus: { x: 4, y: 26, w: 92, h: 34 },
   },
   {
-    title: "Never miss a follow-up",
+    title: "Reach out in one tap",
     description:
-      "Each person gets their own rhythm. Novara sets the next date and reminds you the day it arrives.",
-    video: "/onboarding/05-followup.mp4",
-    poster: "/onboarding/05-followup.jpg",
-    icon: BellRing,
+      "Contact now opens the way you actually talk to them — text, email or LinkedIn — without hunting for the details.",
+    video: "/onboarding/3-contactnow.mp4",
+    poster: "/onboarding/3-contactnow.jpg",
+    icon: Send,
     tone: "bg-warm-soft text-warm",
+    focus: { x: 49, y: 8, w: 48, h: 24 },
   },
   {
-    title: "Always have a reason",
+    title: "Never open with \u201cjust checking in\u201d",
     description:
-      "Recent news about their company, ready to open with \u2014 so it is never just \u201cchecking in\u201d.",
-    video: "/onboarding/06-news.mp4",
-    poster: "/onboarding/06-news.jpg",
+      "Novara pulls recent news about their company, so you always have a real reason to get back in touch.",
+    video: "/onboarding/4-starters.mp4",
+    poster: "/onboarding/4-starters.jpg",
     icon: Newspaper,
+    tone: "bg-priority-medium-soft text-priority-medium",
+    focus: { x: 4, y: 31, w: 92, h: 33 },
+  },
+  {
+    title: "Add someone the moment you meet",
+    description:
+      "Scan their business card, or pull them straight from your iPhone contacts. It takes seconds, right there at the event.",
+    video: "/onboarding/5-add.mp4",
+    poster: "/onboarding/5-add.jpg",
+    icon: UserPlus,
+    tone: "bg-priority-high-soft text-priority-high",
+    focus: { x: 4, y: 9, w: 92, h: 42 },
+  },
+  {
+    title: "Then let Novara remember",
+    description:
+      "Every contact gets their own rhythm. Novara sets the next date and reminds you when it comes round.",
+    video: "/onboarding/6-remember.mp4",
+    poster: "/onboarding/6-remember.jpg",
+    icon: BellRing,
     tone: "bg-primary/15 text-primary",
+    focus: { x: 4, y: 28, w: 92, h: 32 },
   },
 ];
 
@@ -217,7 +230,7 @@ export function OnboardingTour({ onComplete }: OnboardingTourProps) {
               // WIDER than the footage, so object-cover silently cropped the top
               // and bottom off every step — which is why clips appeared to open
               // mid-sentence.
-              className="relative aspect-[660/1338] w-full max-w-[248px] max-h-[52vh] shrink-0 overflow-hidden rounded-[22px] border border-border bg-elevated">
+              className="relative h-[min(50vh,460px)] aspect-[660/1338] shrink-0 overflow-hidden rounded-[22px] border border-border bg-elevated">
             {STEPS.map((s, i) => {
               const visible = i === step;
               const useIcon = reducedMotion || !s.video || failed[i];
@@ -245,7 +258,7 @@ export function OnboardingTour({ onComplete }: OnboardingTourProps) {
                   ref={(el) => {
                     videoRefs.current[i] = el;
                   }}
-                  className="absolute inset-0 h-full w-full object-cover transition-opacity"
+                  className="absolute inset-0 h-full w-full object-contain transition-opacity"
                   style={{
                     opacity: visible ? 1 : 0,
                     transitionDuration: `${CROSSFADE_MS}ms`,
@@ -263,6 +276,23 @@ export function OnboardingTour({ onComplete }: OnboardingTourProps) {
                 />
               );
             })}
+
+            {/* Directs the eye at the one control the copy is about. Keyed on
+                the step so the ring re-animates each time, and pointer-events
+                are off so it can never intercept a tap. */}
+            {current.focus && !reducedMotion && (
+              <div
+                key={`focus-${step}`}
+                className="ob-focus pointer-events-none absolute rounded-2xl"
+                style={{
+                  left: `${current.focus.x}%`,
+                  top: `${current.focus.y}%`,
+                  width: `${current.focus.w}%`,
+                  height: `${current.focus.h}%`,
+                }}
+                aria-hidden="true"
+              />
+            )}
           </div>
 
           {/* min-height holds the frame steady: a three-line description on
