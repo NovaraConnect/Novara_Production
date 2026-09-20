@@ -531,7 +531,7 @@ export default function ContactDetail() {
                 ))}
               </ul>
             )}
-            <p className="text-[10px] text-muted-foreground mt-4">Updates every 6 hours · Google News</p>
+            <p className="text-[10px] text-muted-foreground mt-4">Updated daily · News sources</p>
           </div>
 
           {/* Notes & Links */}

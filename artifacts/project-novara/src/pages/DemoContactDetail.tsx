@@ -238,7 +238,7 @@ export default function DemoContactDetail() {
               </ul>
             )}
             <p className="text-[10px] text-muted-foreground mt-4">
-              Updates every 6 hours · Google News
+              Updated daily · News sources
             </p>
           </div>
 

@@ -4,6 +4,9 @@ See also: `diagrams/database-erd.mmd`.
 
 ## Overview
 
+> **Which Neon branch is live?** `production_clean` (`br-old-band-atl4jpg9`), NOT the branch named `production`. Verify before every migration — see `docs/production/NEON_SETUP.md`.
+
+
 A single Neon (serverless Postgres) database. Four tables exist, per direct reading of
 `artifacts/api-server/tests/schema.sql` (which documents the real, hand-applied production shape)
 and `lib/db/drizzle/0000_steep_the_captain.sql` (the one Drizzle-generated migration, for

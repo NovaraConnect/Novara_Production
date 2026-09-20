@@ -57,7 +57,7 @@ export default function Home() {
           {[
             { icon: Users, label: "Track your contacts", desc: "Never forget who to reach out to" },
             { icon: RefreshCw, label: "Smart cadence", desc: "Auto-downgrade after 6 months" },
-            { icon: Newspaper, label: "Live news", desc: "Conversation starters via Google News" },
+            { icon: Newspaper, label: "Live news", desc: "Conversation starters from recent news" },
             { icon: Shield, label: "Private & secure", desc: "Your data, your contacts" },
           ].map((f) => (
             <div key={f.label} className="bg-card border border-border/40 rounded-2xl p-4 text-left shadow-sm">

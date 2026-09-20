@@ -4,6 +4,39 @@ Order matters: **Neon → Clerk → Backend → Frontend → Domains → Mobile.
 is independent of the pilot. Nothing here touches pilot services. Steps that hit a
 live external account are marked ⚠️ NEEDS APPROVAL — do not run without Cloe's go-ahead.
 
+> ## ⚠️ THE LIVE BRANCH IS `production_clean`, NOT `production`
+>
+> **Verified 2026-09-19 against the running production API.**
+>
+> | Neon branch | ID | Status |
+> |---|---|---|
+> | **`production_clean`** | `br-old-band-atl4jpg9` | ✅ **LIVE** — this is what `novara-prod-api` connects to |
+> | `production` | `br-wandering-poetry-at9cqdyx` | ❌ **STALE** — flagged "Default" in the Neon UI, but unused |
+>
+> The plan below says to create a branch named `production`. That is **not**
+> what ended up being used. The branch name and Neon's "Default" flag are both
+> actively misleading here.
+>
+> **How to tell them apart without guessing:**
+> - `production_clean` has **6 tables** including `apns_tokens` (migration 0002)
+>   and `company_news_cache` (migration 0003), and holds real APNs device tokens.
+> - `production` has **4 tables**, no `apns_tokens`, and no live data.
+>
+> **Before running ANY migration, verify the actual production connection —
+> never trust the branch name.** On 2026-09-19 migration
+> `0003_company_news_cache.sql` was applied to `production` by mistake; it was
+> only caught because the API kept logging
+> `company_news_cache table is missing` afterwards.
+>
+> Recommended check before migrating:
+> 1. In the Neon SQL Editor, confirm the branch selector reads `production_clean`.
+> 2. Run `SELECT to_regclass('public.apns_tokens') IS NOT NULL;` — must be `t`.
+> 3. After migrating, confirm the Render API logs stop reporting the table as missing.
+>
+> An empty, unused `company_news_cache` table remains on the stale `production`
+> branch from that mistake. It is harmless and is deliberately being left in
+> place for now. **Do not delete either branch.**
+
 ## 0. GitHub (branch model)
 - Create branch `production` from this clean branch. Keep `main` as pilot.
 - Protect `production` (no force-push; require the CI check).
