@@ -1,145 +1,100 @@
+// ============================================================================
+// GET /api/company-news — recent headlines about a contact's employer.
+//
+// THE SHAPE OF THE FIX
+// --------------------
+// This route used to own an in-memory Map keyed on `company|industry|role`,
+// which meant the same company was fetched again after every deploy, and
+// again for every distinct industry/role tagging of the same employer.
+//
+// Now the split is:
+//
+//   lib/news/companyKey  normalise the name        ("Revolut Ltd" -> revolut)
+//   lib/news/cache       ONE shared row per company, in Postgres, 24h
+//   lib/news/provider    the only code that knows GNews exists
+//   this route           rank the shared result for THIS contact
+//
+// Industry and role never reach the provider or the cache key. They are
+// applied here, at read time, by the existing ranker — so personalisation is
+// unchanged while one cached company result serves every user who knows
+// someone there.
+//
+// The response shape is deliberately unchanged; hooks/useCompanyNews.ts and
+// its localStorage cache continue to work untouched.
+// ============================================================================
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth";
-import { rankArticles, type NewsHeadline, type RankableArticle } from "../lib/newsRanking";
+import { selectHeadlines, type NewsHeadline } from "../lib/newsRanking";
+import { companyCacheKey, displayCompanyName } from "../lib/news/companyKey";
+import { getCompanyArticles } from "../lib/news/cache";
 
 const router = Router();
 
-// Re-exported for existing importers; ranking/scoring now lives in lib/newsRanking.
+// Re-exported for existing importers.
 export type Headline = NewsHeadline;
 
-interface CacheEntry {
-  fetchedAt: number;
-  headlines: NewsHeadline[];
-}
-
-const cache = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
-
-async function fetchFromGNews(
-  company: string,
-  industry: string,
-  role: string,
-): Promise<NewsHeadline[]> {
-  const apiKey = process.env.GNEWS_API_KEY;
-  if (!apiKey) throw new Error("GNEWS_API_KEY is not set");
-
-  // GNews searches titles and descriptions — quoted phrase guarantees the
-  // company name appears in the article headline or summary (not buried in body).
-  const q = `"${company}"`;
-  const url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(q)}&lang=en&max=10&token=${apiKey}`;
-  console.log(`[news] GNews fetch: q=${q}`);
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-
-  let response: Response;
-  try {
-    response = await fetch(url, { signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  console.log(`[news] GNews response: status=${response.status} content-type=${response.headers.get("content-type")}`);
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    console.error(`[news] GNews non-OK body: ${body.slice(0, 300)}`);
-    throw new Error(`GNews responded with HTTP ${response.status}: ${body.slice(0, 120)}`);
-  }
-
-  const data = await response.json() as {
-    totalArticles?: number;
-    articles?: RankableArticle[];
-    errors?: string[];
-  };
-
-  const raw = (data.articles ?? []).filter((a) => a.title && a.url);
-  console.log(`[news] GNews totalArticles=${data.totalArticles ?? "?"} returned=${raw.length}`);
-
-  const { selected, all } = rankArticles(raw, { company, industry, role });
-
-  console.log(`[news] Score breakdown for "${company}" (industry="${industry}" role="${role}"):`);
-  for (const { breakdown, duplicateOf } of all) {
-    console.log(
-      `[news]  [${breakdown.tier.toUpperCase()}] score=${breakdown.score} ` +
-        `inTitle=${breakdown.companyInTitle} inBody=${breakdown.companyInBody} ` +
-        `cap=${breakdown.capitalizationSignal} ` +
-        `nearby=[${breakdown.contextTermsNearby.join(",")}] ` +
-        `industry=[${breakdown.industryTermsFound.join(",")}] ` +
-        `junk=[${breakdown.junkTermsFound.join(",")}] ` +
-        `${duplicateOf ? "DUP " : ""}` +
-        `"${breakdown.title.slice(0, 80)}"`,
-    );
-  }
-
-  console.log(`[news] Qualified: ${selected.length}/${raw.length} for "${company}"`);
-
-  return selected.map(({ article }) => ({
-    title: article.title ?? "",
-    source: article.source?.name ?? "",
-    publishedAt: article.publishedAt ?? "",
-    url: article.url ?? "",
-    description: article.description ?? undefined,
-  }));
-}
+/** How many headlines a contact screen shows. Note this is NOT the number we
+ *  ask the provider for: providers bill per REQUEST, so we fetch a wider set
+ *  (PROVIDER_ARTICLE_LIMIT) at the same price and let the ranker pick the
+ *  best few. Raising this would not cost more; it would just show more. */
+const HEADLINES_SHOWN = 3;
 
 router.get("/company-news", requireAuth, async (req, res) => {
-  const company = (req.query["company"] as string | undefined)?.trim();
+  const rawCompany = (req.query["company"] as string | undefined)?.trim();
   const industry = ((req.query["industry"] as string | undefined) ?? "").trim();
   const role = ((req.query["role"] as string | undefined) ?? "").trim();
 
-  if (!company) {
+  if (!rawCompany) {
     res.status(400).json({ error: "Missing company query parameter" });
     return;
   }
 
-  const cacheKey = `${company}|${industry}|${role}`.toLowerCase();
-  const cached = cache.get(cacheKey);
-  const now = Date.now();
+  const company = displayCompanyName(rawCompany);
+  const key = companyCacheKey(rawCompany);
 
-  if (cached && now - cached.fetchedAt < CACHE_TTL_MS) {
-    res.json({ company, headlines: cached.headlines, fetchedAt: cached.fetchedAt, fromCache: true });
+  // Nothing usable survived normalisation (punctuation only, say). Do not
+  // spend a provider request on it and do not create a junk cache row.
+  if (!key) {
+    res.json({ company, headlines: [], fetchedAt: Date.now(), fromCache: false });
     return;
   }
 
-  try {
-    const headlines = await fetchFromGNews(company, industry, role);
-    cache.set(cacheKey, { fetchedAt: now, headlines });
-    res.json({ company, headlines, fetchedAt: now, fromCache: false });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    const isAbort = message.includes("abort") || message.includes("AbortError");
-    const isConfigMissing = message.includes("GNEWS_API_KEY is not set");
-    console.error(`[news] error for "${company}": ${message}`);
+  const outcome = await getCompanyArticles(key, company);
 
-    // A missing API key is a configuration problem, not transient — never mask
-    // it with stale cache, and classify it distinctly for the UI.
-    if (isConfigMissing) {
-      res.json({
-        company,
-        headlines: [],
-        fetchedAt: now,
-        fromCache: false,
-        error: "config_missing",
-        detail: "Company news is not configured (GNEWS_API_KEY is not set).",
-      });
-      return;
-    }
-
-    if (cached) {
-      res.json({ company, headlines: cached.headlines, fetchedAt: cached.fetchedAt, fromCache: true, stale: true });
-      return;
-    }
-
+  if (outcome.kind === "empty") {
     res.json({
       company,
       headlines: [],
-      fetchedAt: now,
+      fetchedAt: Date.now(),
       fromCache: false,
-      error: isAbort ? "timeout" : "fetch_failed",
-      detail: message,
+      error: outcome.reason,
+      detail:
+        outcome.reason === "config_missing"
+          ? "Company news is not configured."
+          : outcome.reason === "timeout"
+            ? "The news provider timed out."
+            : "The news provider could not be reached.",
     });
+    return;
   }
+
+  // Ranking happens per request, against THIS contact's industry and role,
+  // over the shared company-level articles.
+  const headlines = selectHeadlines(
+    outcome.value.articles,
+    { company, industry, role },
+    HEADLINES_SHOWN,
+  );
+
+  res.json({
+    company,
+    headlines,
+    fetchedAt: outcome.value.fetchedAt,
+    // "Served without a provider request" — reported honestly by the cache
+    // rather than inferred from timestamps.
+    fromCache: outcome.value.cached,
+    ...(outcome.kind === "stale" ? { stale: true } : {}),
+  });
 });
 
 export default router;

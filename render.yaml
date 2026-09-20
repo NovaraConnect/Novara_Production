@@ -1,3 +1,23 @@
+# ⚠️ THIS FILE DOES NOT DESCRIBE PRODUCTION. Do not deploy from it.
+#
+# It describes the LEGACY services `novara-mobile2` and
+# `novara-mobile2-frontend`. Production runs two DIFFERENT services, created
+# by hand in the Render dashboard (see docs/production/DEPLOYMENT_PRODUCTION.md):
+#
+#   novara-prod-api  -> api.novaraconnect.group   (Express API)
+#   novara-prod-web  -> app.novaraconnect.group   (static SPA)
+#
+# It is also incomplete: the APNs, Gemini/Anthropic and Clerk proxy variables
+# production depends on are absent below, so anything provisioned from this
+# file would come up with push and AI silently disabled.
+#
+# Kept, unedited, only so the legacy services remain traceable while they are
+# being retired. Service definitions are deliberately untouched: renaming a
+# service in a synced Blueprint can CREATE a new paid service rather than
+# rename the old one.
+#
+# When the legacy services are gone, delete this file.
+
 services:
 - type: web
 name: novara-mobile2

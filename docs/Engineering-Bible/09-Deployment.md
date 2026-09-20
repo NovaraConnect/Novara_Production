@@ -1,5 +1,12 @@
 # 09 — Deployment
 
+> **STALE AS OF 2026-09-19.** This page describes the LEGACY deployment.
+> Production now runs `novara-prod-api` (`api.novaraconnect.group`) and
+> `novara-prod-web` (`app.novaraconnect.group`), both created by hand in the
+> Render dashboard — see `docs/production/DEPLOYMENT_PRODUCTION.md`.
+> `render.yaml` is **not** the source of truth and does not describe
+> production; it covers the legacy `novara-mobile2*` services only.
+
 See also: `diagrams/deployment.mmd`.
 
 ## Hosting summary
