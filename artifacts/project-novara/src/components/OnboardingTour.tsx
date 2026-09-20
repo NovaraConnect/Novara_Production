@@ -120,14 +120,15 @@ const STEPS: Step[] = [
   {
     title: "Add someone the moment you meet",
     description:
-      "Scan a business card, import from your iPhone contacts, drop in a LinkedIn screenshot or scan a QR code. Seconds, right there at the event.",
+      "Scan a business card, import from your iPhone contacts, use a LinkedIn screenshot or a QR code \u2014 or just type them in. Seconds, right there at the event.",
     video: "/onboarding/5-add.mp4",
     poster: "/onboarding/5-add.jpg",
     icon: UserPlus,
     tone: "bg-priority-high-soft text-priority-high",
-    // All four ways in, not just the top two: LinkedIn and QR are part of
-    // the point that adding someone is never the slow bit.
-    focus: { x: 4, y: 9, w: 92, h: 73 },
+    // Every route in, down to and including the "OR ENTER MANUALLY" divider:
+    // typing someone in by hand is a first-class option, not a fallback, and
+    // leaving it outside the ring implied otherwise.
+    focus: { x: 2, y: 8, w: 96, h: 81 },
   },
   {
     title: "Then let Novara remember",
