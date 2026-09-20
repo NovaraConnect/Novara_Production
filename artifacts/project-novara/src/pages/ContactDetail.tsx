@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { availableMethods, usablePreferred, openContactMethod, METHOD_LABEL, type ContactMethod } from "@/lib/contactActions";
 import { downloadIcs, googleCalendarUrl } from "@/lib/calendar";
 import { requestNotificationPermission, sendNotification, isDigestEnabled, setDigestEnabled, scheduleDigestCheck, isNotificationGranted } from "@/lib/webNotifications";
+import { isNativeShell } from "@/lib/installPrompt";
 import { useCompanyNews } from "@/hooks/useCompanyNews";
 import { useContacts } from "@/hooks/useContacts";
 import { useSettings } from "@/hooks/useSettings";
@@ -31,6 +32,9 @@ export default function ContactDetail() {
   const { contacts, markContacted, removeContact } = useContacts();
   const { settings } = useSettings();
   const [notifEnabled, setNotifEnabled] = useState(false);
+  // Web Notifications and APNs are different systems; only the browser has the
+  // former. See the reminders dropdown below.
+  const nativeApp = isNativeShell();
 
   const contact = match && params?.id ? contacts.find(c => c.id === params.id) ?? null : null;
 
@@ -163,6 +167,9 @@ export default function ContactDetail() {
   };
 
   const handleEnableNotifications = async () => {
+    // Unreachable from the native shell's menu, but kept as a guard so this
+    // never prompts for a permission the WKWebView cannot grant.
+    if (nativeApp) { setLocation("/settings"); return; }
     const granted = await requestNotificationPermission();
     if (granted) {
       setNotifEnabled(true);
@@ -328,7 +335,22 @@ export default function ContactDetail() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64">
-              {!notifEnabled ? (
+              {nativeApp ? (
+                // The native shell has no Web Notifications API at all — follow-up
+                // reminders arrive as APNs push from the server's daily scheduler
+                // and are opted into in Settings. Offering the browser permission
+                // prompt here always failed, and then told people to open "browser
+                // settings", which do not exist inside an app.
+                <>
+                  <div className="px-3 py-2 text-xs text-muted-foreground">
+                    Follow-ups for {contact.firstName} are included in your daily reminder.
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setLocation("/settings")} className="gap-2 cursor-pointer">
+                    <Bell className="w-4 h-4" />Manage reminders in Settings
+                  </DropdownMenuItem>
+                </>
+              ) : !notifEnabled ? (
                 <DropdownMenuItem onClick={handleEnableNotifications} className="gap-2 cursor-pointer">
                   <Bell className="w-4 h-4" />Enable browser notifications
                 </DropdownMenuItem>
