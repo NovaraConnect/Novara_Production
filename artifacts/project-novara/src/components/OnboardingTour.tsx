@@ -52,7 +52,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  Activity, UserPlus, Sparkles, Newspaper, BellRing,
+  Activity, UserPlus, Sparkles, Newspaper, BellRing, Target,
   ArrowRight, ChevronRight, type LucideIcon,
 } from "lucide-react";
 
@@ -61,6 +61,9 @@ interface Step {
   description: string;
   /** Served from the web app, not the binary. Optional: no clip is fine. */
   video?: string;
+  /** First frame as a small JPEG. Shown by the browser the instant the box
+   *  exists, so a step is NEVER blank while its clip arrives. ~20 KB each. */
+  poster?: string;
   /** Shown when the clip fails, or when the user prefers reduced motion. */
   icon: LucideIcon;
   tone: string;
@@ -68,44 +71,58 @@ interface Step {
 
 const STEPS: Step[] = [
   {
-    title: "Your network, remembered",
+    title: "Your network, at a glance",
     description:
-      "Everyone who matters to your career in one place, with today's follow-ups at the top.",
+      "Everyone who matters to your career in one place, with today's follow-ups already at the top.",
     video: "/onboarding/01-dashboard.mp4",
+    poster: "/onboarding/01-dashboard.jpg",
     icon: Activity,
     tone: "bg-primary/15 text-primary",
   },
   {
+    title: "Start with your goals",
+    description:
+      "Tell Novara what you're working towards. Contacts who match rise in priority, and the rest quietly settle.",
+    video: "/onboarding/02-goals.mp4",
+    poster: "/onboarding/02-goals.jpg",
+    icon: Target,
+    tone: "bg-priority-high-soft text-priority-high",
+  },
+  {
     title: "Add people in seconds",
     description:
-      "Scan a business card, or import someone straight from your iPhone contacts.",
-    video: "/onboarding/02-add.mp4",
+      "Scan a business card, import from your iPhone contacts, or drop in a LinkedIn profile. Novara fills in the rest.",
+    video: "/onboarding/03-add.mp4",
+    poster: "/onboarding/03-add.jpg",
     icon: UserPlus,
     tone: "bg-priority-medium-soft text-priority-medium",
   },
   {
-    title: "See who's going cold",
+    title: "Watch for the ones slipping",
     description:
-      "Contacts move from Warm to Cooling to Cold as time passes, so nothing slips quietly.",
-    video: "/onboarding/03-status.mp4",
+      "Everyone drifts from Warm to Cooling to Cold as time passes, so you see who needs you before they're gone.",
+    video: "/onboarding/04-status.mp4",
+    poster: "/onboarding/04-status.jpg",
     icon: Sparkles,
     tone: "bg-cooling-soft text-cooling",
   },
   {
-    title: "Always have a reason",
+    title: "Never miss a follow-up",
     description:
-      "Recent news about their company, ready to open with — instead of “just checking in”.",
-    video: "/onboarding/04-contact.mp4",
-    icon: Newspaper,
+      "Each person gets their own rhythm. Novara sets the next date and reminds you the day it arrives.",
+    video: "/onboarding/05-followup.mp4",
+    poster: "/onboarding/05-followup.jpg",
+    icon: BellRing,
     tone: "bg-warm-soft text-warm",
   },
   {
-    title: "Never miss a follow-up",
+    title: "Always have a reason",
     description:
-      "A reminder when someone is due. Tap it and you land on their profile, ready to write.",
-    video: "/onboarding/05-reminders.mp4",
-    icon: BellRing,
-    tone: "bg-priority-high-soft text-priority-high",
+      "Recent news about their company, ready to open with \u2014 so it is never just \u201cchecking in\u201d.",
+    video: "/onboarding/06-news.mp4",
+    poster: "/onboarding/06-news.jpg",
+    icon: Newspaper,
+    tone: "bg-primary/15 text-primary",
   },
 ];
 
@@ -234,6 +251,7 @@ export function OnboardingTour({ onComplete }: OnboardingTourProps) {
                     transitionDuration: `${CROSSFADE_MS}ms`,
                   }}
                   src={s.video}
+                  poster={s.poster}
                   muted
                   playsInline
                   loop
