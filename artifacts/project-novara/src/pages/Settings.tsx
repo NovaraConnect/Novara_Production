@@ -167,8 +167,9 @@ export default function Settings() {
               onClick={async () => {
                 try {
                   await updateSettings.mutateAsync({ hasSeenTutorial: false });
-                  setLocation("/dashboard");
-                  toast.success("Tutorial reset — it'll appear on the Dashboard");
+                  // Straight to the introduction rather than via the Dashboard,
+                  // which would only redirect here anyway.
+                  setLocation("/welcome");
                 } catch {
                   toast.error("Failed to reset tutorial");
                 }

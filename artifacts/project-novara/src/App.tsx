@@ -25,6 +25,7 @@ import PitchPage from "@/pages/PitchPage";
 import NotFound from "@/pages/not-found";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import Support from "@/pages/Support";
+import Welcome from "@/pages/Welcome";
 import SignInPage from "@/pages/SignIn";
 import SignUpPage from "@/pages/SignUp";
 import InstallPrompt from "@/components/InstallPrompt";
@@ -240,6 +241,10 @@ function Router() {
       <Route path="/" component={HomeRedirect} />
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
+      {/* Deliberately NOT one of the shell's four sections: the iOS router
+          treats any other path as .outsideShell and hides the native tab
+          bar, which is what lets the introduction use the whole screen. */}
+      <Route path="/welcome" component={() => <ProtectedRoute component={Welcome} />} />
       <Route path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
       <Route path="/contacts" component={() => <ProtectedRoute component={Contacts} />} />
       <Route path="/add" component={() => <ProtectedRoute component={AddContact} />} />

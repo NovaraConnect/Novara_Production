@@ -2,10 +2,10 @@ import { Link } from "wouter";
 import { computeHealthScore, computeStatus, getDaysPastDue, formatDate } from "@/lib/utils";
 import { BottomNav } from "@/components/BottomNav";
 import { ContactCard } from "@/components/ContactCard";
-import { OnboardingTour } from "@/components/OnboardingTour";
 import { Plus, Loader2, Users, Clock, Info, ChevronRight, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useContacts } from "@/hooks/useContacts";
+import { Redirect } from "wouter";
 import { useSettings } from "@/hooks/useSettings";
 import { useUser } from "@clerk/react";
 
@@ -44,6 +44,15 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  // First run goes to /welcome rather than showing an overlay here. That path
+  // is not one of the iOS shell's sections, so the native tab bar hides and
+  // the introduction gets the whole screen. Checked after the loading guard,
+  // so a slow settings fetch never flashes the Dashboard first.
+  if (settings && !settings.hasSeenTutorial) {
+    return <Redirect to="/welcome" />;
+  }
+
   return (
     <div className="min-h-screen bg-background pb-nav">
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border/50 pt-safe pb-4 px-6">
@@ -195,9 +204,6 @@ export default function Dashboard() {
           </Link>
         )}
       </div>
-      {settings && !settings.hasSeenTutorial && (
-        <OnboardingTour onComplete={() => updateSettings.mutate({ hasSeenTutorial: true })} />
-      )}
       <BottomNav />
     </div>
   );
