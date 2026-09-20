@@ -52,7 +52,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  Activity, UserPlus, Sparkles, Newspaper, BellRing, Send, CalendarClock,
+  Activity, UserPlus, Sparkles, Newspaper, BellRing, Send, CalendarClock, Target,
   ArrowRight, ChevronRight, type LucideIcon,
 } from "lucide-react";
 
@@ -86,6 +86,20 @@ const STEPS: Step[] = [
     icon: Activity,
     tone: "bg-primary/15 text-primary",
     focus: { x: 4, y: 10, w: 92, h: 22 },
+  },
+  {
+    // Named by content, not position: the ARRAY is the source of order, and
+    // the number-prefixed names of the other clips are historical.
+    title: "Built around your goals",
+    description:
+      "Tell Novara what you're working towards. Contacts whose industry, role or interests match it rise in priority \u2014 the rest quietly settle.",
+    video: "/onboarding/goals.mp4",
+    poster: "/onboarding/goals.jpg",
+    icon: Target,
+    tone: "bg-priority-high-soft text-priority-high",
+    // The whole Career Profile card: the statement you write, the goals, and
+    // the line that explains the matching. That explanation IS the beat.
+    focus: { x: 2, y: 31, w: 96, h: 56 },
   },
   {
     title: "See who needs you today",
