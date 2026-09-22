@@ -49,6 +49,16 @@ export function computeHealthScore(contacts: { nextFollowUpDate?: string | null 
   return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
 }
 
+/** `d` (default: now) as "YYYY-MM-DD" in the user's own time zone — the value
+ *  a date input expects. `toISOString()` would give the UTC date instead, which
+ *  is already tomorrow during a US evening. */
+export function localDateString(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "Never";
   try {

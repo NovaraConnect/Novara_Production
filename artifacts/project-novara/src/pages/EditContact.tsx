@@ -15,7 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { toast } from "sonner";
 import { ImportanceBadge, priorityColors } from "@/components/ImportanceBadge";
-import { cn } from "@/lib/utils";
+import { cn, localDateString } from "@/lib/utils";
 
 const INITIAL_OPTIONS: Contact["initialFollowUpDays"][] = [1, 2, 3];
 const CADENCE_OPTIONS: Contact["followUpCadenceDays"][] = [...MANUAL_CADENCE_OPTIONS];
@@ -49,8 +49,13 @@ const formSchema = z.object({
   connectionStatus: z.enum(["connected", "pipeline"]),
   initialFollowUpDays: z.coerce.number().refine(val => [1,2,3].includes(val)),
   followUpCadenceDays: z.coerce.number().refine(val => [21,30,42,60,90,180].includes(val)),
-  notes: z.string().optional()
-});
+  notes: z.string().optional(),
+  firstContactDate: z.string().optional(),
+  lastInteractionDate: z.string().optional(),
+}).refine(
+  v => !v.firstContactDate || !v.lastInteractionDate || v.lastInteractionDate >= v.firstContactDate,
+  { message: "Can't be before the day you met", path: ["lastInteractionDate"] },
+);
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -80,7 +85,8 @@ export default function EditContact() {
       firstName: "", lastName: "", company: "", role: "", metAt: "",
       linkedinUrl: "", email: "", phone: "", industry: "", function: "", preferredContactMethod: "none",
       importance: "Medium", connectionStatus: "connected" as const,
-      initialFollowUpDays: 2, followUpCadenceDays: 21, notes: ""
+      initialFollowUpDays: 2, followUpCadenceDays: 21, notes: "",
+      firstContactDate: "", lastInteractionDate: "",
     }
   });
 
@@ -110,7 +116,12 @@ export default function EditContact() {
         connectionStatus: contact.connectionStatus ?? "connected",
         initialFollowUpDays: contact.initialFollowUpDays,
         followUpCadenceDays: contact.followUpCadenceDays,
-        notes: contact.notes ?? ""
+        notes: contact.notes ?? "",
+        firstContactDate: contact.firstContactDate ?? "",
+        // Same day as meeting means "not spoken since", which the form shows as blank.
+        lastInteractionDate: contact.lastInteractionDate && contact.lastInteractionDate !== contact.firstContactDate
+          ? contact.lastInteractionDate
+          : "",
       });
       setInterests(contact.interests ?? []);
       setPriorityOverride(contact.priorityOverride ?? false);
@@ -246,6 +257,24 @@ export default function EditContact() {
             <FormField control={form.control} name="metAt" render={({ field }) => (
               <FormItem><FormLabel>Where did you meet?</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
             )} />
+
+            <div className="grid grid-cols-2 gap-3">
+              <FormField control={form.control} name="firstContactDate" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>When did you meet?</FormLabel>
+                  <FormControl><Input type="date" max={localDateString()} {...field} data-testid="input-first-contact-date" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="lastInteractionDate" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Last spoke <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                  <FormControl><Input type="date" min={form.watch("firstContactDate") || undefined} max={localDateString()} {...field} data-testid="input-last-interaction-date" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+            <p className="text-xs text-muted-foreground">Leave "Last spoke" blank if you haven't been in touch since you met.</p>
 
             {/* Contact Profile for dynamic priority */}
             <div className="rounded-2xl border border-border/50 bg-card shadow-sm p-5 space-y-4">

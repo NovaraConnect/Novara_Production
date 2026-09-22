@@ -27,6 +27,7 @@ import {
 import { QRScanner, type ScannedQRContact } from "@/components/QRScanner";
 import { NativeContactImport } from "@/components/NativeContactImport";
 import { useFeatures } from "@/hooks/useFeatures";
+import { localDateString } from "@/lib/utils";
 
 const INITIAL_OPTIONS: Contact["initialFollowUpDays"][] = [1, 2, 3];
 const CADENCE_OPTIONS: Contact["followUpCadenceDays"][] = [...MANUAL_CADENCE_OPTIONS];
@@ -47,8 +48,13 @@ const formSchema = z.object({
   connectionStatus: z.enum(["connected", "pipeline"]),
   initialFollowUpDays: z.coerce.number().refine(val => [1,2,3].includes(val)),
   followUpCadenceDays: z.coerce.number().refine(val => [21,30,42,60,90,180].includes(val)),
-  notes: z.string().optional()
-});
+  notes: z.string().optional(),
+  firstContactDate: z.string().optional(),
+  lastInteractionDate: z.string().optional(),
+}).refine(
+  v => !v.firstContactDate || !v.lastInteractionDate || v.lastInteractionDate >= v.firstContactDate,
+  { message: "Can't be before the day you met", path: ["lastInteractionDate"] },
+);
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -88,7 +94,8 @@ export default function AddContact() {
       firstName: "", lastName: "", company: "", role: "", metAt: "",
       linkedinUrl: "", email: "", phone: "", industry: "", function: "", preferredContactMethod: "none",
       importance: "Medium", connectionStatus: "connected",
-      initialFollowUpDays: 2, followUpCadenceDays: 42, notes: ""
+      initialFollowUpDays: 2, followUpCadenceDays: 42, notes: "",
+      firstContactDate: localDateString(), lastInteractionDate: "",
     }
   });
 
@@ -334,6 +341,24 @@ export default function AddContact() {
                 <FormMessage />
               </FormItem>
             )} />
+
+            <div className="grid grid-cols-2 gap-3">
+              <FormField control={form.control} name="firstContactDate" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>When did you meet?</FormLabel>
+                  <FormControl><Input type="date" max={localDateString()} {...field} data-testid="input-first-contact-date" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="lastInteractionDate" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Last spoke <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                  <FormControl><Input type="date" min={form.watch("firstContactDate") || undefined} max={localDateString()} {...field} data-testid="input-last-interaction-date" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+            <p className="text-xs text-muted-foreground">Leave "Last spoke" blank if you haven't been in touch since you met.</p>
 
             {/* ── PRIMARY SAVE ──────────────────────────────── */}
             <Button

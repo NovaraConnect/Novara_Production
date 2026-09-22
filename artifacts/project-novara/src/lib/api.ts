@@ -68,7 +68,12 @@ export async function fetchContacts(getToken: GetAuthToken): Promise<Contact[]> 
 
 export async function createContact(
   getToken: GetAuthToken,
-  data: Omit<Contact, "id" | "createdAt" | "updatedAt" | "firstContactDate" | "lastInteractionDate" | "nextFollowUpDate">,
+  data: Omit<Contact, "id" | "createdAt" | "updatedAt" | "firstContactDate" | "lastInteractionDate" | "nextFollowUpDate"> & {
+    /** When they met. Omitted → today. */
+    firstContactDate?: string;
+    /** When they last spoke. Blank → not since they met. */
+    lastInteractionDate?: string;
+  },
 ): Promise<Contact> {
   const res = await apiFetch(getToken, "/api/contacts", {
     method: "POST",
