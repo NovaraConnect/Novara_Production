@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeStatus } from "./utils";
+import { computeStatus, formatDate } from "./utils";
 
 function daysFromNow(days: number): string {
   const d = new Date();
@@ -31,4 +31,23 @@ describe("computeStatus (relationship health, contact-object only)", () => {
   // Type-level guarantee: computeStatus only accepts a contact-shaped object.
   // Passing a raw date string is a TypeScript compile error (the legacy
   // string signature was removed) — see lib/utils.ts.
+});
+
+describe("formatDate", () => {
+  // Date-only strings used to be parsed as UTC midnight, which is the evening
+  // before anywhere west of UTC — so every date rendered a day early in the US.
+  it("shows a date-only value on its own calendar day", () => {
+    expect(formatDate("2026-05-30")).toBe("May 30, 2026");
+    expect(formatDate("2026-01-01")).toBe("Jan 1, 2026");
+  });
+
+  it("still formats full timestamps, in local time", () => {
+    // Local noon on May 30, whatever zone the test runs in.
+    expect(formatDate(new Date(2026, 4, 30, 12).toISOString())).toBe("May 30, 2026");
+  });
+
+  it("says Never when there is no date", () => {
+    expect(formatDate(null)).toBe("Never");
+    expect(formatDate("")).toBe("Never");
+  });
 });

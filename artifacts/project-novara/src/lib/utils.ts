@@ -59,10 +59,18 @@ export function localDateString(d: Date = new Date()): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Parses "YYYY-MM-DD" as local midnight. `new Date("2026-05-30")` is UTC
+ *  midnight, which is the evening before anywhere west of UTC. Full
+ *  timestamps are left to `new Date`. */
+function parseDateOnly(dateStr: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(dateStr);
+}
+
 export function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "Never";
   try {
-    return format(new Date(dateStr), "MMM d, yyyy");
+    return format(parseDateOnly(dateStr), "MMM d, yyyy");
   } catch {
     return "Never";
   }
