@@ -33,6 +33,7 @@ next_follow_up_date date NOT NULL DEFAULT CURRENT_DATE,
 notes text,
 email text,
 phone text,
+preferred_contact_method text,
 created_at timestamptz NOT NULL DEFAULT now(),
 updated_at timestamptz NOT NULL DEFAULT now()
 );
