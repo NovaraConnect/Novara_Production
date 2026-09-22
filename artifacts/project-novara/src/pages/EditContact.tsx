@@ -50,8 +50,9 @@ const formSchema = z.object({
   initialFollowUpDays: z.coerce.number().refine(val => [1,2,3].includes(val)),
   followUpCadenceDays: z.coerce.number().refine(val => [21,30,42,60,90,180].includes(val)),
   notes: z.string().optional(),
-  firstContactDate: z.string().optional(),
-  lastInteractionDate: z.string().optional(),
+  // iOS Safari's date picker ignores `max`, so the rule has to live here too.
+  firstContactDate: z.string().optional().refine(v => !v || v <= localDateString(), "Can't be in the future"),
+  lastInteractionDate: z.string().optional().refine(v => !v || v <= localDateString(), "Can't be in the future"),
 }).refine(
   v => !v.firstContactDate || !v.lastInteractionDate || v.lastInteractionDate >= v.firstContactDate,
   { message: "Can't be before the day you met", path: ["lastInteractionDate"] },
@@ -260,16 +261,16 @@ export default function EditContact() {
 
             <div className="grid grid-cols-2 gap-3">
               <FormField control={form.control} name="firstContactDate" render={({ field }) => (
-                <FormItem>
+                <FormItem className="min-w-0">
                   <FormLabel>When did you meet?</FormLabel>
-                  <FormControl><Input type="date" max={localDateString()} {...field} data-testid="input-first-contact-date" /></FormControl>
+                  <FormControl><Input type="date" className="min-w-0 appearance-none text-left" {...field} data-testid="input-first-contact-date" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="lastInteractionDate" render={({ field }) => (
-                <FormItem>
+                <FormItem className="min-w-0">
                   <FormLabel>Last spoke <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
-                  <FormControl><Input type="date" min={form.watch("firstContactDate") || undefined} max={localDateString()} {...field} data-testid="input-last-interaction-date" /></FormControl>
+                  <FormControl><Input type="date" className="min-w-0 appearance-none text-left" {...field} data-testid="input-last-interaction-date" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
