@@ -39,7 +39,7 @@ export type Contact = {
   updated_at: Date;
 };
 
-function toDateStr(val: Date | string): string {
+export function toDateStr(val: Date | string): string {
   return typeof val === "string" ? val.split("T")[0] : val.toISOString().split("T")[0];
 }
 

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { pool, dbToContact } from "../db";
+import { pool, dbToContact, toDateStr } from "../db";
 import { requireAuth, type AuthedRequest } from "../middlewares/auth";
 import type { Request, Response } from "express";
 import {
@@ -12,6 +12,7 @@ import {
 import { recalculateContactsForUser } from "../lib/recalculate";
 import { analyzeContactWithAI } from "../lib/enrich";
 import { logger } from "../lib/logger";
+import { computeNextFollowUp, resolveContactDates, utcDateString } from "../lib/followUpDates";
 
 const router = Router();
 
@@ -65,13 +66,21 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
     importance, initialFollowUpDays, followUpCadenceDays, goalTags, connectionStatus, notes,
     industry, function: contactFunction, interests,
     priorityOverride, currentPriority: manualPriority, cadenceOverride,
-    preferredContactMethod,
+    preferredContactMethod, firstContactDate, lastInteractionDate,
   } = req.body;
 
   const preferredMethod = normalizePreferred(preferredContactMethod);
 
   if (!firstName || !lastName || !company) {
     res.status(400).json({ error: "firstName, lastName, company are required" });
+    return;
+  }
+
+  // When they met and last spoke. Both optional: omitted means "met today",
+  // and a blank last-spoke means "haven't spoken since we met".
+  const dates = resolveContactDates({ first: firstContactDate, last: lastInteractionDate });
+  if (!dates.ok) {
+    res.status(400).json({ error: dates.error, code: "INVALID_CONTACT_DATES" });
     return;
   }
 
@@ -97,7 +106,7 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
     }
 
     const { rows: [settingsRow] } = await pool.query(
-      "SELECT career_goals, career_statement, goal_tags FROM user_settings WHERE user_id = $1",
+      "SELECT career_goals, career_statement, goal_tags, auto_downgrade_after_months FROM user_settings WHERE user_id = $1",
       [userId],
     );
     const profile = profileFromSettingsRow(settingsRow);
@@ -154,6 +163,14 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
       ? Number(followUpCadenceDays)
       : deriveSuggestedCadence(effectivePriority);
 
+    const nextFollowUp = computeNextFollowUp({
+      firstContactDate: dates.firstContactDate,
+      lastInteractionDate: dates.lastInteractionDate,
+      initialFollowUpDays: Number(initialFollowUpDays) || 7,
+      cadenceDays: effectiveCadence,
+      downgradeMonths: Number(settingsRow?.auto_downgrade_after_months) || 6,
+    });
+
     const { rows: [contact] } = await pool.query(
       `INSERT INTO contacts (
         user_id, first_name, last_name, linkedin_url, email, phone, company, role, met_at,
@@ -169,7 +186,7 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
         $13, $14, $15::text[],
         $16, $17, $18,
         $19::text[], $20,
-        CURRENT_DATE, CURRENT_DATE, CURRENT_DATE + (($16)::int * INTERVAL '1 day'), $21,
+        $23::date, $24::date, $25::date, $21,
         $22
       ) RETURNING *`,
       [
@@ -181,6 +198,7 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
         goalTagsLiteral, connectionStatus || "connected",
         notes || null,
         preferredMethod,
+        dates.firstContactDate, dates.lastInteractionDate, nextFollowUp,
       ],
     );
     res.status(201).json(dbToContact(contact));
@@ -219,7 +237,7 @@ router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
     nextFollowUpDate, notes,
     industry, function: contactFunction, interests,
     priorityOverride, currentPriority: manualPriority, cadenceOverride,
-    preferredContactMethod,
+    preferredContactMethod, firstContactDate, lastInteractionDate,
   } = req.body;
 
   const preferredMethod = normalizePreferred(preferredContactMethod);
@@ -227,7 +245,7 @@ router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
   try {
     const [existingResult, settingsResult] = await Promise.all([
       pool.query("SELECT * FROM contacts WHERE id = $1 AND user_id = $2", [id, userId]),
-      pool.query("SELECT career_goals, career_statement, goal_tags FROM user_settings WHERE user_id = $1", [userId]),
+      pool.query("SELECT career_goals, career_statement, goal_tags, auto_downgrade_after_months FROM user_settings WHERE user_id = $1", [userId]),
     ]);
 
     if (!existingResult.rows[0]) {
@@ -237,6 +255,25 @@ router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
 
     const existing = existingResult.rows[0];
     const profile = profileFromSettingsRow(settingsResult.rows[0]);
+
+    const today = utcDateString();
+    const storedDates = {
+      first: existing.first_contact_date ? toDateStr(existing.first_contact_date) : today,
+      last: existing.last_interaction_date ? toDateStr(existing.last_interaction_date) : today,
+    };
+    const dates = resolveContactDates({
+      first: firstContactDate,
+      last: lastInteractionDate,
+      current: storedDates,
+      today,
+    });
+    if (!dates.ok) {
+      res.status(400).json({ error: dates.error, code: "INVALID_CONTACT_DATES" });
+      return;
+    }
+    const datesChanged =
+      dates.firstContactDate !== storedDates.first ||
+      dates.lastInteractionDate !== storedDates.last;
 
     const finalCompany = company !== undefined ? (company || null) : existing.company;
     const finalRole = role !== undefined ? (role ?? null) : existing.role;
@@ -311,6 +348,21 @@ router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
       effectiveCadence = deriveSuggestedCadence(effectivePriority);
     }
 
+    // Moving either date reschedules the follow-up from the new dates. Any
+    // other edit leaves the schedule alone: changing a note must not silently
+    // move someone's reminder.
+    const nextFollowUp = datesChanged
+      ? computeNextFollowUp({
+          firstContactDate: dates.firstContactDate,
+          lastInteractionDate: dates.lastInteractionDate,
+          initialFollowUpDays:
+            Number(initialFollowUpDays) || Number(existing.initial_follow_up_days) || 7,
+          cadenceDays: effectiveCadence,
+          downgradeMonths: Number(settingsResult.rows[0]?.auto_downgrade_after_months) || 6,
+          today,
+        })
+      : nextFollowUpDate ? String(nextFollowUpDate).split("T")[0] : null;
+
     const goalTagsLiteral = Array.isArray(goalTags) ? toArrayLiteral(goalTags) : null;
     const interestsLiteral = toArrayLiteral(finalInterests);
 
@@ -339,6 +391,8 @@ router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
         next_follow_up_date = COALESCE($22::date, next_follow_up_date),
         notes = $23,
         preferred_contact_method = $24,
+        first_contact_date = $25::date,
+        last_interaction_date = $26::date,
         updated_at = NOW()
       WHERE id = $1 AND user_id = $2
       RETURNING *`,
@@ -351,9 +405,10 @@ router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
         finalIndustry, finalFunction, interestsLiteral,
         initialFollowUpDays || null, effectiveCadence, isCadenceOverride,
         goalTagsLiteral, connectionStatus || null,
-        nextFollowUpDate ? nextFollowUpDate.split("T")[0] : null,
+        nextFollowUp,
         notes ?? null,
         preferredMethod,
+        dates.firstContactDate, dates.lastInteractionDate,
       ],
     );
     res.json(dbToContact(contact));
