@@ -4,13 +4,24 @@
 // The web app is the source of truth. This shell exists to put Novara on
 // TestFlight and the App Store; it adds no product logic of its own.
 //
-// This file is read ONLY by the Capacitor CLI, which is run on demand via
-// `pnpm dlx @capacitor/cli@7.4.4` (see docs/production/IOS_TESTFLIGHT.md).
-// Capacitor is deliberately NOT a repo dependency: novara-prod-web runs
-// `pnpm install --frozen-lockfile` on every deploy, and there is no reason for
-// the production web build to install packages it never uses. The CLI's own
-// `CapacitorConfig` type is therefore not imported — the shape below is what
-// the CLI expects, and it validates the file when it loads it.
+// This file is read ONLY by the Capacitor CLI. Invoke it through the local
+// binary — `./node_modules/.bin/cap` — not `pnpm exec`/`pnpm run`, whose
+// wrappers re-run `pnpm install` and trip this repo's ERR_PNPM_IGNORED_BUILDS
+// gate. See docs/production/IOS_TESTFLIGHT.md.
+//
+// `@capacitor/{cli,core,ios}` are pinned devDependencies at 7.4.4. An earlier
+// version of this comment said to run the CLI on demand via `pnpm dlx` and
+// keep it out of the repo; that does not work. `cap add ios` and `cap sync`
+// resolve the native platform from the project's OWN node_modules and fail
+// with "Could not find the ios platform" when the CLI runs from a dlx store.
+//
+// Consequence: novara-prod-web runs `pnpm install --frozen-lockfile` on every
+// deploy, so these packages install on every production web build. None of
+// their code enters the browser bundle — it costs install time, not bundle
+// size.
+//
+// The CLI's own `CapacitorConfig` type is not imported — the shape below is
+// what the CLI expects, and it validates the file when it loads it.
 //
 // TWO MODES, switched by NOVARA_IOS_MODE at `cap sync` time:
 //

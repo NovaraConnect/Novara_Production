@@ -152,7 +152,7 @@ reviewable in a diff and they survive a `cap sync`:
 |---|---|---|
 | Bundle identifier | `group.novaraconnect.app` | `PRODUCT_BUNDLE_IDENTIFIER` |
 | Display name | Novara | `CFBundleDisplayName` |
-| Version / build | 1.0.0 / 7 | `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` |
+| Version / build | 1.0.0 / 8 (the approved App Store build) | `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` |
 | Deployment target | iOS 15.0 | `IPHONEOS_DEPLOYMENT_TARGET` |
 | Orientation | portrait only, matching the PWA manifest | `UISupportedInterfaceOrientations` |
 | Device family | iPhone only | `TARGETED_DEVICE_FAMILY` |
