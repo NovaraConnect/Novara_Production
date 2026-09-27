@@ -14,6 +14,10 @@ import { analyzeContactWithAI } from "../lib/enrich";
 import { logger } from "../lib/logger";
 import { computeNextFollowUp, resolveContactDates, utcDateString } from "../lib/followUpDates";
 
+/** Novara Free ceiling. Enforced on BOTH create paths — POST /contacts and
+ *  POST /contacts/import — so the limit cannot be bypassed by importing. */
+const FREE_TIER_LIMIT = 6;
+
 const router = Router();
 
 const PREFERRED_METHODS = new Set(["text", "email", "linkedin"]);
@@ -89,7 +93,6 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
   const interestsArr: string[] = Array.isArray(interests) ? interests : [];
   const interestsLiteral = toArrayLiteral(interestsArr);
 
-  const FREE_TIER_LIMIT = 25;
 
   try {
     const { rows: [countRow] } = await pool.query(
@@ -99,7 +102,7 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
     if (parseInt(countRow.count, 10) >= FREE_TIER_LIMIT) {
       res.status(403).json({
         error: "Contact limit reached",
-        message: `You've reached the ${FREE_TIER_LIMIT}-contact limit. More capacity is coming soon.`,
+        message: `Novara Free includes up to ${FREE_TIER_LIMIT} contacts. Novara Pro removes the limit.`,
         code: "CONTACT_LIMIT_REACHED",
       });
       return;
@@ -483,6 +486,26 @@ router.post("/contacts/import", requireAuth, async (req: Request, res: Response)
     return;
   }
 
+  // The free ceiling applies here as well. Without this, a user could import
+  // an unlimited address book and never meet the limit that POST /contacts
+  // enforces — which would make FREE_TIER_LIMIT one API call from meaningless.
+  const { rows: [limitRow] } = await pool.query(
+    "SELECT COUNT(*) AS count FROM contacts WHERE user_id = $1",
+    [userId],
+  );
+  const alreadyStored = parseInt(limitRow.count, 10);
+  if (alreadyStored >= FREE_TIER_LIMIT) {
+    res.status(403).json({
+      error: "Contact limit reached",
+      message: `Novara Free includes up to ${FREE_TIER_LIMIT} contacts. Novara Pro removes the limit.`,
+      code: "CONTACT_LIMIT_REACHED",
+    });
+    return;
+  }
+  // Partial imports are allowed: take what fits and report the remainder,
+  // rather than rejecting a whole batch because its tail overflows.
+  const capacity = FREE_TIER_LIMIT - alreadyStored;
+
   const { rows: [settingsRow] } = await pool.query(
     "SELECT career_goals, career_statement, goal_tags FROM user_settings WHERE user_id = $1",
     [userId],
@@ -491,8 +514,13 @@ router.post("/contacts/import", requireAuth, async (req: Request, res: Response)
 
   let imported = 0;
   let skipped = 0;
+  let skippedOverLimit = 0;
 
   for (const c of contacts) {
+    if (imported >= capacity) {
+      skippedOverLimit++;
+      continue;
+    }
     try {
       const today = new Date().toISOString().split("T")[0];
       const firstContactDate = c.firstContactDate ?? c.createdAt?.split("T")[0] ?? today;
@@ -552,7 +580,13 @@ router.post("/contacts/import", requireAuth, async (req: Request, res: Response)
     }
   }
 
-  res.json({ imported, skipped });
+  res.json({
+    imported,
+    skipped,
+    ...(skippedOverLimit > 0
+      ? { skippedOverLimit, limit: FREE_TIER_LIMIT, code: "CONTACT_LIMIT_REACHED" }
+      : {}),
+  });
 });
 
 export default router;

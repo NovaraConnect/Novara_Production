@@ -72,7 +72,7 @@ function labelDays(days: number): string {
   return `${days} days`;
 }
 
-const FREE_TIER_LIMIT = 25;
+const FREE_TIER_LIMIT = 6;
 
 export default function AddContact() {
   const [, setLocation] = useLocation();
@@ -262,7 +262,7 @@ export default function AddContact() {
             <div>
               <p className="text-base font-bold text-foreground mb-1">You've reached the contact limit</p>
               <p className="text-sm text-muted-foreground max-w-[280px]">
-                Novara currently supports up to {FREE_TIER_LIMIT} contacts. More capacity is coming soon.
+                Novara Free includes up to {FREE_TIER_LIMIT} contacts. Novara Pro removes the limit.
               </p>
             </div>
             <Button variant="outline" className="rounded-xl" onClick={() => window.history.back()}>
