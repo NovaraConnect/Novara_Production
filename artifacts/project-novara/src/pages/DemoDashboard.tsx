@@ -64,8 +64,10 @@ export default function DemoDashboard() {
     { Warm: 0, Cooling: 0, Cold: 0, Dormant: 0 },
   );
 
-  // Demo is "frozen" at June 14, 2026
-  const today = new Date("2026-06-14T00:00:00.000Z");
+  // Demo dates are offsets from now (see demo/demoData.ts), so "today" has to
+  // be today — with the old frozen date every contact looked like a future
+  // follow-up and the Needs Attention list rendered empty.
+  const today = new Date();
   const nextWeek = new Date(today);
   nextWeek.setDate(nextWeek.getDate() + 7);
 

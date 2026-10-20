@@ -9,7 +9,7 @@ const STEPS = [
     page: "dashboard" as const,
     title: "View your network health",
     description:
-      "Your Network Health Score reflects how well you're maintaining key relationships. 66/100 means you're doing well — but 2 contacts are cooling.",
+      "Your Network Health Score reflects how well you're maintaining key relationships. The higher it is, the fewer people are slipping through the cracks.",
     targetId: "demo-health",
   },
   {
