@@ -23,6 +23,8 @@ import LandingPage from "@/pages/LandingPage";
 import UxPreview from "@/pages/UxPreview";
 import PitchPage from "@/pages/PitchPage";
 import NotFound from "@/pages/not-found";
+import Invite from "@/pages/Invite";
+import { PendingInviteRedirect } from "@/components/PendingInviteRedirect";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import Support from "@/pages/Support";
 import Welcome from "@/pages/Welcome";
@@ -237,6 +239,8 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 
 function Router() {
   return (
+    <>
+    <PendingInviteRedirect />
     <Switch>
       <Route path="/" component={HomeRedirect} />
       <Route path="/sign-in/*?" component={SignInPage} />
@@ -245,6 +249,9 @@ function Router() {
           treats any other path as .outsideShell and hides the native tab
           bar, which is what lets the introduction use the whole screen. */}
       <Route path="/welcome" component={() => <ProtectedRoute component={Welcome} />} />
+      {/* Invitation accept. Outside the shell and outside ProtectedRoute, so a signed-out
+          visitor can sign in from here. Renders NotFound unless VITE_UNIVERSITY_ACCESS=true. */}
+      <Route path="/invite" component={Invite} />
       <Route path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
       <Route path="/contacts" component={() => <ProtectedRoute component={Contacts} />} />
       <Route path="/add" component={() => <ProtectedRoute component={AddContact} />} />
@@ -266,6 +273,7 @@ function Router() {
       <Route path="/pitch" component={PitchPage} />
       <Route component={NotFound} />
     </Switch>
+    </>
   );
 }
 

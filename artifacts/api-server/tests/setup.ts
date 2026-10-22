@@ -38,6 +38,16 @@ clerkMiddleware:
 () =>
 (_req: unknown, _res: unknown, next: () => void) =>
 next(),
+// clerkClient.users.getUser backs the verified-email check on invitation
+// accept. Tests register each user's email with setTestClerkUser (testApp.ts).
+// Unregistered users resolve to null, which the route treats as unverified.
+clerkClient: {
+users: {
+getUser: async (id: string) =>
+((globalThis as { __novaraTestClerkUsers?: Map<string, unknown> })
+.__novaraTestClerkUsers?.get(id) ?? null),
+},
+},
 getAuth: (req: { headers: Record<string, unknown> }) => {
 if (req.headers["x-test-force-auth-error"]) {
 throw new Error(
@@ -64,9 +74,10 @@ return schemaReady;
 // test starts with empty tables so cross-test pollution (e.g. contact counts
 // leaking between "it" blocks) can't produce a false pass.
 beforeEach(async () => {
+(globalThis as { __novaraTestClerkUsers?: Map<string, unknown> }).__novaraTestClerkUsers = new Map();
 await ensureSchema();
 await pool.query(
-"TRUNCATE contacts, user_settings, push_subscriptions, apns_tokens, feedback RESTART IDENTITY CASCADE",
+"TRUNCATE contacts, user_settings, push_subscriptions, apns_tokens, feedback, organizations, organization_members, organization_invitations, entitlements RESTART IDENTITY CASCADE",
 );
 });
 

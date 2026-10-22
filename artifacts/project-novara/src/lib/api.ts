@@ -212,6 +212,8 @@ export interface Features {
   linkedinAiParse: boolean;
   /** Whether the LinkedIn screenshot importer is shown at all. */
   linkedinScreenshotImport: boolean;
+  /** Server gate for university access. Also needs VITE_UNIVERSITY_ACCESS to show UI. */
+  universityAccess: boolean;
 }
 
 const FEATURES_CACHE_KEY = "novara.features.lastKnown";
@@ -233,6 +235,7 @@ export function readCachedFeatures(): Features | null {
       cardAiParse: !!data?.cardAiParse,
       linkedinAiParse: !!data?.linkedinAiParse,
       linkedinScreenshotImport: !!data?.linkedinScreenshotImport,
+      universityAccess: !!data?.universityAccess,
     };
   } catch {
     return null;
@@ -255,6 +258,7 @@ export async function fetchFeatures(getToken: GetAuthToken): Promise<Features> {
     cardAiParse: !!data?.cardAiParse,
     linkedinAiParse: !!data?.linkedinAiParse,
     linkedinScreenshotImport: !!data?.linkedinScreenshotImport,
+    universityAccess: !!data?.universityAccess,
   };
 
   try {

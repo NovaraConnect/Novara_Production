@@ -85,3 +85,46 @@ export async function sendFeedbackNotification(payload: FeedbackNotificationPayl
     throw new Error(`Resend API error: ${result.error.message}`);
   }
 }
+
+
+/**
+ * Sends a university invitation. Returns false instead of throwing, so the
+ * caller can always hand the admin the invite link as a fallback. The link is
+ * never written to logs, because it contains a bearer token.
+ */
+export async function sendOrganizationInvitationEmail(params: {
+  to: string;
+  organizationName: string;
+  inviteUrl: string;
+  expiresAt: Date;
+}): Promise<boolean> {
+  if (!resend) {
+    logger.warn("RESEND_API_KEY not set — invitation email skipped; admin must share the link");
+    return false;
+  }
+  const org = escapeHtml(params.organizationName);
+  const url = escapeHtml(params.inviteUrl);
+  const expires = escapeHtml(params.expiresAt.toISOString().split("T")[0]);
+  const html = `
+    <p>You have been invited to join <strong>${org}</strong> on Novara.</p>
+    <p><a href="${url}">Accept your invitation</a></p>
+    <p>Sign in with this email address to accept. The invitation expires on ${expires} and can be used once.</p>
+    <p>If you were not expecting this invitation, you can ignore this email.</p>
+  `.trim();
+  try {
+    const result = await resend.emails.send({
+      from: RESEND_FROM_EMAIL,
+      to: params.to,
+      subject: `You're invited to join ${params.organizationName} on Novara`,
+      html,
+    });
+    if (result.error) {
+      logger.warn({ code: result.error.name }, "Invitation email rejected by provider");
+      return false;
+    }
+    return true;
+  } catch (err) {
+    logger.warn({ err: err instanceof Error ? err.name : "unknown" }, "Invitation email failed");
+    return false;
+  }
+}

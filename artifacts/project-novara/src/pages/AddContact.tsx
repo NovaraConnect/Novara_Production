@@ -27,6 +27,7 @@ import {
 import { QRScanner, type ScannedQRContact } from "@/components/QRScanner";
 import { NativeContactImport } from "@/components/NativeContactImport";
 import { useFeatures } from "@/hooks/useFeatures";
+import { useUniversityEntitlement } from "@/hooks/useUniversityEntitlement";
 import { localDateString } from "@/lib/utils";
 
 const INITIAL_OPTIONS: Contact["initialFollowUpDays"][] = [1, 2, 3];
@@ -214,7 +215,11 @@ export default function AddContact() {
 
   const removeInterest = (tag: string) => setInterests(prev => prev.filter(t => t !== tag));
 
-  const atLimit = contacts.length >= FREE_TIER_LIMIT;
+  // An active university entitlement lifts the free ceiling. The server enforces
+  // the same rule, so this only keeps the UI from blocking an entitled user early.
+  const { active: universityActive } = useUniversityEntitlement();
+  const contactLimit = universityActive ? Number.POSITIVE_INFINITY : FREE_TIER_LIMIT;
+  const atLimit = contacts.length >= contactLimit;
 
   const onSubmit = async (values: FormValues) => {
     if (atLimit) return;

@@ -9,6 +9,7 @@ import feedbackRouter from "./feedback";
 import featuresRouter from "./features";
 import parseCardRouter from "./parseCard";
 import parseLinkedInRouter from "./parseLinkedIn";
+import universityRouter from "./university";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,7 @@ router.use(feedbackRouter);
 router.use(featuresRouter);
 router.use(parseCardRouter);
 router.use(parseLinkedInRouter);
+// University access. Every route is behind UNIVERSITY_ACCESS_ENABLED (404 when off).
+router.use(universityRouter);
 
 export default router;

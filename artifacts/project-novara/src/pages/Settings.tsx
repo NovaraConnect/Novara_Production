@@ -12,6 +12,7 @@ import { useAuth, useClerk, useUser } from "@clerk/react";
 import { UserSettings } from "@/types/contact";
 import { NovaraMark } from "@/components/NovaraMark";
 import { isNativeShell } from "@/lib/installPrompt";
+import { OrganizationSection } from "@/components/OrganizationSection";
 import { APP_VERSION } from "@/lib/appVersion";
 import { deleteAccount } from "@/lib/api";
 import {
@@ -276,6 +277,8 @@ export default function Settings() {
             Currently: contacts older than <span className="font-semibold text-foreground">{labelMonths(settings.autoDowngradeAfterMonths)}</span> follow up every 6 months.
           </p>
         </section>
+
+        <OrganizationSection />
 
         {/* Career Profile */}
         <section id="career-profile" className="scroll-mt-24">

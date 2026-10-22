@@ -10,13 +10,14 @@ import {
   type PriorityLevel,
 } from "../lib/priority";
 import { recalculateContactsForUser } from "../lib/recalculate";
+import { FREE_TIER_LIMIT, contactLimitFor } from "../lib/entitlements";
 import { analyzeContactWithAI } from "../lib/enrich";
 import { logger } from "../lib/logger";
 import { computeNextFollowUp, resolveContactDates, utcDateString } from "../lib/followUpDates";
 
-/** Novara Free ceiling. Enforced on BOTH create paths — POST /contacts and
- *  POST /contacts/import — so the limit cannot be bypassed by importing. */
-const FREE_TIER_LIMIT = 6;
+/** Novara Free ceiling (FREE_TIER_LIMIT) lives in lib/entitlements. It is enforced on BOTH
+ *  create paths, POST /contacts and POST /contacts/import, so importing cannot bypass it.
+ *  contactLimitFor() lifts it for an active university entitlement. */
 
 const router = Router();
 
@@ -99,7 +100,8 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
       "SELECT COUNT(*) AS count FROM contacts WHERE user_id = $1",
       [userId],
     );
-    if (parseInt(countRow.count, 10) >= FREE_TIER_LIMIT) {
+    const limit = await contactLimitFor(userId);
+    if (parseInt(countRow.count, 10) >= limit) {
       res.status(403).json({
         error: "Contact limit reached",
         message: `Novara Free includes up to ${FREE_TIER_LIMIT} contacts. Novara Pro removes the limit.`,
@@ -494,7 +496,8 @@ router.post("/contacts/import", requireAuth, async (req: Request, res: Response)
     [userId],
   );
   const alreadyStored = parseInt(limitRow.count, 10);
-  if (alreadyStored >= FREE_TIER_LIMIT) {
+  const limit = await contactLimitFor(userId);
+  if (alreadyStored >= limit) {
     res.status(403).json({
       error: "Contact limit reached",
       message: `Novara Free includes up to ${FREE_TIER_LIMIT} contacts. Novara Pro removes the limit.`,
@@ -504,7 +507,7 @@ router.post("/contacts/import", requireAuth, async (req: Request, res: Response)
   }
   // Partial imports are allowed: take what fits and report the remainder,
   // rather than rejecting a whole batch because its tail overflows.
-  const capacity = FREE_TIER_LIMIT - alreadyStored;
+  const capacity = limit - alreadyStored;
 
   const { rows: [settingsRow] } = await pool.query(
     "SELECT career_goals, career_statement, goal_tags FROM user_settings WHERE user_id = $1",

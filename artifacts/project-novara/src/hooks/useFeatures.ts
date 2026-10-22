@@ -34,5 +34,6 @@ export function useFeatures() {
     cardAiParse: data?.cardAiParse ?? false,
     linkedinAiParse: data?.linkedinAiParse ?? false,
     linkedinScreenshotImport: data?.linkedinScreenshotImport ?? false,
+    universityAccess: data?.universityAccess ?? false,
   };
 }
