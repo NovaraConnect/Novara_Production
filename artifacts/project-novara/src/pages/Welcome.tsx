@@ -19,23 +19,41 @@
 // so nothing about new-vs-existing user behaviour changes:
 //   • Dashboard redirects here when that flag is false
 //   • Settings "Replay Tutorial" clears the flag and sends the user here
-//   • finishing (or skipping) sets it true and returns to the Dashboard
+//   • finishing (or skipping) saves the flag, and only then returns to the
+//     Dashboard. If the save fails we stay here and show a retryable error;
+//     navigating first let the Dashboard read the stale `false` and send the
+//     user straight back into this tour.
 // ============================================================================
+import { useRef } from "react";
 import { useLocation } from "wouter";
+import { toast } from "sonner";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { useSettings } from "@/hooks/useSettings";
 
 export default function Welcome() {
   const [, setLocation] = useLocation();
   const { settings, updateSettings } = useSettings();
+  // Guards against a second Continue/Skip/Escape while the save is in flight.
+  const finishing = useRef(false);
 
-  const finish = () => {
-    // Navigate first so the exit is immediate — the flag write is not
-    // something the user should wait behind, and it is idempotent.
-    setLocation("/dashboard");
-    if (settings && !settings.hasSeenTutorial) {
-      updateSettings.mutate({ hasSeenTutorial: true });
+  // Continue, Skip and Escape all reach this through OnboardingTour's onComplete.
+  const finish = async () => {
+    if (finishing.current) return;
+    finishing.current = true;
+    try {
+      if (settings && !settings.hasSeenTutorial) {
+        // mutateAsync resolves after the mutation's onSuccess has written the
+        // server's hasSeenTutorial: true into the ["settings"] cache, so the
+        // Dashboard gate sees the saved value when we navigate below.
+        await updateSettings.mutateAsync({ hasSeenTutorial: true });
+      }
+    } catch {
+      toast.error("Couldn't save your progress. Check your connection and try again.");
+      return;
+    } finally {
+      finishing.current = false;
     }
+    setLocation("/dashboard");
   };
 
   return <OnboardingTour onComplete={finish} />;
