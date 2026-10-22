@@ -13,7 +13,16 @@ Companion document: `docs/BILLING_AND_UNIVERSITY_ACCESS_PLAN.md` (decisions reco
 - No consumer Stripe Checkout in this release.
 - Access is read-time authoritative: a request checks membership, organization status, and access end date directly, so no scheduled job is needed for correctness.
 
-Out of scope for this release: SSO/SAML, domain auto-join, bulk CSV import, per-seat billing, Apple IAP, RevenueCat, Stripe.
+Out of scope for this release: SSO/SAML, domain auto-join, bulk CSV import, per-student or per-seat billing (students are unlimited), Apple IAP, RevenueCat, Stripe.
+
+## 0A. Commercial model (scope correction, 2026-10-21)
+
+- University access is **unlimited for students**. Nothing in the API or the web app caps, rejects, or revokes access based on how many people belong to an organization.
+- `licensed_enrollment` is optional commercial metadata for contract reporting and renewal conversations. It is returned only to platform staff and is never read by an access check.
+- Organization admins see a `memberCount` for reporting. It is not presented as "seats used" and is not a cap.
+- University-entitled users have unlimited contacts in both the API and the web UI. The six-contact free limit applies only to users without an active university entitlement.
+- Pricing (proposed, owner to confirm): annual campus license by invoice or purchase order, Net 30, tiered by enrollment band (founding pilot, department, campus, large campus or system), plus an optional founding-partner offer. Full table in `docs/BILLING_AND_UNIVERSITY_ACCESS_PLAN.md` section 6.4.
+- Not built and not planned for this release: consumer Stripe Checkout, in-app university payment, and any student payment screen.
 
 ## 1. Verified facts this plan relies on (main @ d3f1344)
 
@@ -30,7 +39,7 @@ Out of scope for this release: SSO/SAML, domain auto-join, bulk CSV import, per-
 | Name | Where | Default | Purpose |
 |---|---|---|---|
 | `UNIVERSITY_ACCESS_ENABLED` | api-server env | unset (off) | When off, all `/api/organizations*`, `/api/invitations*`, and `/api/entitlements*` routes return 404. |
-| `PLATFORM_ADMIN_USER_IDS` | api-server env | unset (none) | Comma-separated Clerk user IDs allowed to create organizations and set seat limits. |
+| `PLATFORM_ADMIN_USER_IDS` | api-server env | unset (none) | Comma-separated Clerk user IDs allowed to create organizations and set licensed enrollment (commercial metadata). |
 | `VITE_UNIVERSITY_ACCESS` | web build env | unset | Shows the invite route and the Settings "Organization" section. Also surfaced through `/api/features` as `universityAccess`. |
 | `INVITE_BASE_URL` | api-server env | `https://app.novaraconnect.group` | Base for invitation links. |
 | `RESEND_API_KEY` | api-server env | unset | **Needs owner approval to add to `novara-prod-api`.** Without it, invitation email is skipped and the admin copies the link (section 6). |
@@ -61,7 +70,7 @@ CREATE TABLE IF NOT EXISTS organizations (
   name                  text NOT NULL CHECK (length(btrim(name)) BETWEEN 1 AND 200),
   status                text NOT NULL DEFAULT 'active'
                         CHECK (status IN ('active', 'suspended')),
-  seat_limit            integer NOT NULL DEFAULT 0 CHECK (seat_limit >= 0),
+  licensed_enrollment   integer NULL CHECK (licensed_enrollment IS NULL OR licensed_enrollment >= 0),  -- metadata only, never an access limit
   access_ends_at        timestamptz NULL,
   created_by_user_id    text NOT NULL,
   created_at            timestamptz NOT NULL DEFAULT now(),
@@ -185,14 +194,14 @@ New file `artifacts/api-server/src/routes/organizations.ts`, mounted at `/api` i
 
 | Method | Path | Auth | Body | Behavior |
 |---|---|---|---|---|
-| POST | `/api/admin/organizations` | platform admin | `{ name, seatLimit, accessEndsAt?, adminEmail? }` | Creates an organization. With `adminEmail`, also creates an admin invitation (needs `seatLimit` ≥ 1). Returns `201` with the organization and the one-time admin link. |
-| PATCH | `/api/admin/organizations/:orgId` | platform admin | `{ name?, seatLimit?, status?, accessEndsAt? }` | Updates. Lowering `seatLimit` below current active seats is refused with `409` and does not revoke anyone. Setting `status='suspended'` deactivates university entitlements through the read-time check, and the sync step runs in the same transaction. |
+| POST | `/api/admin/organizations` | platform admin | `{ name, licensedEnrollment?, accessEndsAt?, adminEmail? }` | Creates an organization. With `adminEmail`, also creates an admin invitation. Returns `201` with the organization (including `licensedEnrollment`) and the one-time admin link. |
+| PATCH | `/api/admin/organizations/:orgId` | platform admin | `{ name?, licensedEnrollment?, status?, accessEndsAt? }` | Updates. `licensedEnrollment` is metadata: changing it never removes or blocks anyone. Setting `status='suspended'` deactivates university entitlements through the read-time check, and the sync step runs in the same transaction. |
 
 ### Organization admin
 
 | Method | Path | Auth | Body | Behavior |
 |---|---|---|---|---|
-| GET | `/api/organizations/:orgId` | member | — | Name, status, seat limit, seats used, access end date. |
+| GET | `/api/organizations/:orgId` | member | — | Name, status, access end date, `memberCount` (reporting). `licensedEnrollment` is never returned here. |
 | GET | `/api/organizations/:orgId/members` | admin | — | Members with role and status. Emails are not returned. |
 | POST | `/api/organizations/:orgId/invitations` | admin | `{ email, role? }` | Normalizes email to lowercase. Refuses if a pending invite exists for that email (`409`, returns the existing ID). Creates the token, sends the email if Resend is configured, and returns `{ id, inviteUrl, emailSent }`. `inviteUrl` is shown **once** to the admin. |
 | GET | `/api/organizations/:orgId/invitations` | admin | — | Invitations, with status and expiry. Tokens and hashes are never returned. |
@@ -214,7 +223,7 @@ New file `artifacts/api-server/src/routes/organizations.ts`, mounted at `/api` i
 2. Hash the token. `SELECT ... FROM organization_invitations WHERE token_hash = $1 FOR UPDATE`. Unknown token returns `404`.
 3. Check status and `expires_at`. Non-pending returns `410`.
 4. Compare the Clerk verified email with `invitation.email` (both lowercased). Mismatch returns `403 email_mismatch` and does not reveal the invited address.
-5. `SELECT ... FROM organizations WHERE id = $1 FOR UPDATE`. This serializes concurrent accepts for the same org, so seat counts stay correct. Refuse with `409 seats_full` when active seats ≥ `seat_limit`.
+5. `SELECT ... FROM organizations WHERE id = $1 FOR UPDATE`. This serializes concurrent accepts for the same invitation and any status change on the org. No head-count check: universities have unlimited students.
 6. Check the organization is `active` and not past `access_ends_at`. Otherwise `410 organization_inactive`.
 7. Upsert `organization_members` (`ON CONFLICT (organization_id, user_id) DO UPDATE SET status='active', role=excluded.role, revoked_at=NULL` only if the membership is currently revoked; if already active, return success without changing it, which makes accept idempotent).
 8. Call `syncUniversityEntitlement`.
@@ -266,7 +275,6 @@ States:
 - Errors, each with plain text and a next step:
   - `email_not_verified`: "Verify your email in your account settings, then try again."
   - `email_mismatch`: "This invitation was sent to a different email address. Sign in with that address."
-  - `seats_full`: "{organizationName} has no open seats. Ask your administrator."
   - `expired` / `revoked` / `accepted`: "This invitation is no longer valid. Ask your administrator for a new one."
   - Network failure: retry button. Mutations use the same single-flight guard as `Welcome.tsx`.
 
@@ -284,7 +292,8 @@ Visible only when `universityAccess` is on **and** the user has an active member
 
 ### 8.4 Contact limit (`src/pages/AddContact.tsx`, existing)
 
-- Limit comes from `/api/entitlements/me` or the server response. The client does not hardcode `6`. The server enforces the limit regardless.
+- The limit comes from `contactLimit(universityActive)` in `src/lib/contactLimit.ts`. Free users keep the six-contact ceiling. Users with an active university entitlement are unlimited. The server applies the same rule.
+- Covered by `src/lib/contactLimit.test.ts`.
 
 ### 8.5 Platform admin
 
@@ -306,7 +315,8 @@ Required cases:
 - Accept, already-accepted by someone else: `410`.
 - Accept, email mismatch: `403`; response does not include the invited address.
 - Accept, unverified email: `403 email_not_verified`.
-- Accept, seats: with `seat_limit = 1` and two different students accepting concurrently, exactly one succeeds and the other gets `409 seats_full`. This test must run against a real Postgres, not a mock.
+- Accept, single use under concurrency: two accepts of one invitation (same verified address, two accounts) produce exactly one `200` and one `410`. Runs against a real Postgres, not a mock.
+- Unlimited access: many invited students join regardless of `licensed_enrollment`, and lowering that figure changes no access.
 - Accept, org suspended or past `access_ends_at`: `410`.
 - Revoke member: entitlement becomes `inactive` in the same transaction; read-time check returns inactive immediately.
 - Last admin: cannot revoke the last active admin (`409`).
@@ -315,7 +325,7 @@ Required cases:
 - Flag off: every new route returns `404`, including for platform admins.
 - Platform admin route called by a non-admin: `404`.
 - Contact limit: university-active user can add contacts beyond 6; a non-entitled user is still blocked at 6 (regression test for the existing limit).
-- Lowering seat limit below current seats: `409`; no member is revoked.
+- Licensed enrollment is metadata: lowering it changes no access and returns `200`. Only platform staff receive the figure. Admins and members do not.
 
 ### 9.2 Web (`artifacts/project-novara`)
 
@@ -343,7 +353,7 @@ Section 3.3.
 1. Platform staff create organizations. Admin invitation can be attached at creation.
 2. Verify `novaraconnect.group` as the Resend sending domain. **Manual step, not yet done.**
 3. `RESEND_API_KEY` on `novara-prod-api`: **not added.** Waits for release approval.
-4. Seats are explicit invitations only. A `.edu` address never grants access by itself. Covered by a test.
+4. Access is by explicit invitation only, with no head-count limit. A `.edu` address never grants access by itself. Covered by a test.
 5. Contract end date is optional (`NULL` means no end).
 6. Invitations expire after 14 days.
 7. Organization admins act only within their own organization. Covered by a test.
@@ -400,11 +410,11 @@ No rollback step touches `feat/stripe`, `main` billing code, or Render service s
 - `src/routes/university.ts`: platform admin, organization admin, invitation preview and accept, entitlement read.
 - Contact limit now goes through `contactLimitFor`. With the flag off it is exactly 6, with no database call.
 - `/api/features` reports `universityAccess`.
-- Web: `/invite` page, Settings Organization section, `PendingInviteRedirect`, `useUniversityEntitlement`, and the AddContact limit lift. Gated by `VITE_UNIVERSITY_ACCESS`.
+- Web: `/invite` page, Settings Organization section (member count for admins, no seat language), `PendingInviteRedirect`, `useUniversityEntitlement`, and `contactLimit` for the AddContact ceiling. Gated by `VITE_UNIVERSITY_ACCESS`.
 
 ### Tests
 
-- API: full suite 238 of 238 passing against local Postgres 16. Includes 37 new integration tests (flag off, roles, cross-org, accept paths, expiry, revocation, seats including a concurrent accept race, token handling) and 11 unit tests.
+- API: full suite 241 of 241 passing against local Postgres 16. Includes integration tests for flag off, roles, cross-org isolation, accept paths, expiry, revocation, unlimited access, metadata visibility, and a concurrent single-use race, plus unit tests for token handling.
 - Web: 187 existing tests pass, plus 7 new tests for token capture and storage.
 - Typecheck clean for both packages. Web production build passes with the flag off and on.
 - Migration 0004 applied, rolled back, and re-applied cleanly on a scratch database.

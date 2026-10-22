@@ -42,8 +42,8 @@ export interface OrganizationDetail {
   id: string;
   name: string;
   status: string;
-  seatLimit: number;
-  seatsUsed: number;
+  /** Active members. For reporting only. Not a cap and not shown as "seats". */
+  memberCount: number;
   accessEndsAt: string | null;
   role: "admin" | "member";
 }

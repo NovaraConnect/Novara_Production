@@ -1,5 +1,9 @@
 // ============================================================================
-// University organizations, seats, invitations and entitlements.
+// University organizations, invitations and entitlements.
+//
+// Universities have UNLIMITED students. Nothing here caps or rejects access by
+// head count. licensed_enrollment is commercial metadata for contract reporting
+// only, and it is returned only to platform staff.
 //
 // Everything here is behind UNIVERSITY_ACCESS_ENABLED (404 when off). Each
 // route lists its gates explicitly, in order: flag, then auth, then role. No
@@ -63,28 +67,39 @@ interface OrgRow {
   id: string;
   name: string;
   status: string;
-  seat_limit: number;
+  licensed_enrollment: number | null;
   access_ends_at: Date | null;
   created_at: Date;
 }
 
-function orgDto(row: OrgRow, seatsUsed?: number) {
+/** `commercial` adds licensed enrollment. Platform staff only. Members and
+ *  organization admins never receive it. `memberCount` is for reporting. */
+function orgDto(row: OrgRow, opts: { memberCount?: number; commercial?: boolean } = {}) {
   return {
     id: row.id,
     name: row.name,
     status: row.status,
-    seatLimit: row.seat_limit,
-    ...(seatsUsed !== undefined ? { seatsUsed } : {}),
     accessEndsAt: row.access_ends_at ? row.access_ends_at.toISOString() : null,
+    ...(opts.memberCount !== undefined ? { memberCount: opts.memberCount } : {}),
+    ...(opts.commercial ? { licensedEnrollment: row.licensed_enrollment } : {}),
   };
 }
 
-async function countActiveSeats(db: Pick<PoolClient, "query">, orgId: string): Promise<number> {
+async function countActiveMembers(db: Pick<PoolClient, "query">, orgId: string): Promise<number> {
   const { rows } = await db.query<{ n: string }>(
     "SELECT COUNT(*)::text AS n FROM organization_members WHERE organization_id = $1 AND status = 'active'",
     [orgId],
   );
   return parseInt(rows[0]?.n ?? "0", 10);
+}
+
+/** Commercial metadata: a whole number from 0 to 1,000,000, or null to clear.
+ *  Returns "invalid" for anything else. Returns undefined when absent. */
+function parseLicensedEnrollment(value: unknown): number | null | undefined | "invalid" {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (!Number.isInteger(value) || (value as number) < 0 || (value as number) > 1_000_000) return "invalid";
+  return value as number;
 }
 
 /** Parses an optional ISO date. Returns undefined when absent, null on junk or
@@ -136,9 +151,9 @@ router.post(
       res.status(400).json({ error: "name must be 1 to 200 characters" });
       return;
     }
-    const seatLimit = body["seatLimit"];
-    if (!Number.isInteger(seatLimit) || (seatLimit as number) < 0 || (seatLimit as number) > 100000) {
-      res.status(400).json({ error: "seatLimit must be an integer from 0 to 100000" });
+    const licensedEnrollment = parseLicensedEnrollment(body["licensedEnrollment"]);
+    if (licensedEnrollment === "invalid") {
+      res.status(400).json({ error: "licensedEnrollment must be a whole number of 0 or more, or null" });
       return;
     }
     const accessEndsAt = parseFutureDate(body["accessEndsAt"]);
@@ -153,10 +168,6 @@ router.post(
         res.status(400).json({ error: "adminEmail is not a valid address" });
         return;
       }
-      if ((seatLimit as number) < 1) {
-        res.status(400).json({ error: "seatLimit must be at least 1 to invite an admin" });
-        return;
-      }
     }
 
     const actor = (req as AuthedRequest).userId;
@@ -166,10 +177,10 @@ router.post(
     try {
       await client.query("BEGIN");
       const { rows } = await client.query<OrgRow>(
-        `INSERT INTO organizations (name, seat_limit, access_ends_at, created_by_user_id)
+        `INSERT INTO organizations (name, licensed_enrollment, access_ends_at, created_by_user_id)
          VALUES ($1, $2, $3, $4)
-         RETURNING id, name, status, seat_limit, access_ends_at, created_at`,
-        [name, seatLimit, accessEndsAt ?? null, actor],
+         RETURNING id, name, status, licensed_enrollment, access_ends_at, created_at`,
+        [name, licensedEnrollment ?? null, accessEndsAt ?? null, actor],
       );
       org = rows[0]!;
       if (adminEmail) {
@@ -183,7 +194,7 @@ router.post(
       client.release();
     }
 
-    logger.info({ organizationId: org.id, seatLimit }, "University organization created");
+    logger.info({ organizationId: org.id }, "University organization created");
     const emailSent = invitation && adminEmail
       ? await sendOrganizationInvitationEmail({
           to: adminEmail,
@@ -194,7 +205,7 @@ router.post(
       : false;
 
     res.status(201).json({
-      organization: orgDto(org, 0),
+      organization: orgDto(org, { memberCount: 0, commercial: true }),
       adminInvitation: invitation
         ? {
             id: invitation.id,
@@ -228,13 +239,14 @@ router.patch(
         return;
       }
     }
-    let seatLimit: number | undefined;
-    if (body["seatLimit"] !== undefined) {
-      if (!Number.isInteger(body["seatLimit"]) || (body["seatLimit"] as number) < 0 || (body["seatLimit"] as number) > 100000) {
-        res.status(400).json({ error: "seatLimit must be an integer from 0 to 100000" });
+    let licensedEnrollment: number | null | undefined;
+    if (body["licensedEnrollment"] !== undefined) {
+      const parsed = parseLicensedEnrollment(body["licensedEnrollment"]);
+      if (parsed === "invalid") {
+        res.status(400).json({ error: "licensedEnrollment must be a whole number of 0 or more, or null" });
         return;
       }
-      seatLimit = body["seatLimit"] as number;
+      licensedEnrollment = parsed;
     }
     let status: "active" | "suspended" | undefined;
     if (body["status"] !== undefined) {
@@ -258,7 +270,7 @@ router.patch(
     try {
       await client.query("BEGIN");
       const { rows: [current] } = await client.query<OrgRow>(
-        "SELECT id, name, status, seat_limit, access_ends_at, created_at FROM organizations WHERE id = $1 FOR UPDATE",
+        "SELECT id, name, status, licensed_enrollment, access_ends_at, created_at FROM organizations WHERE id = $1 FOR UPDATE",
         [orgId],
       );
       if (!current) {
@@ -266,34 +278,24 @@ router.patch(
         res.status(404).json({ error: "Not found" });
         return;
       }
-      if (seatLimit !== undefined) {
-        const active = await countActiveSeats(client, orgId);
-        if (seatLimit < active) {
-          await client.query("ROLLBACK");
-          res.status(409).json({
-            error: "seat_limit_below_members",
-            message: `Organization has ${active} active members. Seat limit cannot drop below that.`,
-          });
-          return;
-        }
-      }
+      // No head-count check here. Enrollment is metadata; lowering it never removes anyone.
       const { rows: [updated] } = await client.query<OrgRow>(
         `UPDATE organizations
-            SET name = $2, status = $3, seat_limit = $4, access_ends_at = $5, updated_at = now()
+            SET name = $2, status = $3, licensed_enrollment = $4, access_ends_at = $5, updated_at = now()
           WHERE id = $1
-          RETURNING id, name, status, seat_limit, access_ends_at, created_at`,
+          RETURNING id, name, status, licensed_enrollment, access_ends_at, created_at`,
         [
           orgId,
           name ?? current.name,
           status ?? current.status,
-          seatLimit ?? current.seat_limit,
+          licensedEnrollment === undefined ? current.licensed_enrollment : licensedEnrollment,
           accessEndsAt === undefined ? current.access_ends_at : accessEndsAt,
         ],
       );
       await syncOrganizationEntitlements(client, orgId);
       await client.query("COMMIT");
-      const seats = await countActiveSeats(pool, orgId);
-      res.json(orgDto(updated!, seats));
+      const members = await countActiveMembers(pool, orgId);
+      res.json(orgDto(updated!, { memberCount: members, commercial: true }));
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;
@@ -313,15 +315,15 @@ router.get(
   wrap(async (req, res) => {
     const ctx = orgContext(res);
     const { rows: [row] } = await pool.query<OrgRow>(
-      "SELECT id, name, status, seat_limit, access_ends_at, created_at FROM organizations WHERE id = $1",
+      "SELECT id, name, status, licensed_enrollment, access_ends_at, created_at FROM organizations WHERE id = $1",
       [ctx.organizationId],
     );
     if (!row) {
       res.status(404).json({ error: "Not found" });
       return;
     }
-    const seats = await countActiveSeats(pool, ctx.organizationId);
-    res.json({ ...orgDto(row, seats), role: ctx.role });
+    const members = await countActiveMembers(pool, ctx.organizationId);
+    res.json({ ...orgDto(row, { memberCount: members }), role: ctx.role });
   }),
 );
 
@@ -438,7 +440,7 @@ router.post(
     try {
       await client.query("BEGIN");
       const { rows: [org] } = await client.query<OrgRow>(
-        "SELECT id, name, status, seat_limit, access_ends_at, created_at FROM organizations WHERE id = $1 FOR UPDATE",
+        "SELECT id, name, status, licensed_enrollment, access_ends_at, created_at FROM organizations WHERE id = $1 FOR UPDATE",
         [organizationId],
       );
       if (!org || org.status !== "active") {
@@ -732,9 +734,10 @@ router.post(
       }
       // Lock order: organization, then invitation, then membership.
       const { rows: [org] } = await client.query<{
-        id: string; name: string; status: string; seat_limit: number; access_ends_at: Date | null;
+        id: string; name: string; status: string; access_ends_at: Date | null;
       }>(
-        "SELECT id, name, status, seat_limit, access_ends_at FROM organizations WHERE id = $1 FOR UPDATE",
+        // Organization lock first. It orders concurrent accepts and status changes.
+        "SELECT id, name, status, access_ends_at FROM organizations WHERE id = $1 FOR UPDATE",
         [pre.organization_id],
       );
       const { rows: [inv] } = await client.query<{
@@ -786,12 +789,7 @@ router.post(
 
       let resultingRole: string = member?.role ?? inv!.role;
       if (!alreadyActive) {
-        const seats = await countActiveSeats(client, org!.id);
-        if (seats >= org!.seat_limit) {
-          await client.query("ROLLBACK");
-          res.status(409).json({ error: "seats_full", message: `${org!.name} has no open seats. Ask your administrator.` });
-          return;
-        }
+        // No head-count check: universities have unlimited students.
         // Re-activates a previously revoked row, or creates one. The
         // invitation's role decides the role. The old role does not carry over.
         const { rows: [upserted] } = await client.query<{ role: string }>(

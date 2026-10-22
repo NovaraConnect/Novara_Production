@@ -1,5 +1,5 @@
-// Integration tests for university organizations, seats, invitations and
-// entitlements. Runs against the real Postgres (see tests/setup.ts).
+// Integration tests for university organizations, invitations and
+// entitlements. Universities have unlimited students: nothing here caps access. Runs against the real Postgres (see tests/setup.ts).
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import request from "supertest";
 import { app, authHeaders, setTestClerkUser } from "./testApp";
@@ -22,8 +22,8 @@ function tokenFrom(inviteUrl: string): string {
 }
 
 /** Org whose admin has already accepted, so they are an active member. */
-async function createOrgWithActiveAdmin(seatLimit: number) {
-  const { organization, adminInvitation } = await createOrg({ seatLimit });
+async function createOrgWithActiveAdmin() {
+  const { organization, adminInvitation } = await createOrg();
   const accept = await acceptAs(ADMIN, ADMIN_EMAIL, tokenFrom(adminInvitation!.inviteUrl));
   expect(accept.status).toBe(200);
   return { organization };
@@ -33,13 +33,13 @@ function contact(i: number) {
   return { firstName: `F${i}`, lastName: "L", company: "Acme" };
 }
 
-async function createOrg(opts: { seatLimit?: number; adminEmail?: string | null } = {}) {
+async function createOrg(opts: { licensedEnrollment?: number | null; adminEmail?: string | null } = {}) {
   const res = await request(app)
     .post("/api/admin/organizations")
     .set(authHeaders(PLATFORM))
     .send({
       name: "State University",
-      seatLimit: opts.seatLimit ?? 5,
+      ...(opts.licensedEnrollment !== undefined ? { licensedEnrollment: opts.licensedEnrollment } : {}),
       ...(opts.adminEmail === null ? {} : { adminEmail: opts.adminEmail ?? ADMIN_EMAIL }),
     });
   expect(res.status).toBe(201);
@@ -89,7 +89,7 @@ describe("feature flag", () => {
 
   it("returns 404 on every university route while off, even for platform admins", async () => {
     const checks = [
-      request(app).post("/api/admin/organizations").set(authHeaders(PLATFORM)).send({ name: "x", seatLimit: 1 }),
+      request(app).post("/api/admin/organizations").set(authHeaders(PLATFORM)).send({ name: "x" }),
       request(app).get("/api/entitlements/me").set(authHeaders(STUDENT_A)),
       request(app).post("/api/invitations/preview").set(authHeaders(STUDENT_A)).send({ token: "a".repeat(43) }),
       request(app).post("/api/invitations/accept").set(authHeaders(STUDENT_A)).send({ token: "a".repeat(43) }),
@@ -143,25 +143,27 @@ describe("platform admin creates organizations", () => {
     const res = await request(app)
       .post("/api/admin/organizations")
       .set(authHeaders(ADMIN))
-      .send({ name: "Sneaky", seatLimit: 10 });
+      .send({ name: "Sneaky", licensedEnrollment: 10 });
     expect(res.status).toBe(404);
   });
 
-  it("rejects an admin invite when there are zero seats", async () => {
+  it("creates an admin invitation without any enrollment figure", async () => {
     const res = await request(app)
       .post("/api/admin/organizations")
       .set(authHeaders(PLATFORM))
-      .send({ name: "No Seats", seatLimit: 0, adminEmail: ADMIN_EMAIL });
-    expect(res.status).toBe(400);
+      .send({ name: "No Figure Yet", adminEmail: ADMIN_EMAIL });
+    expect(res.status).toBe(201);
+    expect(res.body.adminInvitation).not.toBeNull();
   });
 
   it("validates input", async () => {
     const bad = [
-      { name: "", seatLimit: 1 },
-      { name: "ok", seatLimit: -1 },
-      { name: "ok", seatLimit: 1.5 },
-      { name: "ok", seatLimit: 1, accessEndsAt: "2001-01-01T00:00:00Z" },
-      { name: "ok", seatLimit: 1, adminEmail: "not-an-email" },
+      { name: "" },
+      { name: "ok", licensedEnrollment: -1 },
+      { name: "ok", licensedEnrollment: 1.5 },
+      { name: "ok", licensedEnrollment: "many" },
+      { name: "ok", accessEndsAt: "2001-01-01T00:00:00Z" },
+      { name: "ok", adminEmail: "not-an-email" },
     ];
     for (const body of bad) {
       const res = await request(app).post("/api/admin/organizations").set(authHeaders(PLATFORM)).send(body);
@@ -281,7 +283,7 @@ describe("accepting an invitation", () => {
   });
 
   it("refuses a revoked invitation", async () => {
-    const { organization } = await createOrgWithActiveAdmin(3);
+    const { organization } = await createOrgWithActiveAdmin();
     const inv = await inviteStudent(organization.id, A_EMAIL);
     const token = tokenFrom(inv.body.inviteUrl);
     const rev = await request(app)
@@ -312,67 +314,103 @@ describe("accepting an invitation", () => {
   });
 });
 
-describe("seats", () => {
-  it("refuses the second student when the single seat is taken", async () => {
-    const { organization, adminInvitation } = await createOrg({ seatLimit: 1 });
-    expect((await acceptAs(ADMIN, ADMIN_EMAIL, tokenFrom(adminInvitation!.inviteUrl))).status).toBe(200);
+describe("university access is not capped by head count", () => {
+  it("admits every invited student, even when the licensed figure is tiny", async () => {
+    const { organization } = await createOrgWithActiveAdmin();
+    const patch = await request(app)
+      .patch(`/api/admin/organizations/${organization.id}`)
+      .set(authHeaders(PLATFORM))
+      .send({ licensedEnrollment: 1 });
+    expect(patch.status).toBe(200);
 
-    const inv = await inviteStudent(organization.id, A_EMAIL);
-    expect(inv.status).toBe(201);
-    const res = await acceptAs(STUDENT_A, A_EMAIL, tokenFrom(inv.body.inviteUrl));
-    expect(res.status).toBe(409);
-    expect(res.body.error).toBe("seats_full");
+    for (let i = 0; i < 5; i++) {
+      const email = `student${i}@school.edu`;
+      const inv = await inviteStudent(organization.id, email);
+      expect(inv.status).toBe(201);
+      const res = await acceptAs(`user_bulk_${i}`, email, tokenFrom(inv.body.inviteUrl));
+      expect(res.status).toBe(200);
+    }
+
+    const detail = await request(app).get(`/api/organizations/${organization.id}`).set(authHeaders(ADMIN));
+    expect(detail.body.memberCount).toBe(6); // admin + five students
   });
 
-  it("lets exactly one of two concurrent accepts win when one seat is left", async () => {
-    // Admin holds 1 of 2 seats, leaving exactly one for the two students racing.
-    const { organization } = await createOrgWithActiveAdmin(2);
-
-    const invA = await inviteStudent(organization.id, A_EMAIL);
-    const invB = await inviteStudent(organization.id, B_EMAIL);
-    const tokA = tokenFrom(invA.body.inviteUrl);
-    const tokB = tokenFrom(invB.body.inviteUrl);
-
-    setTestClerkUser(STUDENT_A, { email: A_EMAIL });
-    setTestClerkUser(STUDENT_B, { email: B_EMAIL });
-
-    const [ra, rb] = await Promise.all([
-      request(app).post("/api/invitations/accept").set(authHeaders(STUDENT_A)).send({ token: tokA }),
-      request(app).post("/api/invitations/accept").set(authHeaders(STUDENT_B)).send({ token: tokB }),
-    ]);
-    const statuses = [ra.status, rb.status].sort();
-    expect(statuses).toEqual([200, 409]);
-    const { rows } = await pool.query(
-      "SELECT COUNT(*)::int AS n FROM organization_members WHERE organization_id = $1 AND status = 'active'",
-      [organization.id],
-    );
-    expect(rows[0].n).toBe(2); // admin + exactly one student
-  });
-
-  it("refuses to lower the seat limit below active members", async () => {
-    const { organization, adminInvitation } = await createOrg({ seatLimit: 3 });
-    expect((await acceptAs(ADMIN, ADMIN_EMAIL, tokenFrom(adminInvitation!.inviteUrl))).status).toBe(200);
+  it("does not let lowering the licensed figure remove or block anyone", async () => {
+    const { organization } = await createOrgWithActiveAdmin();
     const inv = await inviteStudent(organization.id, A_EMAIL);
     expect((await acceptAs(STUDENT_A, A_EMAIL, tokenFrom(inv.body.inviteUrl))).status).toBe(200);
 
-    const res = await request(app)
+    const patch = await request(app)
       .patch(`/api/admin/organizations/${organization.id}`)
       .set(authHeaders(PLATFORM))
-      .send({ seatLimit: 1 });
-    expect(res.status).toBe(409);
-    expect(res.body.error).toBe("seat_limit_below_members");
+      .send({ licensedEnrollment: 0 });
+    expect(patch.status).toBe(200);
 
+    const ent = await request(app).get("/api/entitlements/me").set(authHeaders(STUDENT_A));
+    expect(ent.body.university.active).toBe(true);
+  });
+
+  it("returns the licensed figure to platform staff only", async () => {
+    const { organization } = await createOrgWithActiveAdmin();
+    const set = await request(app)
+      .patch(`/api/admin/organizations/${organization.id}`)
+      .set(authHeaders(PLATFORM))
+      .send({ licensedEnrollment: 12000 });
+    expect(set.body.licensedEnrollment).toBe(12000);
+
+    const asAdmin = await request(app).get(`/api/organizations/${organization.id}`).set(authHeaders(ADMIN));
+    expect(asAdmin.body).not.toHaveProperty("licensedEnrollment");
+    expect(asAdmin.body.memberCount).toBe(1);
+  });
+
+  it("lets platform staff clear the licensed figure", async () => {
+    const { organization } = await createOrg({ licensedEnrollment: 9000 });
+    const cleared = await request(app)
+      .patch(`/api/admin/organizations/${organization.id}`)
+      .set(authHeaders(PLATFORM))
+      .send({ licensedEnrollment: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.licensedEnrollment).toBeNull();
+  });
+
+  it("gives a university member the same unlimited contact access as an admin", async () => {
+    const { organization } = await createOrgWithActiveAdmin();
+    const inv = await inviteStudent(organization.id, A_EMAIL);
+    expect((await acceptAs(STUDENT_A, A_EMAIL, tokenFrom(inv.body.inviteUrl))).status).toBe(200);
+    for (let i = 0; i < 8; i++) {
+      const ok = await request(app).post("/api/contacts").set(authHeaders(STUDENT_A)).send(contact(i));
+      expect(ok.status).toBe(201);
+    }
+  });
+});
+
+describe("single-use invitations under concurrency", () => {
+  it("lets only one of two concurrent accepts of the same invitation succeed", async () => {
+    const { organization } = await createOrgWithActiveAdmin();
+    const inv = await inviteStudent(organization.id, A_EMAIL);
+    const token = tokenFrom(inv.body.inviteUrl);
+
+    // Two accounts that both present the same verified address and the same token.
+    setTestClerkUser(STUDENT_A, { email: A_EMAIL });
+    setTestClerkUser(STUDENT_B, { email: A_EMAIL });
+    const [ra, rb] = await Promise.all([
+      request(app).post("/api/invitations/accept").set(authHeaders(STUDENT_A)).send({ token }),
+      request(app).post("/api/invitations/accept").set(authHeaders(STUDENT_B)).send({ token }),
+    ]);
+    expect([ra.status, rb.status].sort()).toEqual([200, 410]);
+
+    const loser = ra.status === 410 ? STUDENT_A : STUDENT_B;
     const { rows } = await pool.query(
-      "SELECT COUNT(*)::int AS n FROM organization_members WHERE organization_id = $1 AND status = 'active'",
-      [organization.id],
+      "SELECT COUNT(*)::int AS n FROM organization_members WHERE organization_id = $1 AND user_id = $2 AND status = 'active'",
+      [organization.id, loser],
     );
-    expect(rows[0].n).toBe(2);
+    expect(rows[0].n).toBe(0);
   });
 });
 
 describe("revocation", () => {
   it("removes access at once when an admin revokes a member", async () => {
-    const { organization, adminInvitation } = await createOrg({ seatLimit: 3 });
+    const { organization, adminInvitation } = await createOrg();
     expect((await acceptAs(ADMIN, ADMIN_EMAIL, tokenFrom(adminInvitation!.inviteUrl))).status).toBe(200);
     const inv = await inviteStudent(organization.id, A_EMAIL);
     expect((await acceptAs(STUDENT_A, A_EMAIL, tokenFrom(inv.body.inviteUrl))).status).toBe(200);
@@ -395,7 +433,7 @@ describe("revocation", () => {
   });
 
   it("refuses to revoke the last active admin", async () => {
-    const { organization, adminInvitation } = await createOrg({ seatLimit: 2 });
+    const { organization, adminInvitation } = await createOrg();
     expect((await acceptAs(ADMIN, ADMIN_EMAIL, tokenFrom(adminInvitation!.inviteUrl))).status).toBe(200);
     const members = await request(app).get(`/api/organizations/${organization.id}/members`).set(authHeaders(ADMIN));
     const self = members.body[0];
@@ -407,7 +445,7 @@ describe("revocation", () => {
   });
 
   it("revokes a pending invitation and reports a second revoke as already revoked", async () => {
-    const { organization } = await createOrgWithActiveAdmin(2);
+    const { organization } = await createOrgWithActiveAdmin();
     const inv = await inviteStudent(organization.id, A_EMAIL);
     const first = await request(app)
       .post(`/api/organizations/${organization.id}/invitations/${inv.body.id}/revoke`)
@@ -422,7 +460,7 @@ describe("revocation", () => {
 
 describe("organization admin scope", () => {
   it("refuses a plain member on admin routes with 403", async () => {
-    const { organization, adminInvitation } = await createOrg({ seatLimit: 3 });
+    const { organization, adminInvitation } = await createOrg();
     expect((await acceptAs(ADMIN, ADMIN_EMAIL, tokenFrom(adminInvitation!.inviteUrl))).status).toBe(200);
     const inv = await inviteStudent(organization.id, A_EMAIL);
     expect((await acceptAs(STUDENT_A, A_EMAIL, tokenFrom(inv.body.inviteUrl))).status).toBe(200);
@@ -443,10 +481,10 @@ describe("organization admin scope", () => {
   });
 
   it("does not let an admin of one organization act on another", async () => {
-    const orgA = await createOrg({ seatLimit: 2, adminEmail: ADMIN_EMAIL });
+    const orgA = await createOrg({ adminEmail: ADMIN_EMAIL });
     expect((await acceptAs(ADMIN, ADMIN_EMAIL, tokenFrom(orgA.adminInvitation!.inviteUrl))).status).toBe(200);
 
-    const orgB = await createOrg({ seatLimit: 2, adminEmail: null });
+    const orgB = await createOrg({ adminEmail: null });
     const res = await request(app).get(`/api/organizations/${orgB.organization.id}/members`).set(authHeaders(ADMIN));
     expect(res.status).toBe(404);
     const invite = await inviteStudent(orgB.organization.id, C_EMAIL, ADMIN);
@@ -459,7 +497,7 @@ describe("organization admin scope", () => {
   });
 
   it("refuses a duplicate live invitation for the same address", async () => {
-    const { organization } = await createOrgWithActiveAdmin(2);
+    const { organization } = await createOrgWithActiveAdmin();
     expect((await inviteStudent(organization.id, A_EMAIL)).status).toBe(201);
     const dup = await inviteStudent(organization.id, A_EMAIL);
     expect(dup.status).toBe(409);
@@ -467,7 +505,7 @@ describe("organization admin scope", () => {
   });
 
   it("rotates the token on resend and kills the old link", async () => {
-    const { organization } = await createOrgWithActiveAdmin(2);
+    const { organization } = await createOrgWithActiveAdmin();
     const inv = await inviteStudent(organization.id, A_EMAIL);
     const oldToken = tokenFrom(inv.body.inviteUrl);
     const resent = await request(app)
@@ -482,7 +520,7 @@ describe("organization admin scope", () => {
   });
 
   it("lists invitations and members without exposing tokens, hashes, emails or Clerk IDs", async () => {
-    const { organization, adminInvitation } = await createOrg({ seatLimit: 2 });
+    const { organization, adminInvitation } = await createOrg();
     expect((await acceptAs(ADMIN, ADMIN_EMAIL, tokenFrom(adminInvitation!.inviteUrl))).status).toBe(200);
     await inviteStudent(organization.id, A_EMAIL);
     const invites = await request(app).get(`/api/organizations/${organization.id}/invitations`).set(authHeaders(ADMIN));
@@ -503,7 +541,7 @@ describe("entitlement read", () => {
   });
 
   it("reports the organization and role for an active member", async () => {
-    const { organization, adminInvitation } = await createOrg({ seatLimit: 2 });
+    const { organization, adminInvitation } = await createOrg();
     expect((await acceptAs(ADMIN, ADMIN_EMAIL, tokenFrom(adminInvitation!.inviteUrl))).status).toBe(200);
     const res = await request(app).get("/api/entitlements/me").set(authHeaders(ADMIN));
     expect(res.body.university).toMatchObject({

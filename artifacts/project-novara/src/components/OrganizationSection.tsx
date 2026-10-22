@@ -65,6 +65,7 @@ function OrganizationPanel({ orgId }: { orgId: string }) {
               {org.data.accessEndsAt
                 ? `Access through ${new Date(org.data.accessEndsAt).toLocaleDateString()}`
                 : "Access is active"}
+              {isAdmin && ` · ${org.data.memberCount} member${org.data.memberCount === 1 ? "" : "s"}`}
             </p>
           </div>
         )}

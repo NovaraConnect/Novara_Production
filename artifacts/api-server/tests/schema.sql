@@ -103,8 +103,9 @@ CREATE TABLE IF NOT EXISTS organizations (
     name               text NOT NULL CHECK (length(btrim(name)) BETWEEN 1 AND 200),
     status             text NOT NULL DEFAULT 'active'
                        CHECK (status IN ('active', 'suspended')),
-    -- 0 means no seats: nobody can accept until a platform admin raises it.
-    seat_limit         integer NOT NULL DEFAULT 0 CHECK (seat_limit >= 0),
+    -- Commercial metadata for contract reporting and renewal conversations.
+    -- Never read by any access check: universities have unlimited students.
+    licensed_enrollment integer NULL CHECK (licensed_enrollment IS NULL OR licensed_enrollment >= 0),
     -- Optional contract end. NULL means no end date.
     access_ends_at     timestamptz NULL,
     created_by_user_id text NOT NULL,

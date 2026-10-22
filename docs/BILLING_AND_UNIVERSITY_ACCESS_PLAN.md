@@ -7,7 +7,7 @@ Owner decisions are listed in section 9 and must be answered before implementati
 
 1. **Apple IAP implementation target is the Capacitor shell** (`artifacts/project-novara/ios`). The Expo path (`artifacts/novara-mobile`) is out of scope unless App Store Connect later shows the Expo build is the one in review.
 2. **`entitlements` is a new, additive, provider-neutral table.** It is not a rename of, and does not depend on, the Stripe-only `subscriptions` table from the `feat/stripe` branch.
-3. **University organizations come first:** organizations, administrator roles, seats, invitations, acceptance, revocation, and expiry. Detail is in `docs/UNIVERSITY_ACCESS_IMPLEMENTATION_PLAN.md`.
+3. **University organizations come first:** organizations, administrator roles, invitations, acceptance, revocation, and expiry. Students are unlimited; there are no seats. Detail is in `docs/UNIVERSITY_ACCESS_IMPLEMENTATION_PLAN.md`.
 4. **University entitlement works in the iOS app and in the Android web/PWA after sign-in.** It never shows a payment screen to a student.
 5. **No consumer Stripe Checkout in this release.** Stripe web work stays on `feat/stripe`. Any future Stripe work starts with the native-shell gate as its first commit.
 6. **Apple subscription state is authoritative.** Access follows the state that Apple/RevenueCat reports. No extra grace period is added on top of it.
@@ -49,7 +49,7 @@ These were checked directly, not assumed.
 **Constraints already agreed:**
 - Pricing discussed previously: about $7.99–9.99/month for Pro (from the project overview). Annual price not decided.
 - Stripe is the web payment rail only. Apple In-App Purchase is required for any digital subscription purchased inside the iOS app.
-- Universities pay annually as organizations. Students must not self-assign seats from a `.edu` address.
+- Universities pay an annual campus license by invoice or purchase order, Net 30, as organizations. Students never self-assign access from a `.edu` address. University access has no per-student cap.
 
 ---
 
@@ -59,8 +59,8 @@ These were checked directly, not assumed.
 1. One server-authoritative entitlement check for `novara_pro`, used by every premium gate on the API.
 2. iOS consumers can buy Novara Pro with Apple In-App Purchase through RevenueCat, with restore and manage-subscription paths.
 3. Web consumers can buy Novara Pro through Stripe Checkout, using the existing `feat/stripe` work where it holds up under review.
-4. Universities buy a seat-based annual contract, and an administrator grants named students access by invitation.
-5. Access changes (purchase, renewal, expiry, cancellation, seat revocation) take effect without deleting any contacts, settings, or profile data.
+4. Universities buy an annual campus license that covers unlimited students. An administrator invites named students, and each invitation is verified.
+5. Access changes (purchase, renewal, expiry, cancellation, member revocation) take effect without deleting any contacts, settings, or profile data.
 
 **Non-goals (for this project)**
 - SSO for universities (later).
@@ -80,13 +80,13 @@ These were checked directly, not assumed.
 |---|---|---|
 | `entitlements` | One row per grant of `novara_pro` to a user | `id`, `user_id` (Clerk id), `entitlement_key` (`novara_pro`), `source` (`apple_iap` \| `stripe_web` \| `university_contract`), `status` (`active` \| `grace` \| `expired` \| `revoked`), `starts_at`, `ends_at`, `provider_ref`, `organization_id` (nullable), `created_at`, `updated_at` |
 | `billing_events` | Idempotency log for provider webhooks | `provider` (`revenuecat` \| `stripe`), `event_id` (unique with provider), `received_at`, `processed_at`, `payload_hash`, `outcome` |
-| `organizations` | A university or business account | `id`, `name`, `status` (`active` \| `suspended` \| `ended`), `contract_starts_at`, `contract_ends_at`, `seat_limit`, `stripe_customer_id` (nullable), `created_at` |
-| `organization_members` | A seat, admin, or invitation | `id`, `organization_id`, `user_id` (nullable until accepted), `email` (lowercased), `role` (`admin` \| `member`), `invitation_status` (`pending` \| `accepted` \| `revoked` \| `expired`), `invited_by`, `invited_at`, `expires_at`, `accepted_at`, `revoked_at`, `seat_consumed` (bool) |
+| `organizations` | A university or business account | `id`, `name`, `status` (`active` \| `suspended` \| `ended`), `contract_starts_at`, `contract_ends_at`, `licensed_enrollment` (nullable; commercial metadata only, never read by an access check), `stripe_customer_id` (nullable; unused for university invoices), `created_at` |
+| `organization_members` | A member, admin, or invitation | `id`, `organization_id`, `user_id` (nullable until accepted), `email` (lowercased), `role` (`admin` \| `member`), `invitation_status` (`pending` \| `accepted` \| `revoked` \| `expired`), `invited_by`, `invited_at`, `expires_at`, `accepted_at`, `revoked_at` |
 
 Constraints to include:
 - Unique `(provider, event_id)` on `billing_events`.
 - At most one `active` `novara_pro` entitlement per user for each source. Overlaps resolve to the best source (section 3.3).
-- Seat count: a seat is consumed when `organization_members.seat_consumed = true`. A database check or transaction must prevent exceeding `organizations.seat_limit`.
+- No head-count limit. Universities have unlimited students, so no database check or transaction caps membership. `licensed_enrollment` is commercial metadata for renewal and reporting, and no access check reads it.
 
 ### 3.2 Access check (single entry point)
 
@@ -97,7 +97,7 @@ Constraints to include:
 ### 3.3 Precedence and state rules
 
 - If a user has several active grants, the effective state is `active` if any grant is `active`, otherwise `grace` if any is in grace, otherwise free.
-- `university_contract` grants are created only by an organization admin's accepted invitation. They end when the seat is revoked or the contract ends.
+- `university_contract` grants are created only by an organization admin's accepted invitation. They end when the member is revoked or the contract ends.
 - Expiry or revocation downgrades to free. It never deletes contacts, `user_settings`, or profile data. Users above the 6-contact ceiling keep their data and cannot add more.
 - Grace period for failed renewals: **proposed 7 days**, to be confirmed (section 9).
 
@@ -180,28 +180,45 @@ Output of this review: keep / modify / discard for each file in the commit. Noth
 
 ---
 
-## 6. University organizations and seats
+## 6. University organizations and commercial model
 
 ### 6.1 Commercial model
 
-- A university signs an annual contract as an organization. It pays by Stripe Invoice, ACH, or another off-app institutional process. No consumer checkout is used.
-- The contract sets `contract_starts_at`, `contract_ends_at`, and `seat_limit`.
-- Seats are granted to named individuals. Access ends when the contract ends or a seat is revoked.
+- A university buys an annual campus license as an organization. Payment is by annual invoice or purchase order, Net 30, outside the app.
+- Access is **unlimited for students**. Any invited student can join. No head-count cap, seat count, or per-student fee applies.
+- `licensed_enrollment` records the enrolled population the contract was priced on. It is used for renewal and reporting conversations only. It is never an access-control limit, and no request is rejected or revoked because of it.
+- The contract sets `contract_starts_at` and `contract_ends_at` (optional end date).
+- Pricing tiers and the founding-partner offer are in section 6.4.
 
 ### 6.2 Roles and flows
 
-- **Administrator** (`role = admin`): invites members, revokes or reassigns seats, and sees only their organization's seat list. Created by Novara staff, not self-service.
+- **Administrator** (`role = admin`): invites students, revokes invitations and members, and sees only their organization's member list and invitation status. Created by Novara staff, not self-service.
 - **Member** (`role = member`): receives an invitation and accepts it. Sees only their own entitlement.
-- **Invitation flow:** admin creates an invitation with an email and expiry (proposed 14 days). The email contains a single-use token. Accepting the invitation requires signing in with that email. Acceptance consumes a seat and creates a `university_contract` entitlement.
+- **Invitation flow:** admin creates an invitation with an email. The token is single use, expires after 14 days, and is stored only as a hash. Accepting requires signing in with a verified email that matches the invited address. Acceptance creates a `university_contract` entitlement.
 - **Roster import** (CSV of emails) is a later phase. Each row is still an invitation, not an automatic grant.
-- **Revocation** removes the seat, sets the entitlement to `revoked`, and leaves all user data in place.
-- **Reassignment** revokes one seat and invites a new person, in one transaction.
+- **Revocation** removes one member, sets that entitlement to `revoked`, and leaves all user data in place.
+- **Reassignment** revokes one member and invites a new person.
 
 ### 6.3 Rules
 
 - A `.edu` address alone grants nothing. Access requires an accepted invitation.
 - Students see only their own entitlement and cannot see billing, the admin list, or other students.
-- Admins can see member emails and seat status for their organization only.
+- Admins see masked member emails, invitation status, and their organization's member count, for their organization only.
+- Only platform staff see `licensed_enrollment`.
+
+### 6.4 Pricing and terms (proposed, owner to confirm)
+
+| License | Eligible enrollment band | Annual price |
+| --- | ---: | ---: |
+| Founding pilot | One department / up to 500 students | $5,000–$7,500 |
+| Department | Up to 2,000 students | $10,000–$15,000 |
+| Campus | Up to 10,000 students | $20,000–$30,000 |
+| Large campus or system | More than 10,000 students | Custom, starting around $35,000 |
+
+- **Founding-partner offer (first one or two universities):** $10,000 per year for campus-wide access for up to 10,000 enrolled students. The rate is locked for two years.
+- **Terms:** annual invoice or purchase order, Net 30.
+- **Not in scope:** consumer Stripe Checkout, any in-app university payment, and any payment screen shown to a student. Universities pay outside the app. Students only accept an invitation.
+- Price bands are for contract conversations. The app does not show them and does not enforce them.
 
 ### 6.4 Expiry handling
 
@@ -275,7 +292,7 @@ Answered 2026-10-21: Q1 (Capacitor), Q4 (no consumer Stripe in this release), Q5
 3. **Pro contents:** the exact list of features that become Pro, including whether the 6-contact free limit stays.
 4. **Launch scope:** iOS only first, or iOS and web together?
 5. **Grace period** for failed renewals (proposed 7 days).
-6. **University pricing:** per seat, per organization, or flat fee; seat limit defaults; who creates organizations.
+6. **University pricing:** resolved in section 6.4 (annual campus license, tiered by enrollment band, unlimited students, invoice Net 30). Still open: who creates organizations (recommended: platform staff) and whether to confirm the band prices with counsel.
 7. **Legal review:** Apple external purchase rules for web links, and university contract terms (counsel).
 8. **Apple guideline status:** confirm current App Review rules before the paywall copy is written.
 
@@ -286,7 +303,8 @@ Answered 2026-10-21: Q1 (Capacitor), Q4 (no consumer Stripe in this release), Q5
 **Tests**
 - Entitlement module unit tests for every state transition in section 3.3.
 - Webhook tests: bad signature rejected, duplicate event ignored, out-of-order events resolved by timestamp.
-- Seat limit tests: concurrent invitations cannot exceed `seat_limit`.
+- Unlimited access tests: many invited students can join regardless of `licensed_enrollment`, and lowering that figure changes no access.
+- Single-use tests: concurrent accepts of one invitation admit exactly one account.
 - Regression: existing contact limit and import behaviour unchanged for free users.
 - Manual: sandbox purchase, restore, cancel, and expiry on iOS; Stripe test-mode checkout and portal.
 

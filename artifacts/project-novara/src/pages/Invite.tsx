@@ -30,7 +30,6 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 const MESSAGES: Record<string, string> = {
   email_not_verified: "Verify your email address in your account settings, then try again.",
   email_mismatch: "This invitation was sent to a different email address. Sign out, then sign in with that address.",
-  seats_full: "This organization has no open seats. Ask your administrator.",
   invitation_expired: "This invitation has expired. Ask your administrator for a new one.",
   invitation_unavailable: "This invitation is no longer valid. Ask your administrator for a new one.",
   already_used: "This invitation has already been used.",

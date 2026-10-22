@@ -28,6 +28,7 @@ import { QRScanner, type ScannedQRContact } from "@/components/QRScanner";
 import { NativeContactImport } from "@/components/NativeContactImport";
 import { useFeatures } from "@/hooks/useFeatures";
 import { useUniversityEntitlement } from "@/hooks/useUniversityEntitlement";
+import { FREE_CONTACT_LIMIT, contactLimit } from "@/lib/contactLimit";
 import { localDateString } from "@/lib/utils";
 
 const INITIAL_OPTIONS: Contact["initialFollowUpDays"][] = [1, 2, 3];
@@ -73,7 +74,6 @@ function labelDays(days: number): string {
   return `${days} days`;
 }
 
-const FREE_TIER_LIMIT = 6;
 
 export default function AddContact() {
   const [, setLocation] = useLocation();
@@ -215,11 +215,9 @@ export default function AddContact() {
 
   const removeInterest = (tag: string) => setInterests(prev => prev.filter(t => t !== tag));
 
-  // An active university entitlement lifts the free ceiling. The server enforces
-  // the same rule, so this only keeps the UI from blocking an entitled user early.
+  // An active university entitlement lifts the free ceiling (see lib/contactLimit).
   const { active: universityActive } = useUniversityEntitlement();
-  const contactLimit = universityActive ? Number.POSITIVE_INFINITY : FREE_TIER_LIMIT;
-  const atLimit = contacts.length >= contactLimit;
+  const atLimit = contacts.length >= contactLimit(universityActive);
 
   const onSubmit = async (values: FormValues) => {
     if (atLimit) return;
@@ -239,7 +237,7 @@ export default function AddContact() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("limit") || msg.includes("403")) {
-        toast.error(`You've reached the ${FREE_TIER_LIMIT}-contact limit.`);
+        toast.error(`You've reached the ${FREE_CONTACT_LIMIT}-contact limit.`);
       } else {
         toast.error("Failed to save contact. Please try again.");
       }
@@ -267,7 +265,7 @@ export default function AddContact() {
             <div>
               <p className="text-base font-bold text-foreground mb-1">You've reached the contact limit</p>
               <p className="text-sm text-muted-foreground max-w-[280px]">
-                Novara Free includes up to {FREE_TIER_LIMIT} contacts. Novara Pro removes the limit.
+                Novara Free includes up to {FREE_CONTACT_LIMIT} contacts. Novara Pro removes the limit.
               </p>
             </div>
             <Button variant="outline" className="rounded-xl" onClick={() => window.history.back()}>
