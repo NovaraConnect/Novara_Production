@@ -3,6 +3,15 @@
 Status: **PLAN ONLY. No code, schema, Render, or provider changes have been made.**
 Owner decisions are listed in section 9 and must be answered before implementation starts.
 
+### Decisions (recorded 2026-10-21)
+
+1. **Apple IAP implementation target is the Capacitor shell** (`artifacts/project-novara/ios`). The Expo path (`artifacts/novara-mobile`) is out of scope unless App Store Connect later shows the Expo build is the one in review.
+2. **`entitlements` is a new, additive, provider-neutral table.** It is not a rename of, and does not depend on, the Stripe-only `subscriptions` table from the `feat/stripe` branch.
+3. **University organizations come first:** organizations, administrator roles, seats, invitations, acceptance, revocation, and expiry. Detail is in `docs/UNIVERSITY_ACCESS_IMPLEMENTATION_PLAN.md`.
+4. **University entitlement works in the iOS app and in the Android web/PWA after sign-in.** It never shows a payment screen to a student.
+5. **No consumer Stripe Checkout in this release.** Stripe web work stays on `feat/stripe`. Any future Stripe work starts with the native-shell gate as its first commit.
+6. **Apple subscription state is authoritative.** Access follows the state that Apple/RevenueCat reports. No extra grace period is added on top of it.
+
 Baseline: `main` at `d3f1344` (includes the onboarding fix merged from `codex/fix-onboarding-loop`, commit `dc9ec69`).
 
 ---
@@ -65,6 +74,8 @@ These were checked directly, not assumed.
 
 ### 3.1 Tables (proposed; not yet created)
 
+`entitlements` is provider-neutral and additive. It is created by migration `0004_entitlements_and_organizations.sql` on `main`. The Stripe branch's `subscriptions` table stays a separate Stripe projection. If that branch later adds its own `0004`, it is renumbered to `0005` when rebased. Exact SQL is in `docs/UNIVERSITY_ACCESS_IMPLEMENTATION_PLAN.md`.
+
 | Table | Purpose | Key columns |
 |---|---|---|
 | `entitlements` | One row per grant of `novara_pro` to a user | `id`, `user_id` (Clerk id), `entitlement_key` (`novara_pro`), `source` (`apple_iap` \| `stripe_web` \| `university_contract`), `status` (`active` \| `grace` \| `expired` \| `revoked`), `starts_at`, `ends_at`, `provider_ref`, `organization_id` (nullable), `created_at`, `updated_at` |
@@ -107,7 +118,7 @@ The shipped iOS app is a web view shell. StoreKit needs a native bridge, so the 
 - **Option A (preferred):** add a native purchase bridge to the existing iOS shell (RevenueCat SDK, `Purchases.configure`, product fetch, purchase, restore), and expose a paywall route in the web app that calls the bridge when running inside the shell. Browser visitors see no iOS purchase UI.
 - **Option B:** build the paywall in `artifacts/novara-mobile` (Expo) and make that the iOS app. This is a larger change and conflicts with the current shipped build unless the web app is retired on iOS.
 
-The plan assumes **Option A** unless you decide otherwise.
+**Decided: Option A (Capacitor shell).** The Expo path is out of scope unless App Store Connect shows otherwise.
 
 ### 4.2 Products and placement
 
@@ -127,12 +138,15 @@ The plan assumes **Option A** unless you decide otherwise.
 
 - Loading, error, and retry states for product fetch and purchase.
 - Restore purchases works on a fresh install with the same Apple ID.
-- Expired or cancelled subscriptions downgrade access at the period end, not immediately, unless Apple revokes the purchase.
+- Access follows Apple/RevenueCat's authoritative subscription state. No additional grace period is added on top of what that state reports.
+- Expired or cancelled subscriptions downgrade access when the provider reports them inactive.
 - Account deletion is out of scope here, but the entitlement must not be left active for a deleted Clerk user (flagged for later).
 
 ---
 
 ## 5. Web: Stripe (existing `feat/stripe` work)
+
+**Not in this release.** No consumer Stripe Checkout ships with the current launch scope. The `feat/stripe` branch stays unmerged. If Stripe web billing is chosen later, the native-shell gate (hide Stripe upgrade and portal controls inside the Capacitor shell) must be the first commit on that branch, before any Stripe configuration or merge.
 
 ### 5.1 Review checklist for `ed18a1b` (must complete before reuse)
 
@@ -198,6 +212,8 @@ Output of this review: keep / modify / discard for each file in the commit. Noth
 
 ## 7. Phased delivery
 
+**Order decided (2026-10-21): university access first.** It needs no payment UI and no native build. See `docs/UNIVERSITY_ACCESS_IMPLEMENTATION_PLAN.md`. The phases below are kept for the Apple IAP work that follows.
+
 Each phase ships behind a feature flag, defaulting to off in production.
 
 **Phase 0: decisions and verification (no code)**
@@ -251,6 +267,8 @@ Note: `VITE_*` values are public in the browser bundle. Only publishable keys be
 ---
 
 ## 9. Decisions needed before implementation
+
+Answered 2026-10-21: Q1 (Capacitor), Q4 (no consumer Stripe in this release), Q5 (no extra grace period beyond Apple/RevenueCat state). The remaining questions stay open.
 
 1. **Which iOS client is shipped?** The web-in-shell app (`project-novara`) or the Expo app (`novara-mobile`)? This determines Option A vs B.
 2. **Prices:** monthly and annual amounts, and whether a trial exists.
