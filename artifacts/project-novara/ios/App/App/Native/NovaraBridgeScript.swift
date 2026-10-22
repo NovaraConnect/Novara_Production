@@ -36,7 +36,13 @@ enum NovaraBridgeScript {
     ///     status bar and tab bar. Build 7 and earlier are version 1 and are
     ///     pinned to dark; the web side hides the Appearance control there
     ///     rather than offering one the shell cannot honour.
-    static let version = 2
+    ///
+    /// 3 — added Apple In-App Purchase through RevenueCat: `getProducts`,
+    ///     `identifyPurchases`, `purchase`, `restorePurchases` and
+    ///     `manageSubscriptions`. The web paywall requires version 3, so a
+    ///     version 1 or 2 binary never shows one. Purchase results are what
+    ///     Apple reported. Pro access is decided by the server.
+    static let version = 3
 
     static let source: String = """
     (function () {
@@ -119,6 +125,11 @@ enum NovaraBridgeScript {
         haptic: function (style) { post({ name: 'haptic', style: style || 'selection' }); },
         pickContact: function () { return request('pickContact'); },
         scanCard: function () { return request('scanCard'); },
+        getProducts: function () { return request('getProducts'); },
+        identifyPurchases: function (userId) { return request('identifyPurchases', { userId: userId }); },
+        purchase: function (productId) { return request('purchase', { productId: productId }); },
+        restorePurchases: function () { return request('restorePurchases'); },
+        manageSubscriptions: function () { return request('manageSubscriptions'); },
         openSettings: function () { post({ name: 'openAppSettings' }); },
         setTheme: function (choice) {
           // The CHOICE, not the resolved theme: 'system' maps to iOS's own

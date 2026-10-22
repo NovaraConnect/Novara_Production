@@ -71,11 +71,16 @@ app.use(express.urlencoded({ extended: true }));
 // General rate limit for the whole API surface. This is a first line of
 // defense while the unauthenticated proxy endpoints (news, LinkedIn import)
 // remain the most exposed to abuse.
+//
+// The RevenueCat webhook is exempt: RevenueCat delivers subscription events in
+// bursts, and a 429 would only make it retry. It authenticates itself with a
+// shared secret instead (routes/revenuecat.ts).
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.path === "/webhooks/revenuecat",
 });
 app.use("/api", apiLimiter);
 

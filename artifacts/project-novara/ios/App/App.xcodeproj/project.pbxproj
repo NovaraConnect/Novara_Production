@@ -19,6 +19,7 @@
 		668D4E223006FE6CFB28126F /* NovaraTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4257522FC8C4090603551E1D /* NovaraTheme.swift */; };
 		A6189E0C169035F77D2F91D8 /* Pods_Novara_Connect.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 11AFB9A847A73CC98A113DF5 /* Pods_Novara_Connect.framework */; };
 		B0DC673469BB58C14B6D2FEA /* NovaraCardScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF4C6129F4DD85FA9AED782A /* NovaraCardScanner.swift */; };
+		9A1C7E2D4B6F0A1E3C5D7F92 /* NovaraPurchases.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1C7E2D4B6F0A1E3C5D7F91 /* NovaraPurchases.swift */; };
 		DA7BA7C0DBA47963CE788D2A /* NovaraRootViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968F37A5353B5EBBA6C8EF5E /* NovaraRootViewController.swift */; };
 		EEB693144C72DC1E88C6842C /* NovaraSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68B8D14B85C1B4BA36D4FAB4 /* NovaraSection.swift */; };
 		F239EFB20F1D0BE877DF86FB /* NovaraBridgeScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = C37A2BED8B135DF85AAB506A /* NovaraBridgeScript.swift */; };
@@ -43,6 +44,7 @@
 		A515C1BCFEEE593196B2AA27 /* Pods-Novara Connect.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Novara Connect.debug.xcconfig"; path = "Pods/Target Support Files/Pods-Novara Connect/Pods-Novara Connect.debug.xcconfig"; sourceTree = "<group>"; };
 		A8FFFE9B188A02C5C4F22187 /* NovaraWebViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NovaraWebViewController.swift; sourceTree = "<group>"; };
 		AF4C6129F4DD85FA9AED782A /* NovaraCardScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NovaraCardScanner.swift; sourceTree = "<group>"; };
+		9A1C7E2D4B6F0A1E3C5D7F91 /* NovaraPurchases.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NovaraPurchases.swift; sourceTree = "<group>"; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		C37A2BED8B135DF85AAB506A /* NovaraBridgeScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NovaraBridgeScript.swift; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
@@ -79,6 +81,7 @@
 				5C0DB4810F857EA16479A32D /* NovaraStatusView.swift */,
 				273E1FB6C57EB5F297E000C9 /* NovaraContactImport.swift */,
 				AF4C6129F4DD85FA9AED782A /* NovaraCardScanner.swift */,
+				9A1C7E2D4B6F0A1E3C5D7F91 /* NovaraPurchases.swift */,
 			);
 			path = Native;
 			sourceTree = "<group>";
@@ -248,6 +251,7 @@
 				260EE2EC747486217C22FF07 /* NovaraStatusView.swift in Sources */,
 				20AF201969B3047569D50DA2 /* NovaraContactImport.swift in Sources */,
 				B0DC673469BB58C14B6D2FEA /* NovaraCardScanner.swift in Sources */,
+				9A1C7E2D4B6F0A1E3C5D7F92 /* NovaraPurchases.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

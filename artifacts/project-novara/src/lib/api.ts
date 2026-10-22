@@ -212,6 +212,10 @@ export interface Features {
   linkedinAiParse: boolean;
   /** Whether the LinkedIn screenshot importer is shown at all. */
   linkedinScreenshotImport: boolean;
+  /** Whether the native Novara Pro paywall may be shown (iOS shell only). Off
+   *  until the App Store products, the RevenueCat webhook and the purchase
+   *  build are all live. */
+  applePaywall: boolean;
 }
 
 const FEATURES_CACHE_KEY = "novara.features.lastKnown";
@@ -233,6 +237,7 @@ export function readCachedFeatures(): Features | null {
       cardAiParse: !!data?.cardAiParse,
       linkedinAiParse: !!data?.linkedinAiParse,
       linkedinScreenshotImport: !!data?.linkedinScreenshotImport,
+      applePaywall: !!data?.applePaywall,
     };
   } catch {
     return null;
@@ -255,6 +260,7 @@ export async function fetchFeatures(getToken: GetAuthToken): Promise<Features> {
     cardAiParse: !!data?.cardAiParse,
     linkedinAiParse: !!data?.linkedinAiParse,
     linkedinScreenshotImport: !!data?.linkedinScreenshotImport,
+    applePaywall: !!data?.applePaywall,
   };
 
   try {
@@ -292,4 +298,27 @@ export async function enrichContact(
     throw new Error(body.error ?? "Enrichment failed");
   }
   return res.json();
+}
+
+// ── Subscription status ──────────────────────────────────────────────────────
+
+/** The server's view of the signed-in user's Novara Pro status. */
+export interface ProStatus {
+  pro: boolean;
+  source: "apple_iap" | null;
+  expiresAt: string | null;
+}
+
+/** Throws on failure. Callers decide what an unknown status means for the UI;
+ *  the server still enforces every limit regardless. */
+export async function fetchProStatus(getToken: GetAuthToken): Promise<ProStatus> {
+  const res = await apiFetch(getToken, "/api/entitlements/me");
+  if (res.status === 401) throw new Error("Unauthorized");
+  if (!res.ok) throw new Error(`Failed to read subscription status: ${res.status}`);
+  const data = await res.json();
+  return {
+    pro: data?.pro === true,
+    source: data?.source === "apple_iap" ? "apple_iap" : null,
+    expiresAt: typeof data?.expiresAt === "string" ? data.expiresAt : null,
+  };
 }

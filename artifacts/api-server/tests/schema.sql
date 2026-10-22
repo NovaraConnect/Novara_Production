@@ -91,3 +91,29 @@ status text NOT NULL DEFAULT 'new',
 created_at timestamptz NOT NULL DEFAULT now(),
 updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Mirrors migrations/0004_apple_iap_entitlements.sql.
+CREATE TABLE IF NOT EXISTS entitlements (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+user_id text NOT NULL,
+source text NOT NULL CHECK (source IN ('apple_iap', 'university', 'stripe')),
+provider_ref text NULL,
+product_id text NULL,
+status text NOT NULL CHECK (status IN ('active', 'inactive')),
+expires_at timestamptz NULL,
+last_event_at timestamptz NULL,
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS entitlements_apple_one_row
+ON entitlements (user_id) WHERE source = 'apple_iap';
+CREATE INDEX IF NOT EXISTS entitlements_user_idx ON entitlements (user_id);
+
+CREATE TABLE IF NOT EXISTS revenuecat_events (
+event_id text PRIMARY KEY,
+event_type text NOT NULL,
+app_user_id text NOT NULL,
+environment text NULL,
+event_timestamp timestamptz NOT NULL,
+received_at timestamptz NOT NULL DEFAULT now()
+);

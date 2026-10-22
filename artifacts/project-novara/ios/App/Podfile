@@ -16,7 +16,8 @@ end
 
 target 'Novara Connect' do
   capacitor_pods
-  # Add your Pods here
+  # Apple In-App Purchase for Novara Pro (see docs/APPLE_IAP_SETUP.md).
+  pod 'RevenueCat', '~> 5.2'
 end
 
 post_install do |installer|

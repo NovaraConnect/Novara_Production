@@ -9,6 +9,8 @@ import feedbackRouter from "./feedback";
 import featuresRouter from "./features";
 import parseCardRouter from "./parseCard";
 import parseLinkedInRouter from "./parseLinkedIn";
+import entitlementsRouter from "./entitlements";
+import revenuecatRouter from "./revenuecat";
 
 const router: IRouter = Router();
 
@@ -22,5 +24,7 @@ router.use(feedbackRouter);
 router.use(featuresRouter);
 router.use(parseCardRouter);
 router.use(parseLinkedInRouter);
+router.use(entitlementsRouter);
+router.use(revenuecatRouter);
 
 export default router;
