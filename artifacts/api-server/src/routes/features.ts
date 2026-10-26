@@ -24,6 +24,10 @@ router.get("/features", (_req: Request, res: Response) => {
     // enabled, and independent of linkedinAiParse: the importer can be shown
     // with AI off (deterministic parsing only), or hidden entirely.
     linkedinScreenshotImport: flagOn(process.env["LINKEDIN_SCREENSHOT_IMPORT"]),
+    // Shows the native Novara Pro paywall (iOS shell only). Off by default: it
+    // must stay off until the App Store products, the RevenueCat webhook and a
+    // TestFlight build with the purchase bridge are all live.
+    applePaywall: flagOn(process.env["IAP_PAYWALL_ENABLED"]),
   });
 });
 
