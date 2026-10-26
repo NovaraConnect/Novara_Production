@@ -4,11 +4,17 @@ PODS:
   - CapacitorCordova (7.4.4)
   - CapacitorPushNotifications (7.0.7):
     - Capacitor
+  - RevenueCat (5.97.0)
 
 DEPENDENCIES:
   - "Capacitor (from `../../../../node_modules/.pnpm/@capacitor+ios@7.4.4_@capacitor+core@7.4.4/node_modules/@capacitor/ios`)"
   - "CapacitorCordova (from `../../../../node_modules/.pnpm/@capacitor+ios@7.4.4_@capacitor+core@7.4.4/node_modules/@capacitor/ios`)"
   - "CapacitorPushNotifications (from `../../../../node_modules/.pnpm/@capacitor+push-notifications@7.0.7_@capacitor+core@7.4.4/node_modules/@capacitor/push-notifications`)"
+  - RevenueCat (~> 5.2)
+
+SPEC REPOS:
+  trunk:
+    - RevenueCat
 
 EXTERNAL SOURCES:
   Capacitor:
@@ -22,7 +28,8 @@ SPEC CHECKSUMS:
   Capacitor: 358dd1c3fdd71d969547b17e159fd8a7736cb45f
   CapacitorCordova: bf648a636f3c153f652d312ae145fb508b6ffced
   CapacitorPushNotifications: 0527809a9619ed775439d5ab2c2d996122b48319
+  RevenueCat: 65bc5e669afd86ffdde309f7aaf8ef56872a85e2
 
-PODFILE CHECKSUM: 5056b5cbdc2f83aa3b5c67f4023eb8ed22a61669
+PODFILE CHECKSUM: 61a7b5f81b605197caf8ef6d688b4bed001a20a4
 
 COCOAPODS: 1.17.0
