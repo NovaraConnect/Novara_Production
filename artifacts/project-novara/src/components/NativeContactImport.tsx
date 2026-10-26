@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { ContactRound } from "lucide-react";
 import { ImportOptionCard } from "@/components/ImportOptionCard";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useContacts } from "@/hooks/useContacts";
 import { findDuplicateContact } from "@/lib/contactDuplicates";
@@ -86,24 +85,20 @@ export function NativeContactImport({
   };
 
   return (
-    <ImportOptionCard
-      icon={ContactRound}
-      title="Import from Contacts"
-      description="Pick someone from your iPhone contacts. Novara only sees the one you choose."
-    >
-      <Button
-        type="button"
-        variant="outline"
-        disabled={busy}
+    <>
+      {/* The whole card opens the picker, like the QR option. The duplicate
+          notice sits beside it rather than inside, since it has a button. */}
+      <ImportOptionCard
+        icon={ContactRound}
+        title="Import from Contacts"
+        description="Choose someone from your iPhone contacts."
         onClick={handlePick}
-        className="w-full h-11 gap-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-sm font-semibold shadow-sm"
-        data-testid="button-import-contact"
-      >
-        {busy ? "Opening Contacts…" : "Choose a Contact"}
-      </Button>
+        disabled={busy}
+        testId="button-import-contact"
+      />
 
       {duplicate && (
-        <div className="mt-3 rounded-xl border border-cooling/25 bg-cooling-soft p-3">
+        <div className="-mt-1 mb-3 rounded-xl border border-cooling/25 bg-cooling-soft p-3">
           <p className="text-xs font-semibold text-cooling">
             You may already have {duplicate.name}
           </p>
@@ -119,6 +114,6 @@ export function NativeContactImport({
           </button>
         </div>
       )}
-    </ImportOptionCard>
+    </>
   );
 }

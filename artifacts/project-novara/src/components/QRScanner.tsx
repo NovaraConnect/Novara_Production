@@ -263,7 +263,7 @@ export function QRScanner({ onExtracted }: QRScannerProps) {
       <ImportOptionCard
         icon={QrCode}
         title="Scan QR Code"
-        description="Scan your business contact's QR code."
+        description="Scan a contact’s QR code."
         {...(status === "idle" ? { onClick: openScanner } : {})}
       >
 

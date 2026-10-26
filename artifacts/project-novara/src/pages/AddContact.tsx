@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Loader2, Wand2, X, Clock, RefreshCw, Plus, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, Loader2, Wand2, X, Clock, RefreshCw, Plus, ChevronDown, ChevronUp, Pencil } from "lucide-react";
+import { ImportOptionCard } from "@/components/ImportOptionCard";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -273,14 +274,15 @@ export default function AddContact() {
 
         {!atLimit && (
           <>
-            {/* Import from the iPhone's own Contacts. Renders nothing in a
-                browser, and nothing in an app build without the native picker. */}
-            <NativeContactImport onExtracted={handleCardScanned} />
+            {/* Section label for the options below. */}
+            <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+              Add from
+            </p>
 
             {/* Business Card Scanner */}
             <BusinessCardScanner onExtracted={handleCardScanned} />
 
-            {/* LinkedIn Screenshot Import — hidden unless the deployment enables
+            {/* LinkedIn Profile import — hidden unless the deployment enables
                 LINKEDIN_SCREENSHOT_IMPORT, so it can be switched off without a
                 deploy. */}
             {linkedinScreenshotImport && (
@@ -290,6 +292,10 @@ export default function AddContact() {
             {/* QR Code Scanner */}
             <QRScanner onExtracted={handleQRScanned} />
 
+            {/* Import from the iPhone's own Contacts. Renders nothing in a
+                browser, and nothing in an app build without the native picker. */}
+            <NativeContactImport onExtracted={handleCardScanned} />
+
             {/* Divider between the no-typing options and the form itself. */}
             <div className="flex items-center gap-3 mt-5 mb-4">
               <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground shrink-0">
@@ -297,6 +303,18 @@ export default function AddContact() {
               </span>
               <span className="h-px flex-1 bg-border" />
             </div>
+
+            {/* Enter Manually — a card that brings the form below into focus. */}
+            <ImportOptionCard
+              icon={Pencil}
+              title="Enter Manually"
+              description="Add a contact by typing the details yourself."
+              onClick={() => {
+                const first = document.querySelector<HTMLInputElement>('[data-testid="input-firstname"]');
+                first?.scrollIntoView({ behavior: "smooth", block: "center" });
+                first?.focus();
+              }}
+            />
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">

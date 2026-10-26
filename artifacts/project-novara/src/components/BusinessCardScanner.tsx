@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { ImportOptionCard } from "@/components/ImportOptionCard";
-import { Camera, Image as ImageIcon, Loader2, X, ScanLine, CheckCircle2, AlertCircle } from "lucide-react";
+import { Camera, Image as ImageIcon, Loader2, X, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { extractContactFields, type ScannedContact } from "@/lib/businessCardParse";
@@ -187,9 +187,9 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
 
   return (
     <ImportOptionCard
-      icon={ScanLine}
-      title="Scan Business Card"
-      description="Take a photo or upload an image to auto-fill contact fields."
+      icon={Camera}
+      title="Business Card"
+      description="Photograph a business card or choose an existing card photo."
     >
 
       {/* ── Processing ── */}
@@ -262,7 +262,7 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
               data-testid="button-scan-card"
             >
               <Camera className="w-4 h-4" />
-              {hasNativeScanner ? "Scan Card" : "Take Photo"}
+              Scan Card
             </Button>
             <Button
               type="button"

@@ -1,29 +1,28 @@
 import type { LucideIcon } from "lucide-react";
-import { ChevronRight } from "lucide-react";
 
-/** LinkedIn's own mark, so the import option is recognisable at a glance.
- *  Drawn inline rather than loaded, and only used to label the feature. */
+/** The "in" letters alone, in the app's primary blue, sized to sit in the
+ *  same icon slot as the other import icons. Drawn inline and only used to
+ *  label the feature. */
 export function LinkedInGlyph() {
   return (
     <span
-      className="w-7 h-7 rounded-md bg-[#0A66C2] text-white flex items-center justify-center shrink-0"
+      className="w-11 h-11 flex items-center justify-center shrink-0 text-primary"
       aria-hidden="true"
     >
-      <span className="text-[13px] font-bold leading-none tracking-tight">in</span>
+      <span className="text-[24px] font-bold leading-none tracking-tight">in</span>
     </span>
   );
 }
 
 /**
  * The shell around each "get a contact in without typing" option on Add
- * Contact — business card, LinkedIn screenshot, QR code.
+ * Contact — business card, LinkedIn profile, QR code, phone contacts.
  *
- * The three used to look like three different features: two tinted panels
- * with uppercase labels and a bare outline button with no card at all. They
- * are now one set — tinted card, coloured title beside its icon, a line of
- * explanation across the full width, chevron on the right.
+ * One set, matching the Add Contact design: a tinted rounded card, an icon tile
+ * on the left, the title and a line of explanation to its right. Cards with
+ * buttons put them below the header; compact cards are the whole tap target.
  *
- * Presentation only. Each scanner keeps its own behaviour and passes its
+ * Presentation only. Each importer keeps its own behaviour and passes its
  * status UI and buttons as children. Pass `onClick` for an option that has no
  * button of its own, which makes the whole card the target.
  */
@@ -33,6 +32,8 @@ export function ImportOptionCard({
   title,
   description,
   onClick,
+  disabled,
+  testId,
   children,
 }: {
   icon?: LucideIcon;
@@ -41,26 +42,41 @@ export function ImportOptionCard({
   title: string;
   description: string;
   onClick?: () => void;
+  disabled?: boolean;
+  testId?: string;
   children?: React.ReactNode;
 }) {
+  const tile =
+    iconNode ??
+    (Icon ? (
+      <span className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0" aria-hidden="true">
+        <Icon className="w-5 h-5 text-primary" />
+      </span>
+    ) : null);
+
   const header = (
-    <>
-      <div className="flex items-center gap-2.5">
-        {iconNode ?? (Icon ? <Icon className="w-6 h-6 text-primary shrink-0" /> : null)}
-        <p className="flex-1 text-[15px] font-bold text-primary">{title}</p>
-        <ChevronRight className="w-4 h-4 text-primary/60 shrink-0" aria-hidden="true" />
+    <div className="flex items-center gap-3">
+      {tile}
+      <div className="min-w-0 flex-1">
+        <p className="text-[15px] font-bold text-primary leading-snug">{title}</p>
+        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{description}</p>
       </div>
-      <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{description}</p>
-    </>
+    </div>
   );
 
-  const shell = "mb-3 rounded-2xl border border-primary/20 bg-primary/[0.07] p-4";
+  const shell = "mb-3 rounded-2xl border border-primary/15 bg-primary/[0.06] p-4 shadow-sm";
 
   // An option with no button of its own is one big target; one with buttons
   // keeps them as the targets, so the card stays a plain container.
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className={`${shell} w-full text-left transition-colors hover:bg-primary/12`}>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        data-testid={testId}
+        className={`${shell} w-full text-left transition-colors hover:bg-primary/10 disabled:opacity-60`}
+      >
         {header}
         {children}
       </button>
@@ -70,7 +86,7 @@ export function ImportOptionCard({
   return (
     <div className={shell}>
       {header}
-      {children ? <div className="mt-3">{children}</div> : null}
+      {children ? <div className="mt-4">{children}</div> : null}
     </div>
   );
 }
