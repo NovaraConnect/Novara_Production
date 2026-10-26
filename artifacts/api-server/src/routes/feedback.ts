@@ -1,5 +1,5 @@
 import { Router } from "express";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { pool } from "../db";
 import { requireAuth, type AuthedRequest } from "../middlewares/auth";
 import type { Request, Response } from "express";
@@ -30,7 +30,10 @@ export const feedbackLimiter = rateLimit({
   limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: Request) => (req as AuthedRequest).userId ?? req.ip ?? "unknown",
+  // Unauthenticated fallback goes through ipKeyGenerator so IPv6 clients share
+  // a per-/64 bucket instead of bypassing the limit by rotating addresses.
+  keyGenerator: (req: Request) =>
+    (req as AuthedRequest).userId ?? ipKeyGenerator(req.ip ?? "unknown"),
   message: { error: "Too many feedback submissions. Please try again later." },
 });
 
