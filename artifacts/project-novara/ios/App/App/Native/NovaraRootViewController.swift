@@ -434,6 +434,16 @@ extension NovaraRootViewController: NovaraWebViewControllerDelegate {
             presentContactPicker(respond: respond)
         case "scanCard":
             presentCardScanner(respond: respond)
+        case "getProducts":
+            NovaraPurchases.products(completion: respond)
+        case "identifyPurchases":
+            NovaraPurchases.identify(userId: params["userId"] as? String ?? "", completion: respond)
+        case "purchase":
+            NovaraPurchases.purchase(productId: params["productId"] as? String ?? "", completion: respond)
+        case "restorePurchases":
+            NovaraPurchases.restore(completion: respond)
+        case "manageSubscriptions":
+            NovaraPurchases.openSubscriptionSettings(completion: respond)
         default:
             respond(.failure(NSError(domain: "Novara", code: -1,
                                      userInfo: [NSLocalizedDescriptionKey: "Unsupported native request"])))

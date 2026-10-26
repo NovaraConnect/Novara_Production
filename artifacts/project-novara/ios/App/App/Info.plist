@@ -27,6 +27,8 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>RevenueCatPublicSDKKey</key>
+	<string>appl_REPLACE_WITH_PUBLIC_SDK_KEY</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Novara asks for Contacts access only if a contact you pick cannot be read from the picker alone. Novara never reads or uploads your address book — only the single contact you choose, and only after you review it.</string>
 	<key>NSCameraUsageDescription</key>
@@ -51,5 +53,22 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 </dict>
 </plist>

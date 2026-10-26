@@ -27,6 +27,9 @@ import {
 import { QRScanner, type ScannedQRContact } from "@/components/QRScanner";
 import { NativeContactImport } from "@/components/NativeContactImport";
 import { useFeatures } from "@/hooks/useFeatures";
+import { useProStatus } from "@/hooks/useProStatus";
+import { canUseNativePurchases } from "@/lib/nativeBridge";
+import { contactLimitApplies, isPaywallVisible } from "@/lib/purchases";
 import { localDateString } from "@/lib/utils";
 
 const INITIAL_OPTIONS: Contact["initialFollowUpDays"][] = [1, 2, 3];
@@ -176,7 +179,13 @@ export default function AddContact() {
 
 
   // Deployment-level switch for showing the LinkedIn screenshot importer.
-  const { linkedinScreenshotImport } = useFeatures();
+  const { linkedinScreenshotImport, applePaywall } = useFeatures();
+  const proStatus = useProStatus();
+  const showPaywallLink = isPaywallVisible({
+    nativePurchases: canUseNativePurchases(),
+    applePaywallFlag: applePaywall,
+    universityEntitled: false,
+  }) && !proStatus.isPro;
 
   // Tracks what the last LinkedIn import wrote, so a second import can withdraw
   // it instead of leaving the previous profile's values behind.
@@ -214,7 +223,7 @@ export default function AddContact() {
 
   const removeInterest = (tag: string) => setInterests(prev => prev.filter(t => t !== tag));
 
-  const atLimit = contacts.length >= FREE_TIER_LIMIT;
+  const atLimit = contactLimitApplies(proStatus) && contacts.length >= FREE_TIER_LIMIT;
 
   const onSubmit = async (values: FormValues) => {
     if (atLimit) return;
@@ -265,6 +274,11 @@ export default function AddContact() {
                 Novara Free includes up to {FREE_TIER_LIMIT} contacts. Novara Pro removes the limit.
               </p>
             </div>
+            {showPaywallLink && (
+              <Button className="rounded-xl" onClick={() => setLocation("/pro")}>
+                See Novara Pro
+              </Button>
+            )}
             <Button variant="outline" className="rounded-xl" onClick={() => window.history.back()}>
               Back to contacts
             </Button>
