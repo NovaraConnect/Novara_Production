@@ -51,6 +51,40 @@ export type HapticStyle = "selection" | "success" | "warning" | "error" | "light
  *  the bridge's surface does not depend on the theme module. */
 export type NativeThemeChoice = "system" | "light" | "dark";
 
+/** The two Novara Pro plans. Product IDs are never hard-coded here: the native
+ *  side reports which StoreKit products it resolved. */
+export type ProPeriod = "monthly" | "annual";
+
+export interface NativeProProduct {
+  productId: string;
+  period: ProPeriod;
+  /** Apple's localized price, e.g. "$4.99". Display this, never a constant. */
+  priceString: string;
+  /** The same price as a number in the local currency, e.g. 4.99. Used only to
+   *  compare the two plans (the yearly saving); never displayed. */
+  price?: number;
+  /** Days of free trial this Apple Account would get on this plan, or 0 when it
+   *  has had the trial already (Apple allows one) or eligibility is unknown. */
+  trialDays?: number;
+}
+
+export type NativePurchaseOutcome = "purchased" | "pending" | "cancelled";
+
+/** The simulator's current StoreKit subscription, reported only by DEBUG builds
+ *  run with the "StoreKit Test" scheme. productId is null when StoreKit has
+ *  never seen a purchase. */
+export interface LocalStoreKitEntitlement {
+  active: boolean;
+  productId: string | null;
+  expiresAt: string | null;
+  isTrial: boolean;
+}
+
+export interface NativeRestoreResult {
+  /** "restored" when Apple reported an active Novara Pro subscription. */
+  outcome: "restored" | "nothing";
+}
+
 interface NovaraNativeBridge {
   version: number;
   platform: string;
@@ -63,7 +97,19 @@ interface NovaraNativeBridge {
   scanCard?(): Promise<NativeCardScan>;
   openSettings?(): void;
   setTheme?(choice: NativeThemeChoice): void;
+  // Bridge version 3: Apple In-App Purchase through RevenueCat.
+  getProducts?(): Promise<{ products: NativeProProduct[] }>;
+  identifyPurchases?(userId: string): Promise<{ ok: boolean }>;
+  purchase?(productId: string): Promise<{ outcome: NativePurchaseOutcome }>;
+  restorePurchases?(): Promise<NativeRestoreResult>;
+  manageSubscriptions?(): Promise<void>;
+  // Local testing only (DEBUG build, "StoreKit Test" scheme). Absent otherwise.
+  localStoreKitEntitlement?(): Promise<LocalStoreKitEntitlement>;
 }
+
+/** First bridge version with purchase methods. Bridge versions 1 and 2 have no
+ *  purchase methods, so the paywall cannot appear on an older binary. */
+export const NATIVE_PURCHASE_BRIDGE_VERSION = 3;
 
 function bridge(): NovaraNativeBridge | null {
   if (typeof window === "undefined") return null;
@@ -79,6 +125,25 @@ export function hasNativeBridge(): boolean {
 /** True when this build of the app can open the system contact picker. */
 export function canPickNativeContact(): boolean {
   return hasNativeBridge() && typeof bridge()?.pickContact === "function";
+}
+
+/**
+ * True when this build can sell Novara Pro through Apple. Requires the native
+ * shell AND a bridge new enough to have the purchase methods. A browser never
+ * qualifies, so Apple payment controls cannot appear there.
+ */
+export function canUseNativePurchases(): boolean {
+  const b = bridge();
+  return (
+    hasNativeBridge() &&
+    !!b &&
+    b.version >= NATIVE_PURCHASE_BRIDGE_VERSION &&
+    typeof b.getProducts === "function" &&
+    typeof b.purchase === "function" &&
+    typeof b.restorePurchases === "function" &&
+    typeof b.identifyPurchases === "function" &&
+    typeof b.manageSubscriptions === "function"
+  );
 }
 
 /** True when this build of the app can open the native document scanner. */
@@ -178,4 +243,58 @@ export function canSetNativeTheme(): boolean {
  */
 export function canOfferThemeChoice(): boolean {
   return !isNativeShell() || canSetNativeTheme();
+}
+
+// ---- Apple In-App Purchase (bridge version 3) -------------------------------
+// Each call rejects with a readable message when the native side cannot
+// complete it. Callers must treat a resolved purchase as "Apple reports the
+// purchase", never as "Pro is active": the server decides that (see
+// lib/purchases.ts and GET /api/entitlements/me).
+
+function purchaseBridge(): NovaraNativeBridge {
+  const b = bridge();
+  if (!b || !canUseNativePurchases()) {
+    throw new Error("Subscriptions aren't available in this version of the app.");
+  }
+  return b;
+}
+
+/** Links the native purchase identity to the signed-in Clerk user ID. */
+export async function identifyNativePurchases(userId: string): Promise<void> {
+  const b = purchaseBridge();
+  await b.identifyPurchases!(userId);
+}
+
+/** The Novara Pro products Apple has resolved for this device. */
+export async function getNativeProProducts(): Promise<NativeProProduct[]> {
+  const b = purchaseBridge();
+  const result = await b.getProducts!();
+  return Array.isArray(result?.products) ? result.products : [];
+}
+
+export async function purchaseNativePro(productId: string): Promise<NativePurchaseOutcome> {
+  const b = purchaseBridge();
+  const result = await b.purchase!(productId);
+  return result.outcome;
+}
+
+export async function restoreNativePurchases(): Promise<NativeRestoreResult> {
+  const b = purchaseBridge();
+  return b.restorePurchases!();
+}
+
+export async function manageNativeSubscriptions(): Promise<void> {
+  const b = purchaseBridge();
+  await b.manageSubscriptions!();
+}
+
+/**
+ * Local testing only: the simulator's StoreKit subscription, or null when this
+ * build is not a StoreKit Test build (always null in a browser and in any
+ * build from TestFlight or the App Store).
+ */
+export async function getLocalStoreKitEntitlement(): Promise<LocalStoreKitEntitlement | null> {
+  const b = bridge();
+  if (!b || !hasNativeBridge() || typeof b.localStoreKitEntitlement !== "function") return null;
+  return b.localStoreKitEntitlement();
 }

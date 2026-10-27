@@ -17,6 +17,9 @@ import { deleteAccount } from "@/lib/api";
 import { useContacts } from "@/hooks/useContacts";
 import { canExportContacts, exportContacts } from "@/lib/exportContacts";
 import { cn } from "@/lib/utils";
+import { useSubscriptionState } from "@/hooks/useSubscriptionState";
+import { usePaywallAvailable } from "@/hooks/usePaywallAvailable";
+import { SUBSCRIPTION_ROUTE } from "@/lib/purchases";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -112,6 +115,10 @@ export default function Settings() {
   const [deleting, setDeleting] = useState(false);
 
   const { contacts } = useContacts();
+  const subscription = useSubscriptionState();
+  // Opens the subscription screen only where it can sell (the iPhone app with
+  // the paywall on); elsewhere the row just shows the plan.
+  const canManageSubscription = usePaywallAvailable();
   const [exporting, setExporting] = useState(false);
   const handleExport = async () => {
     if (contacts.length === 0) {
@@ -243,9 +250,13 @@ export default function Settings() {
           <SectionLabel>Account</SectionLabel>
           <div className="surface-card overflow-hidden divide-y divide-border/60">
             <SettingsRow icon={BookOpen} label="Replay Tutorial" onClick={replayTutorial} disabled={updateSettings.isPending} />
-            {/* Plan status only for now; it opens the subscription screen once
-                Novara Pro is available. */}
-            <SettingsRow icon={CreditCard} label="Manage Subscription" value="Free Plan" />
+            <SettingsRow
+              icon={CreditCard}
+              label="Manage Subscription"
+              value={subscription.isKnown ? subscription.label : undefined}
+              onClick={canManageSubscription ? () => setLocation(SUBSCRIPTION_ROUTE) : undefined}
+              testId="button-manage-subscription"
+            />
             <SettingsRow icon={Bell} label="Notifications" onClick={() => setLocation("/notifications")} />
             {/* Signing out is reversible; deleting the account is not, so the
                 two live in different groups and only the delete is red. */}
@@ -285,7 +296,9 @@ export default function Settings() {
               <AlertDialogDescription>
                 This permanently deletes your contacts, your career profile, your notification
                 settings and your Novara login. It cannot be undone, and there is no way to
-                recover the data afterwards.
+                recover the data afterwards. If you subscribe to Novara Pro, cancel it first in
+                your iPhone's Settings → your name → Subscriptions: deleting your account
+                doesn't stop Apple from billing you.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

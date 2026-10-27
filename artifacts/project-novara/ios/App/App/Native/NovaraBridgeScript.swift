@@ -36,7 +36,22 @@ enum NovaraBridgeScript {
     ///     status bar and tab bar. Build 7 and earlier are version 1 and are
     ///     pinned to dark; the web side hides the Appearance control there
     ///     rather than offering one the shell cannot honour.
-    static let version = 2
+    ///
+    /// 3 — added Apple In-App Purchase through RevenueCat: `getProducts`,
+    ///     `identifyPurchases`, `purchase`, `restorePurchases` and
+    ///     `manageSubscriptions`. The web paywall requires version 3, so a
+    ///     version 1 or 2 binary never shows one. Purchase results are what
+    ///     Apple reported. Pro access is decided by the server.
+    static let version = 3
+
+    /// Local testing only: present in DEBUG builds run with the StoreKit Test
+    /// scheme, absent (an empty line) everywhere else. The web app looks for it
+    /// before reporting simulator purchases to a local API.
+    private static var localStoreKitTestMethod: String {
+        NovaraPurchases.isLocalStoreKitTest
+            ? "localStoreKitEntitlement: function () { return request('localStoreKitEntitlement'); },"
+            : ""
+    }
 
     static let source: String = """
     (function () {
@@ -120,6 +135,12 @@ enum NovaraBridgeScript {
         pickContact: function () { return request('pickContact'); },
         scanCard: function () { return request('scanCard'); },
         shareFile: function (name, text) { return request('shareFile', { name: name, text: text }); },
+        getProducts: function () { return request('getProducts'); },
+        identifyPurchases: function (userId) { return request('identifyPurchases', { userId: userId }); },
+        purchase: function (productId) { return request('purchase', { productId: productId }); },
+        restorePurchases: function () { return request('restorePurchases'); },
+        manageSubscriptions: function () { return request('manageSubscriptions'); },
+        \(localStoreKitTestMethod)
         openSettings: function () { post({ name: 'openAppSettings' }); },
         setTheme: function (choice) {
           // The CHOICE, not the resolved theme: 'system' maps to iOS's own

@@ -82,6 +82,7 @@ export async function createContact(
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as { code?: string; message?: string };
     if (body.code === "CONTACT_LIMIT_REACHED") throw new Error("Contact limit reached");
+    if (body.code === "SUBSCRIPTION_REQUIRED") throw new Error("Subscription required");
     throw new Error("Failed to create contact");
   }
   return res.json();
@@ -212,6 +213,16 @@ export interface Features {
   linkedinAiParse: boolean;
   /** Whether the LinkedIn screenshot importer is shown at all. */
   linkedinScreenshotImport: boolean;
+  /** Whether the native Novara Pro paywall may be shown (iOS shell only). Off
+   *  until the App Store products, the RevenueCat webhook and the purchase
+   *  build are all live. */
+  applePaywall: boolean;
+  /** Whether adding contacts needs Novara Pro or its free trial. Only ever on
+   *  together with applePaywall. Off: Free keeps the 6-contact limit. */
+  subscriptionRequired: boolean;
+  /** Local development API only: simulator StoreKit test purchases may be
+   *  reported to it. Always false on Render. */
+  localStoreKitTest: boolean;
 }
 
 const FEATURES_CACHE_KEY = "novara.features.lastKnown";
@@ -233,6 +244,9 @@ export function readCachedFeatures(): Features | null {
       cardAiParse: !!data?.cardAiParse,
       linkedinAiParse: !!data?.linkedinAiParse,
       linkedinScreenshotImport: !!data?.linkedinScreenshotImport,
+      applePaywall: !!data?.applePaywall,
+      subscriptionRequired: !!data?.subscriptionRequired,
+      localStoreKitTest: !!data?.localStoreKitTest,
     };
   } catch {
     return null;
@@ -255,6 +269,9 @@ export async function fetchFeatures(getToken: GetAuthToken): Promise<Features> {
     cardAiParse: !!data?.cardAiParse,
     linkedinAiParse: !!data?.linkedinAiParse,
     linkedinScreenshotImport: !!data?.linkedinScreenshotImport,
+    applePaywall: !!data?.applePaywall,
+    subscriptionRequired: !!data?.subscriptionRequired,
+    localStoreKitTest: !!data?.localStoreKitTest,
   };
 
   try {
@@ -325,4 +342,54 @@ export async function fetchHealthTrend(getToken: GetAuthToken): Promise<{ score:
   if (!res.ok) return null;
   const body = (await res.json().catch(() => ({}))) as { lastMonth?: { score: number; date: string } | null };
   return body.lastMonth ?? null;
+}
+
+// ── Subscription status ──────────────────────────────────────────────────────
+
+/** Where the user stands: in the free trial, on a paid period, lapsed, or
+ *  never subscribed. */
+export type SubscriptionState = "trial" | "active" | "expired" | "none";
+
+/** The server's view of the signed-in user's Novara Pro status. */
+export interface ProStatus {
+  /** True during the free trial and during a paid period. */
+  pro: boolean;
+  source: "apple_iap" | null;
+  /** End of the current period (the trial end during a trial), or null when not Pro. */
+  expiresAt: string | null;
+  state: SubscriptionState;
+  /** Monthly or annual. During a trial, the plan it turns into. */
+  billingPeriod: "monthly" | "annual" | null;
+}
+
+/** Throws on failure. Callers decide what an unknown status means for the UI;
+ *  the server still enforces every limit regardless. */
+export async function fetchProStatus(getToken: GetAuthToken): Promise<ProStatus> {
+  const res = await apiFetch(getToken, "/api/entitlements/me");
+  if (res.status === 401) throw new Error("Unauthorized");
+  if (!res.ok) throw new Error(`Failed to read subscription status: ${res.status}`);
+  const data = await res.json();
+  return {
+    pro: data?.pro === true,
+    source: data?.source === "apple_iap" ? "apple_iap" : null,
+    expiresAt: typeof data?.expiresAt === "string" ? data.expiresAt : null,
+    state: (["trial", "active", "expired", "none"] as const).find((s) => s === data?.state)
+      // An API from before trials existed only reports `pro`.
+      ?? (data?.pro === true ? "active" : "none"),
+    billingPeriod: data?.billingPeriod === "monthly" || data?.billingPeriod === "annual" ? data.billingPeriod : null,
+  };
+}
+
+/** Local testing only: tells a local API what the simulator's StoreKit test
+ *  environment holds, in place of the RevenueCat webhook. The API refuses this
+ *  everywhere except a developer's own machine. */
+export async function reportLocalStoreKitEntitlement(
+  getToken: GetAuthToken,
+  entitlement: { active: boolean; productId: string | null; expiresAt: string | null; isTrial: boolean },
+): Promise<void> {
+  const res = await apiFetch(getToken, "/api/dev/storekit-test/entitlement", {
+    method: "POST",
+    json: entitlement,
+  });
+  if (!res.ok) throw new Error(`Local StoreKit test report failed: ${res.status}`);
 }
