@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { ContactRound } from "lucide-react";
-import { ImportOptionCard } from "@/components/ImportOptionCard";
+import { ContactRound, Loader2, Lock, ShieldCheck, UserRound } from "lucide-react";
+import { ImportOptionCard, ImportPrimaryButton, InfoRow } from "@/components/ImportOptionCard";
 import { toast } from "sonner";
 import { useContacts } from "@/hooks/useContacts";
 import { findDuplicateContact } from "@/lib/contactDuplicates";
@@ -83,17 +83,25 @@ export function NativeContactImport({
   };
 
   return (
-    <>
-      {/* The whole card opens the picker, like the QR option. */}
-      <ImportOptionCard
-        icon={ContactRound}
-        title="Import from Contacts"
-        description="Choose someone from your iPhone contacts."
-        onClick={handlePick}
-        disabled={busy}
-        testId="button-import-contact"
-      />
-
-    </>
+    <ImportOptionCard
+      icon={ContactRound}
+      title="Import from your contacts"
+      description="Choose someone from your iPhone contacts. Novara only sees the one you select."
+      info={
+        <>
+          <InfoRow icon={Lock} title="Your contacts stay private">
+            Apple's own picker opens. Novara only receives the contact you choose.
+          </InfoRow>
+          <InfoRow icon={ShieldCheck} title="Nothing else is read">
+            Novara doesn't read, store or sync the rest of your address book.
+          </InfoRow>
+        </>
+      }
+    >
+      <ImportPrimaryButton onClick={handlePick} disabled={busy} data-testid="button-import-contact">
+        {busy ? <Loader2 className="animate-spin" /> : <UserRound />}
+        Choose a Contact
+      </ImportPrimaryButton>
+    </ImportOptionCard>
   );
 }

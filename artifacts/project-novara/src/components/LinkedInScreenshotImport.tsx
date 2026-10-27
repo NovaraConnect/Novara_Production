@@ -1,7 +1,12 @@
-import { useState, useRef, useId } from "react";
-import { ImportOptionCard, LinkedInGlyph } from "@/components/ImportOptionCard";
-import { Camera, Image as ImageIcon, Loader2, X, CheckCircle2, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState, useRef } from "react";
+import {
+  ImportOptionCard,
+  ImportPrimaryButton,
+  ImportSecondaryButton,
+  InfoRow,
+  LinkedInGlyph,
+} from "@/components/ImportOptionCard";
+import { Camera, Image as ImageIcon, Loader2, X, CheckCircle2, AlertCircle, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { MAX_FILE_BYTES, recognizeImageText } from "@/lib/imageOcr";
 import { parseLinkedInProfile, hasUsableFields, type LinkedInDraft } from "@/lib/linkedinParse";
@@ -16,7 +21,7 @@ interface LinkedInScreenshotImportProps {
 
 type Status = "idle" | "processing" | "done" | "error";
 
-// Labelled with the plain letters "in" in the app's own blue (LinkedInGlyph),
+// Labelled with the plain letters "in" in Novara's own blue (LinkedInGlyph),
 // not LinkedIn's logo or brand colour. This is user-controlled screenshot
 // import, not a LinkedIn integration. OCR runs on-device; the image is never uploaded, stored, or
 // logged; nothing is saved until the user reviews and taps Save.
@@ -24,7 +29,6 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
   const [status, setStatus] = useState<Status>("idle");
   const cameraRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
-  const noteId = useId();
   const { linkedinAiParse } = useFeatures();
   const { getToken } = useAuth();
 
@@ -105,7 +109,12 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
     <ImportOptionCard
       iconNode={<LinkedInGlyph />}
       title="Import from LinkedIn"
-      description="Photograph a LinkedIn profile on another screen, or select a screenshot from Photos."
+      description="Take a photo of a LinkedIn profile on another screen, or select a screenshot from your photos."
+      info={
+        <InfoRow icon={Lock} title="We don't connect to LinkedIn">
+          Novara only reads the image you provide and doesn't access your LinkedIn account or data.
+        </InfoRow>
+      }
     >
 
       {/* ── Processing ── */}
@@ -167,42 +176,14 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
       {/* ── Idle ── */}
       {status === "idle" && (
         <>
-
-          <div className="flex gap-2">
-            <div className="flex-1 min-w-0">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full h-9 gap-1.5 px-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-[13px] font-semibold shadow-sm"
-                onClick={() => cameraRef.current?.click()}
-                aria-describedby={`${noteId}-camera`}
-              >
-                <Camera className="w-4 h-4 shrink-0" />
-                Take a Photo
-              </Button>
-              <p id={`${noteId}-camera`} className="mt-1 text-center text-[11px] leading-snug text-muted-foreground">
-                Capture a profile instantly
-              </p>
-            </div>
-            <div className="flex-1 min-w-0">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full h-9 gap-1.5 px-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-[13px] font-semibold shadow-sm"
-                onClick={() => libraryRef.current?.click()}
-                aria-describedby={`${noteId}-library`}
-              >
-                <ImageIcon className="w-4 h-4 shrink-0" />
-                Choose Screenshot
-              </Button>
-              <p id={`${noteId}-library`} className="mt-1 text-center text-[11px] leading-snug text-muted-foreground">
-                Select from your photo library
-              </p>
-            </div>
-          </div>
-          <p className="text-[10px] italic text-muted-foreground mt-1.5">
-            Novara does not connect to LinkedIn or access private data.
-          </p>
+          <ImportPrimaryButton onClick={() => libraryRef.current?.click()}>
+            <ImageIcon />
+            Choose Screenshot
+          </ImportPrimaryButton>
+          <ImportSecondaryButton onClick={() => cameraRef.current?.click()}>
+            <Camera />
+            Take a Photo
+          </ImportSecondaryButton>
         </>
       )}
 
