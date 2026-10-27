@@ -561,15 +561,25 @@ export default function InvestorPage() {
             </div>
             <div className="space-y-4 text-lg leading-relaxed text-[#4B5363]">
               <p>
-                I’m French, a University of Florida alum, and my career has taken me from
-                L’Oréal to NextEra. Along the way I’ve met a lot of people worth knowing, and
-                I kept noticing the same thing: networking is the easy part. The hard part is
-                what comes after, actually keeping up the network you’ve built.
-              </p>
-              <p>
-                I built Novara Connect to close that gap, from the iPhone app to the
+                Cloé founded and built Novara Connect, from the iPhone app to the
                 subscription business behind it.
               </p>
+              <p>
+                French, a University of Florida alum, and a career that has run from L’Oréal
+                to NextEra: Cloé has spent years meeting people worth knowing. Along the way
+                came a simple realization. Networking is the easy part. The gap is in what
+                comes after: actually maintaining the network you’ve built. Novara exists to
+                close that gap.
+              </p>
+              <blockquote className="border-l-4 py-1 pl-5" style={{ borderColor: BRAND }}>
+                <p className="font-serif text-xl italic leading-snug text-[#08111F] sm:text-2xl">
+                  “I built Novara Connect to close that gap, from the iPhone app to the
+                  subscription business behind it.”
+                </p>
+                <footer className="mt-2 text-sm font-medium not-italic text-[#5B6272]">
+                  Cloé Carmery, Founder
+                </footer>
+              </blockquote>
               <p className="text-base">
                 {FOUNDER_LINKEDIN_URL ? (
                   <a
