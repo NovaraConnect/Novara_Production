@@ -51,6 +51,8 @@ export interface ScoreBreakdown {
   junkDominated: boolean;
   /** Crime/casualty/filler signals that disqualify an article outright. */
   unsuitableSignals: string[];
+  /** Published by an established business or news outlet. */
+  trustedSource: boolean;
   tier: Tier;
   score: number;
 }
@@ -66,6 +68,7 @@ export interface RankedArticle {
 // real company story rather than an incidental brand mention.
 const CONTEXT_TERMS = new Set([
   "ceo", "cto", "cfo", "coo", "founder", "cofounder", "president", "chairman", "director",
+  "directors", "board", "nominates", "nominated", "executive", "executives",
   "announced", "announces", "launched", "launches", "launch",
   "funding", "funded", "fundraise", "fundraising", "raised", "raise", "round", "series",
   "acquired", "acquisition", "acquires", "merger", "merged",
@@ -97,6 +100,8 @@ const CONTEXT_TERMS = new Set([
 // article to a top tier or rescue it from the junk gate.
 const STRONG_CONTEXT = new Set([
   "ceo", "cto", "cfo", "coo", "founder", "cofounder", "president", "chairman", "director",
+  // leadership and governance, e.g. a founder named to another company's board
+  "directors", "board", "nominates", "nominated", "executive", "executives",
   "announced", "announces", "launched", "launches", "launch",
   "funding", "funded", "fundraise", "fundraising", "raised", "raise", "series",
   "acquired", "acquisition", "acquires", "merger", "merged",
@@ -151,7 +156,7 @@ const JUNK_TERMS = new Set([
 // and they are already scored on their merits.
 const UNSUITABLE_TERMS = new Set([
   // crime
-  "crime", "crimes", "criminal", "criminals", "arrest", "arrested", "arrests",
+  "crime", "crimes", "criminal", "criminally", "criminals", "unruly", "outburst", "arrest", "arrested", "arrests",
   "indicted", "convicted", "sentenced", "manslaughter", "homicide", "murder",
   "murdered", "theft", "stolen", "robbery", "burglary", "carjacking",
   "kidnapping", "hijacked", "smuggling", "trafficking",
@@ -175,7 +180,20 @@ const UNSUITABLE_TERMS = new Set([
 const UNSUITABLE_PHRASES = [
   "quote of the day", "quotes of the day", "word of the day", "on this day",
   "horoscope", "obituary", "birth anniversary", "died on this",
+  // investment-promo filler ("Best Crypto to Buy Now: Revolut's …")
+  "to buy now", "price prediction", "presale",
 ];
+
+// Sport. A story about a match, a player or a season that mentions the company
+// only in passing (as a sponsor, or "black stripe" in American football) is
+// not company news. Applied only when the company is NOT in the headline, so
+// "Stripe signs partnership with the NBA" still counts.
+const SPORTS_TERMS = new Set([
+  "football", "soccer", "basketball", "baseball", "hockey", "cricket", "rugby",
+  "tennis", "golf", "nfl", "nba", "mlb", "nhl", "wsl", "mls", "ncaa",
+  "quarterback", "striker", "midfielder", "goalkeeper", "touchdown",
+  "playoff", "playoffs", "lionesses", "referee", "buckeyes", "fixtures",
+]);
 
 // Generic industry/role tokens that must NOT count as an "industry match" —
 // they match almost anything (a shopping piece says "product", a "Product
@@ -197,11 +215,74 @@ const TITLE_STOPWORDS = new Set([
 
 const PRICE_RE = /[£$€]\s?\d[\d.,]*|\b\d[\d.,]*\s?%/g;
 
+// ── Sources ─────────────────────────────────────────────────────────────────
+// GNews searches every site it indexes and returns 10 articles, so a strict
+// allowlist would leave most companies with nothing (Revolut's coverage is
+// mostly UK regional papers). Instead: established business and news outlets
+// rank first, and sites that never carry company news worth opening a
+// conversation with are dropped outright. Matching is by domain, so
+// "markets.businessinsider.com" counts as "businessinsider.com".
+
+const TRUSTED_SOURCES = [
+  // wires and business press
+  "reuters.com", "apnews.com", "bloomberg.com", "ft.com", "wsj.com", "economist.com",
+  "cnbc.com", "marketwatch.com", "barrons.com", "investors.com", "fortune.com",
+  "forbes.com", "businessinsider.com", "axios.com", "semafor.com", "theinformation.com",
+  "fastcompany.com", "inc.com", "hbr.org", "finance.yahoo.com",
+  // general news with real business desks
+  "nytimes.com", "washingtonpost.com", "theguardian.com", "bbc.com", "bbc.co.uk",
+  "news.sky.com", "thetimes.com", "thetimes.co.uk", "telegraph.co.uk", "independent.co.uk",
+  "cityam.com", "cnn.com", "cbsnews.com", "nbcnews.com", "npr.org", "politico.com", "politico.eu",
+  // technology and industry
+  "techcrunch.com", "theverge.com", "wired.com", "arstechnica.com", "venturebeat.com",
+  "zdnet.com", "sifted.eu", "finextra.com", "simpleflying.com",
+  // international business press
+  "economictimes.indiatimes.com", "livemint.com", "business-standard.com",
+  "thehindubusinessline.com", "moneycontrol.com", "nikkei.com", "scmp.com",
+  "straitstimes.com", "afr.com", "theglobeandmail.com", "handelsblatt.com", "lesechos.fr",
+];
+
+const BLOCKED_SOURCES = [
+  // sport
+  "sportbible.com", "essentiallysports.com", "espn.com", "si.com", "tsn.ca",
+  "bleacherreport.com", "skysports.com", "talksport.com",
+  // tabloid and viral
+  "the-sun.com", "thesun.co.uk", "dailystar.co.uk", "ladbible.com", "unilad.com",
+  // paid crypto and stock promotion, auto-generated market posts
+  "coingape.com", "techbullion.com", "scanx.trade",
+  // press-release wires: the company's own announcement, not reporting
+  "prnewswire.com", "prnewswire.co.uk", "businesswire.com", "globenewswire.com",
+  "accesswire.com", "einpresswire.com", "openpr.com", "newsfilecorp.com",
+];
+
+/** The article's host, without "www.". "" when the URL doesn't parse. */
+export function sourceHost(article: RankableArticle): string {
+  try {
+    return new URL(article.url ?? "").hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+function hostMatches(host: string, domains: string[]): boolean {
+  return !!host && domains.some((d) => host === d || host.endsWith(`.${d}`));
+}
+
 export function tokenize(text: string): string[] {
   return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
 }
 
-function findCapitalizationSignal(text: string, companyLower: string): CapSignal {
+/**
+ * How the company's name is written in the article.
+ *
+ *  - "proper": at least one mention reads as a name: it has a capital letter
+ *    ("Stripe") or is spelled exactly as the user typed it, so brands written
+ *    in lowercase ("eBay", "bp") still count.
+ *  - "lowercase": every mention is the everyday word ("black stripe",
+ *    "charity stripe"), which almost never means the company.
+ *  - "none": only at the start of a sentence, where capitals prove nothing.
+ */
+function findCapitalizationSignal(text: string, companyLower: string, companyAsTyped: string): CapSignal {
   const escaped = companyLower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const regex = new RegExp(`(?<![a-z])${escaped}(?![a-z])`, "gi");
   const matches = [...text.matchAll(regex)];
@@ -217,7 +298,7 @@ function findCapitalizationSignal(text: string, companyLower: string): CapSignal
     const isSentenceStart = idx === 0 || /[.!?]\s+$/.test(before);
 
     if (!isSentenceStart) {
-      if (matchedText[0] === matchedText[0].toUpperCase() && matchedText[0] !== matchedText[0].toLowerCase()) {
+      if (matchedText === companyAsTyped || /[A-Z]/.test(matchedText)) {
         properCount++;
       } else {
         lowercaseCount++;
@@ -308,7 +389,7 @@ export function scoreArticle(article: RankableArticle, ctx: RankContext): ScoreB
   const companyInTitle = titleText.includes(companyLower);
   const companyInBody = bodyText.includes(companyLower);
 
-  const capSignal = findCapitalizationSignal(fullText, companyLower);
+  const capSignal = findCapitalizationSignal(fullText, companyLower, ctx.company);
   const nearbyTerms = findContextTermsInWindow(fullText, companyLower);
   const allTerms = findContextTermsAnywhere(fullText);
 
@@ -323,6 +404,14 @@ export function scoreArticle(article: RankableArticle, ctx: RankContext): ScoreB
 
   const junkTermsFound = findJunkTerms(fullText, companyLower);
   const unsuitableSignals = findUnsuitableSignals(fullText, article.title ?? "", companyLower);
+  if (!companyInTitle) {
+    const companyTokens = new Set(tokenize(companyLower));
+    const sport = tokenize(fullText).find((w) => SPORTS_TERMS.has(w) && !companyTokens.has(w));
+    if (sport) unsuitableSignals.push(`sport:${sport}`);
+  }
+  const host = sourceHost(article);
+  if (hostMatches(host, BLOCKED_SOURCES)) unsuitableSignals.push(`source:${host}`);
+  const trustedSource = hostMatches(host, TRUSTED_SOURCES);
   // "Celebrity shopping / affiliate / coupon" fluff: multiple junk signals and
   // no strong business context near the company. A substantive company story
   // (proper-noun name next to real context terms) has hasStrongContext = true,
@@ -354,12 +443,12 @@ export function scoreArticle(article: RankableArticle, ctx: RankContext): ScoreB
   } else if (junkDominated) {
     // Product/affiliate/celebrity-shopping content without business substance.
     tier = "discard";
-  } else if (
-    (companyInTitle || companyInBody) &&
-    !hasStrongContext &&
-    !industryMatch &&
-    capSignal === "lowercase"
-  ) {
+  } else if ((companyInTitle || companyInBody) && capSignal === "lowercase") {
+    // The name only ever appears as an ordinary word ("lost his black stripe",
+    // "shots from the charity stripe"), so the story is not about the company,
+    // whatever business words sit nearby. This used to require "no business
+    // context" too, and a sports story about a "milestone" slipped through as
+    // Stripe news.
     tier = "discard";
   } else if (companyInTitle && hasStrongContext && capSignal === "proper") {
     tier = "high";
@@ -382,6 +471,13 @@ export function scoreArticle(article: RankableArticle, ctx: RankContext): ScoreB
     tier = "discard";
   }
 
+  // A relevant story from an established outlet ranks above the same story
+  // from an unknown site. It never rescues a discard.
+  if (trustedSource) {
+    score += 3;
+    if (tier === "low") tier = "medium";
+  }
+
   return {
     title: article.title ?? "",
     companyInTitle,
@@ -394,6 +490,7 @@ export function scoreArticle(article: RankableArticle, ctx: RankContext): ScoreB
     junkTermsFound,
     junkDominated,
     unsuitableSignals,
+    trustedSource,
     tier,
     score,
   };
@@ -482,6 +579,7 @@ export function rankArticles(
   const ordered = [...scored].sort((x, y) => {
     const tierDiff = TIER_ORDER[y.breakdown.tier] - TIER_ORDER[x.breakdown.tier];
     if (tierDiff !== 0) return tierDiff;
+    if (x.breakdown.trustedSource !== y.breakdown.trustedSource) return x.breakdown.trustedSource ? -1 : 1;
     if (y.breakdown.score !== x.breakdown.score) return y.breakdown.score - x.breakdown.score;
     return publishedMs(y.article) - publishedMs(x.article);
   });

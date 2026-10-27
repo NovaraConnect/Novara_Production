@@ -179,3 +179,124 @@ describe("business relevance is preferred + ordering", () => {
     expect(selectHeadlines(many, { company: "Acme Corp" })).toHaveLength(3);
   });
 });
+
+describe("a company name that is also an everyday word", () => {
+  const STRIPE: RankContext = { company: "Stripe", industry: "Fintech", role: "Engineer" };
+
+  // Real articles GNews returned for "Stripe" on 27 Oct 2026.
+  const football = art("Two more Ohio State football players loses black stripe: Buckeye Talk", {
+    description: "Favour Akih and Nick Lautar became the latest Ohio State newcomers to earn their black stripe removals, marking a milestone for both players early in the 2025 season.",
+    source: "cleveland.com",
+  });
+  const basketball = art("Angel Reese’s Blunt Response to Referee Goes Viral Before Dream Star Makes Her Point on the Court", {
+    description: "After a missed foul call from the referee, Angel Reese does not dwell on it and subsequently receives two shots from the charity stripe.",
+  });
+  const monitor = art("5 game-changing features that make the Alienware 39 gaming monitor a Black Friday deal worth chasing", {
+    description: "Alienware's world-first 39-inch 5K RGB stripe tandem OLED is the ultrawide display of your dreams",
+  });
+  const meta = art("Meta had to ask Stripe to raise limits as Muse shoppers poured in", {
+    description: "More than 10 million people have set up Meta’s Muse, and Meta had to ask Stripe to raise credit limits.",
+  });
+  const microsoft = art("Microsoft nominates Stripe’s Collison to its board and trims Nadella’s pay", {
+    description: "Microsoft names Stripe’s John Collison to its board slate as two directors leave.",
+  });
+
+  it("drops stories that only use the word, even next to a business word", () => {
+    expect(scoreArticle(football, STRIPE).tier).toBe("discard");
+    expect(scoreArticle(basketball, STRIPE).tier).toBe("discard");
+    expect(scoreArticle(monitor, STRIPE).tier).toBe("discard");
+  });
+
+  it("keeps real Stripe news", () => {
+    const shown = selectHeadlines([football, basketball, monitor, meta, microsoft], STRIPE).map((h) => h.title);
+    expect(shown).toContain(meta.title);
+    expect(shown).toContain(microsoft.title);
+    expect(shown).not.toContain(football.title);
+    expect(shown).not.toContain(monitor.title);
+  });
+
+  it("still counts a brand the user spells in lowercase", () => {
+    const ebay = art("Sellers flock to the marketplace as eBay reports record quarterly revenue", {
+      description: "The company said growth came from collectibles, and shares rose.",
+    });
+    expect(scoreArticle(ebay, { company: "eBay" }).tier).not.toBe("discard");
+  });
+});
+
+describe("sport and investment-promo filler", () => {
+  it("drops a sports story that only mentions the company as a sponsor", () => {
+    const a = art("Alessia Russo reveals why she's backed game-changing initiative to boost grassroots women's football", {
+      description: "The Arsenal forward is an ambassador for Starling Bank's 'Kick On' campaign, which aims to increase funding at grassroots level.",
+    });
+    expect(scoreArticle(a, { company: "Starling Bank" }).tier).toBe("discard");
+  });
+
+  it("keeps a sports deal when the company is the headline", () => {
+    const a = art("Stripe signs multi-year partnership with the NBA", {
+      description: "Stripe will process payments for the basketball league's online store under the agreement.",
+    });
+    expect(scoreArticle(a, { company: "Stripe" }).tier).not.toBe("discard");
+  });
+
+  it("drops 'best crypto to buy now' promotions", () => {
+    const a = art("Best Crypto to Buy Now: Revolut's EEA Crypto Migration Puts Remittix, TAO and Solana in the Adoption Debate", {
+      description: "Revolut is migrating EEA crypto customers to its CySEC-licensed digital asset entity.",
+    });
+    expect(scoreArticle(a, { company: "Revolut" }).tier).toBe("discard");
+  });
+
+  it("keeps news about a company's chairman", () => {
+    const a = art("Former Goldman Sachs chief Sherwood leaves Britain as tax hike fears mount", {
+      description: "A former Goldman Sachs chief who heads the board of Revolut, Europe's most valuable company, has relocated abroad.",
+    });
+    expect(scoreArticle(a, { company: "Revolut", industry: "Fintech" }).tier).not.toBe("discard");
+  });
+});
+
+describe("news sources", () => {
+  const story = (url: string) =>
+    art("Revolut acquires Argentine bank to expand in Latin America", {
+      description: "Revolut has agreed to buy Banco Cetelem Argentina, its first acquisition in the region.",
+      url,
+    });
+
+  it("drops articles from blocked sites however relevant they look", () => {
+    const b = scoreArticle(story("https://www.prnewswire.com/news/revolut-licence"), { company: "Revolut" });
+    expect(b.tier).toBe("discard");
+    expect(b.unsuitableSignals).toContain("source:prnewswire.com");
+  });
+
+  it("recognises trusted outlets on their subdomains", () => {
+    expect(scoreArticle(story("https://markets.businessinsider.com/news/x"), { company: "Revolut" }).trustedSource).toBe(true);
+    expect(scoreArticle(story("https://notbusinessinsider.com/news/x"), { company: "Revolut" }).trustedSource).toBe(false);
+  });
+
+  it("puts the trusted outlet first when two sites cover the same kind of story", () => {
+    const local = art("Revolut launches mortgages for UK customers", {
+      description: "Revolut has launched a mortgage product.",
+      url: "https://www.bristolpost.co.uk/news/revolut-mortgages",
+      publishedAt: "2026-08-21T10:00:00Z",
+    });
+    const reuters = art("Revolut hires former Barclays executive to run lending", {
+      description: "Revolut appointed a new head of lending.",
+      url: "https://www.reuters.com/business/revolut-lending",
+      publishedAt: "2026-08-19T10:00:00Z",
+    });
+    const { selected } = rankArticles([local, reuters], { company: "Revolut" });
+    expect(selected[0].article.url).toContain("reuters.com");
+  });
+
+  it("drops passenger-incident stories about an airline", () => {
+    const a = art("Duct-taped passenger reveals what he drank before outburst on plane", {
+      description: "A man was duct-taped and zip-tied by fellow passengers after a disruptive outburst on an early September American Airlines flight.",
+      content: "A Tucson man says two screwdrivers explain a mid-flight meltdown that got him zip-tied and criminally charged.",
+      url: "https://www.pennlive.com/news/duct-taped-passenger",
+    });
+    expect(scoreArticle(a, { company: "American Airlines", industry: "aviation" }).tier).toBe("discard");
+  });
+
+  it("still shows relevant news from sites on neither list", () => {
+    const b = scoreArticle(story("https://www.bristolpost.co.uk/news/revolut"), { company: "Revolut" });
+    expect(b.tier).not.toBe("discard");
+  });
+});
