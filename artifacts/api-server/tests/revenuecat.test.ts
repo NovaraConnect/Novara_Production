@@ -275,5 +275,12 @@ describe("pure helpers", () => {
     expect(entitlementChangeFor({ ...base, type: "TEST" } as never)).toBeNull();
     expect(entitlementChangeFor({ ...base, type: "TRANSFER" } as never)).toBeNull();
     expect(entitlementChangeFor({ ...base, app_user_id: "user bad id" } as never)).toBeNull();
+    expect(entitlementChangeFor(base as never)?.willRenew).toBe(true);
+    expect(entitlementChangeFor({ ...base, type: "RENEWAL" } as never)?.willRenew).toBe(true);
+    expect(entitlementChangeFor({ ...base, type: "PRODUCT_CHANGE" } as never)?.willRenew).toBe(true);
+    expect(entitlementChangeFor({ ...base, type: "UNCANCELLATION" } as never)?.willRenew).toBe(true);
+    expect(entitlementChangeFor({ ...base, type: "CANCELLATION" } as never)?.willRenew).toBe(false);
+    expect(entitlementChangeFor({ ...base, type: "EXPIRATION" } as never)?.willRenew).toBe(false);
+    expect(entitlementChangeFor({ ...base, type: "BILLING_ISSUE" } as never)?.willRenew).toBeNull();
   });
 });

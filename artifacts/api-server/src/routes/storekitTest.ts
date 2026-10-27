@@ -39,7 +39,8 @@ export function isLocalStoreKitTestEnabled(): boolean {
 const router = Router();
 
 // POST /api/dev/storekit-test/entitlement
-// Body: { active: boolean, productId: string | null, expiresAt: ISO string | null, isTrial: boolean }
+// Body: { active: boolean, productId: string | null, expiresAt: ISO string | null,
+//         isTrial: boolean, willRenew?: boolean | null }
 router.post(STOREKIT_TEST_PATH, requireAuth, async (req: Request, res: Response) => {
   if (!isLocalStoreKitTestEnabled()) {
     res.status(404).json({ error: "Not found" });
@@ -54,6 +55,7 @@ router.post(STOREKIT_TEST_PATH, requireAuth, async (req: Request, res: Response)
     return;
   }
   const active = body["active"] === true && !!expiresAt && expiresAt.getTime() > Date.now();
+  const willRenew = typeof body["willRenew"] === "boolean" ? body["willRenew"] : null;
 
   if (!productId) {
     // StoreKit has never seen a purchase for this simulator: nothing to record.
@@ -64,8 +66,8 @@ router.post(STOREKIT_TEST_PATH, requireAuth, async (req: Request, res: Response)
   try {
     await pool.query(
       `INSERT INTO entitlements
-         (user_id, source, provider_ref, product_id, status, expires_at, period_type, last_event_at, updated_at)
-       VALUES ($1, 'apple_iap', 'xcode-storekit-test', $2, $3, $4, $5, now(), now())
+         (user_id, source, provider_ref, product_id, status, expires_at, period_type, will_renew, last_event_at, updated_at)
+       VALUES ($1, 'apple_iap', 'xcode-storekit-test', $2, $3, $4, $5, $6, now(), now())
        ON CONFLICT (user_id) WHERE source = 'apple_iap'
        DO UPDATE SET
          provider_ref  = EXCLUDED.provider_ref,
@@ -73,6 +75,7 @@ router.post(STOREKIT_TEST_PATH, requireAuth, async (req: Request, res: Response)
          status        = EXCLUDED.status,
          expires_at    = EXCLUDED.expires_at,
          period_type   = EXCLUDED.period_type,
+         will_renew    = EXCLUDED.will_renew,
          last_event_at = EXCLUDED.last_event_at,
          updated_at    = now()`,
       [
@@ -81,6 +84,7 @@ router.post(STOREKIT_TEST_PATH, requireAuth, async (req: Request, res: Response)
         active ? "active" : "inactive",
         expiresAt ? expiresAt.toISOString() : null,
         body["isTrial"] === true ? "TRIAL" : "NORMAL",
+        willRenew,
       ],
     );
     logger.warn("Local StoreKit test entitlement written (development only)");

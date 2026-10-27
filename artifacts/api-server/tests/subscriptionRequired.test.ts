@@ -161,6 +161,42 @@ describe("subscription required (one Pro plan, 7-day trial)", () => {
     }
   });
 
+  it("tracks whether the subscription will renew: cancel, then turn back on", async () => {
+    await deliver(event());
+    expect(await me()).toMatchObject({ pro: true, state: "trial", willRenew: true });
+
+    // Auto-renew turned off: still Pro until the end, but it won't renew.
+    await deliver(event({ type: "CANCELLATION", cancel_reason: "UNSUBSCRIBE" }));
+    expect(await me()).toMatchObject({ pro: true, state: "trial", willRenew: false });
+
+    // Turned back on.
+    await deliver(event({ type: "UNCANCELLATION" }));
+    expect(await me()).toMatchObject({ pro: true, willRenew: true });
+  });
+
+  it("an event that says nothing about renewal keeps the last answer", async () => {
+    await deliver(event());
+    await deliver(event({ type: "CANCELLATION", cancel_reason: "UNSUBSCRIBE" }));
+    await deliver(event({ type: "SUBSCRIPTION_EXTENDED", expiration_at_ms: Date.now() + 9 * DAY }));
+    expect(await me()).toMatchObject({ pro: true, willRenew: false });
+  });
+
+  it("an older CANCELLATION cannot overwrite a newer RENEWAL", async () => {
+    const t = Date.now();
+    await deliver(event({ type: "RENEWAL", period_type: "NORMAL", event_timestamp_ms: t + 5000, expiration_at_ms: t + 30 * DAY }));
+    await deliver(event({ type: "CANCELLATION", cancel_reason: "UNSUBSCRIBE", event_timestamp_ms: t + 1000 }));
+    expect(await me()).toMatchObject({ pro: true, willRenew: true });
+  });
+
+  it("reports renewal as unknown (null) for rows from before it was tracked, and when not Pro", async () => {
+    await deliver(event());
+    await pool.query("UPDATE entitlements SET will_renew = NULL WHERE user_id = $1", [USER]);
+    expect(await me()).toMatchObject({ pro: true, willRenew: null });
+
+    await deliver(event({ type: "EXPIRATION", expiration_at_ms: Date.now() - 1000 }));
+    expect(await me()).toMatchObject({ pro: false, state: "expired", willRenew: null });
+  });
+
   it("billingPeriodFor reads the product ID", () => {
     expect(billingPeriodFor(MONTHLY)).toBe("monthly");
     expect(billingPeriodFor(ANNUAL)).toBe("annual");
@@ -208,6 +244,10 @@ describe("local StoreKit test entitlement (development only)", () => {
 
     await report({ active: true, productId: ANNUAL, expiresAt: new Date(Date.now() + 365 * DAY).toISOString(), isTrial: false });
     expect(await me()).toMatchObject({ pro: true, state: "active", billingPeriod: "annual" });
+
+    // Auto-renew turned off in Xcode's transaction manager.
+    await report({ active: true, productId: ANNUAL, expiresAt: new Date(Date.now() + 365 * DAY).toISOString(), isTrial: false, willRenew: false });
+    expect(await me()).toMatchObject({ pro: true, willRenew: false });
 
     await report({ active: false, productId: ANNUAL, expiresAt: new Date(Date.now() - 1000).toISOString(), isTrial: false });
     expect(await me()).toMatchObject({ pro: false, state: "expired" });
