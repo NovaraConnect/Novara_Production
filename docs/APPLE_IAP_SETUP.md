@@ -203,7 +203,8 @@ On a TestFlight build with a sandbox tester signed in to the device's App Store:
 - **Apple guideline text.** The paywall copy and the disclosures in section 3, step 8 must be checked against the live guidelines before submission.
 - **Feature list.** The paywall lists only what Pro does today: unlimited contacts and unlimited imports. Add to it when the Pro feature list is written down (`BILLING_AND_UNIVERSITY_ACCESS_PLAN.md`, section 4A.5).
 - **Account deletion text.** Settings' delete-account dialog does not yet tell subscribers to cancel in their Apple Account first. Add that line when Settings is redesigned.
-- **Savings label.** "Save 16%" is fixed text derived from the planned prices. Update it if prices change.
+- **Savings label.** The yearly badge ("Save 16%" at US prices) is worked out on the device from the two prices Apple returns for that country, rounded down, and hidden if yearly is not cheaper.
+- **Price prominence.** Each plan card leads with the amount billed ("$4.99 per month", bold); the free trial is the smaller line under it ("7-day free trial, then billed monthly"), as Apple's subscription guidance asks.
 - **Trial wording.** "New subscribers can try it free for 7 days" on Add Contact is fixed text. The paywall itself uses Apple's trial length and only promises the trial to Apple Accounts that can still get it. Change the Add Contact text if the trial length changes.
 
 ---

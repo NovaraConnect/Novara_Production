@@ -21,10 +21,20 @@ export const TERMS_OF_USE_URL = "https://www.apple.com/legal/internet-services/i
  *  (ProductPrice.priceString); nothing here is a price. */
 export const PRO_PERIOD_LABEL = { monthly: "per month", annual: "per year" } as const;
 
-/** Shown beside the annual plan. Derived from the planned prices:
- *  1 − $49.99 / ($4.99 × 12) ≈ 16.5%, rounded down. If prices change, change
- *  this too (see docs/APPLE_IAP_SETUP.md). */
-export const ANNUAL_SAVING_LABEL = "Save 16%";
+/** "billed monthly" / "billed yearly", for the line under the price. */
+export const PRO_BILLED_LABEL = { monthly: "billed monthly", annual: "billed yearly" } as const;
+
+/**
+ * The badge beside the yearly plan, e.g. "Save 16%", worked out from the two
+ * prices Apple returned for THIS storefront (never a fixed number, because
+ * local prices differ by country). Rounded down so it never overstates.
+ * Null, so no badge, when either price is missing or yearly is not cheaper.
+ */
+export function annualSavingLabel(monthlyPrice: number | undefined, annualPrice: number | undefined): string | null {
+  if (!monthlyPrice || !annualPrice || monthlyPrice <= 0 || annualPrice <= 0) return null;
+  const percent = Math.floor((1 - annualPrice / (monthlyPrice * 12)) * 100);
+  return percent >= 1 ? `Save ${percent}%` : null;
+}
 
 /** How to cancel, in the words Apple's own Settings app uses. */
 export const HOW_TO_CANCEL =

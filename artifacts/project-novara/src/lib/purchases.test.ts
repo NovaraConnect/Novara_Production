@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   addContactBlock,
+  annualSavingLabel,
   daysLeft,
   FREE_TIER_LIMIT,
   isPaywallVisible,
@@ -148,6 +149,22 @@ describe("subscriptionTerms", () => {
     const text = subscriptionTerms({ priceString: "$49.99", period: "annual", trialDays: 0 });
     expect(text).not.toContain("Free for");
     expect(text).toContain("$49.99 per year, charged to your Apple Account when you confirm");
+  });
+});
+
+describe("annualSavingLabel", () => {
+  it("works the saving out from the storefront's own prices, rounding down", () => {
+    expect(annualSavingLabel(4.99, 49.99)).toBe("Save 16%");
+    expect(annualSavingLabel(5.99, 59.99)).toBe("Save 16%");
+    expect(annualSavingLabel(4.49, 44.99)).toBe("Save 16%");
+    expect(annualSavingLabel(10, 60)).toBe("Save 50%");
+  });
+
+  it("shows no badge when a price is missing or yearly is not cheaper", () => {
+    expect(annualSavingLabel(undefined, 49.99)).toBeNull();
+    expect(annualSavingLabel(4.99, undefined)).toBeNull();
+    expect(annualSavingLabel(4.99, 59.88)).toBeNull();
+    expect(annualSavingLabel(4.99, 70)).toBeNull();
   });
 });
 

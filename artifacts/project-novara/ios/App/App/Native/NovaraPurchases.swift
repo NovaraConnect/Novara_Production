@@ -81,6 +81,7 @@ enum NovaraPurchases {
                         "productId": product.productIdentifier,
                         "period": package.packageType == .annual ? "annual" : "monthly",
                         "priceString": product.localizedPriceString,
+                        "price": NSDecimalNumber(decimal: product.price).doubleValue,
                         "trialDays": freeTrialDays(product, eligibility[product.productIdentifier]),
                     ]
                 }
@@ -288,6 +289,7 @@ enum NovaraLocalStoreKit {
                     "productId": product.id,
                     "period": subscription.subscriptionPeriod.unit == .year ? "annual" : "monthly",
                     "priceString": product.displayPrice,
+                    "price": NSDecimalNumber(decimal: product.price).doubleValue,
                     "trialDays": trialDays,
                 ])
             }

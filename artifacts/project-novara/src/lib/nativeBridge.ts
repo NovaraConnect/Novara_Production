@@ -58,6 +58,9 @@ export interface NativeProProduct {
   period: ProPeriod;
   /** Apple's localized price, e.g. "$4.99". Display this, never a constant. */
   priceString: string;
+  /** The same price as a number in the local currency, e.g. 4.99. Used only to
+   *  compare the two plans (the yearly saving); never displayed. */
+  price?: number;
   /** Days of free trial this Apple Account would get on this plan, or 0 when it
    *  has had the trial already (Apple allows one) or eligibility is unknown. */
   trialDays?: number;

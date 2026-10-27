@@ -41,8 +41,9 @@ import {
   type ProPeriod,
 } from "@/lib/nativeBridge";
 import {
-  ANNUAL_SAVING_LABEL,
+  annualSavingLabel,
   KEEP_YOUR_CONTACTS_NOTE,
+  PRO_BILLED_LABEL,
   PRO_PERIOD_LABEL,
   subscriptionTerms,
   TERMS_OF_USE_URL,
@@ -266,7 +267,7 @@ export default function Paywall() {
             {products && (
               <>
                 {[
-                  { period: "annual" as const, product: annual, title: "Yearly", saving: ANNUAL_SAVING_LABEL },
+                  { period: "annual" as const, product: annual, title: "Yearly", saving: annualSavingLabel(monthly?.price, annual?.price) },
                   { period: "monthly" as const, product: monthly, title: "Monthly", saving: null },
                 ].map(({ period, product, title, saving }) =>
                   product ? (
@@ -283,11 +284,16 @@ export default function Paywall() {
                         <span className="font-semibold text-foreground">Novara Pro {title}</span>
                         {saving && <span className="text-xs font-semibold text-cooling">{saving}</span>}
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        {product.trialDays && product.trialDays > 0
-                          ? `${product.trialDays} days free, then ${product.priceString} ${PRO_PERIOD_LABEL[period]}`
-                          : `${product.priceString} ${PRO_PERIOD_LABEL[period]}`}
+                      {/* The amount billed is the most prominent price on the card
+                          (App Review 3.1.2); the trial is secondary. */}
+                      <div className="text-lg font-bold text-foreground">
+                        {product.priceString} {PRO_PERIOD_LABEL[period]}
                       </div>
+                      {product.trialDays && product.trialDays > 0 ? (
+                        <div className="text-sm text-muted-foreground">
+                          {product.trialDays}-day free trial, then {PRO_BILLED_LABEL[period]}
+                        </div>
+                      ) : null}
                     </button>
                   ) : null,
                 )}
