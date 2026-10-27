@@ -101,6 +101,8 @@ provider_ref text NULL,
 product_id text NULL,
 status text NOT NULL CHECK (status IN ('active', 'inactive')),
 expires_at timestamptz NULL,
+-- From migrations/0007_entitlements_period_type.sql.
+period_type text NULL,
 last_event_at timestamptz NULL,
 created_at timestamptz NOT NULL DEFAULT now(),
 updated_at timestamptz NOT NULL DEFAULT now()

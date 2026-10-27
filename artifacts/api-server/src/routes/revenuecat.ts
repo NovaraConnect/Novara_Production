@@ -17,6 +17,11 @@
 //
 // NO GRACE. Access is granted until Apple's expiration_at_ms and no longer.
 //
+// TRIALS. The 7-day free trial is an Apple introductory offer. Its events carry
+// period_type TRIAL and grant Pro like a paid period; the period type is kept
+// so the app can say "Free trial, 3 days left". Converting to paid arrives as a
+// RENEWAL with period_type NORMAL; a trial cancelled in time ends in EXPIRATION.
+//
 // TRANSFER. When an Apple Account that already paid restores purchases while
 // signed in to a different Novara account, RevenueCat moves the subscription
 // and sends TRANSFER (which has no app_user_id). We move the Apple row to the
@@ -42,6 +47,8 @@ export interface RevenueCatEvent {
   product_id?: string | null;
   entitlement_ids?: string[] | null;
   expiration_at_ms?: number | null;
+  /** TRIAL, INTRO, NORMAL, PROMOTIONAL or PREPAID. */
+  period_type?: string | null;
   event_timestamp_ms: number;
   environment?: string | null;
   original_transaction_id?: string | null;
@@ -82,7 +89,13 @@ export function isAuthorised(presented: string | undefined, expected: string | u
 
 /** Pure decision: what an event means for the novara_pro entitlement, if anything. */
 export function entitlementChangeFor(event: RevenueCatEvent):
-  | { active: boolean; expiresAt: Date | null; productId: string | null; providerRef: string | null }
+  | {
+      active: boolean;
+      expiresAt: Date | null;
+      productId: string | null;
+      providerRef: string | null;
+      periodType: string | null;
+    }
   | null {
   if (!CLERK_USER_ID.test(event.app_user_id)) return null;
   const ids = Array.isArray(event.entitlement_ids) ? event.entitlement_ids : [];
@@ -91,14 +104,15 @@ export function entitlementChangeFor(event: RevenueCatEvent):
   const expiresAt = typeof event.expiration_at_ms === "number" ? new Date(event.expiration_at_ms) : null;
   const productId = event.product_id ?? null;
   const providerRef = event.original_transaction_id ?? null;
+  const periodType = typeof event.period_type === "string" ? event.period_type : null;
 
   if (ENDING.has(event.type) || (event.type === "CANCELLATION" && event.cancel_reason === REFUND_REASON)) {
-    return { active: false, expiresAt, productId, providerRef };
+    return { active: false, expiresAt, productId, providerRef, periodType };
   }
   if (GRANTING.has(event.type)) {
     // A grant without an end date is not one we will honour.
     if (!expiresAt) return null;
-    return { active: true, expiresAt, productId, providerRef };
+    return { active: true, expiresAt, productId, providerRef, periodType };
   }
   // TEST, PRODUCT_CHANGE without expiry, and anything new: recorded, not acted on.
   // TRANSFER is handled separately (applyTransfer).
@@ -130,8 +144,9 @@ async function applyTransfer(client: PoolClient, event: RevenueCatEvent): Promis
     product_id: string | null;
     status: string;
     expires_at: Date | null;
+    period_type: string | null;
   }>(
-    `SELECT provider_ref, product_id, status, expires_at
+    `SELECT provider_ref, product_id, status, expires_at, period_type
        FROM entitlements
       WHERE source = 'apple_iap' AND user_id = ANY($1)
         AND (last_event_at IS NULL OR last_event_at <= $2)
@@ -152,19 +167,20 @@ async function applyTransfer(client: PoolClient, event: RevenueCatEvent): Promis
   );
   await client.query(
     `INSERT INTO entitlements
-       (user_id, source, provider_ref, product_id, status, expires_at, last_event_at, updated_at)
-     VALUES ($1, 'apple_iap', $2, $3, $4, $5, $6, now())
+       (user_id, source, provider_ref, product_id, status, expires_at, period_type, last_event_at, updated_at)
+     VALUES ($1, 'apple_iap', $2, $3, $4, $5, $6, $7, now())
      ON CONFLICT (user_id) WHERE source = 'apple_iap'
      DO UPDATE SET
        provider_ref  = EXCLUDED.provider_ref,
        product_id    = EXCLUDED.product_id,
        status        = EXCLUDED.status,
        expires_at    = EXCLUDED.expires_at,
+       period_type   = EXCLUDED.period_type,
        last_event_at = EXCLUDED.last_event_at,
        updated_at    = now()
      WHERE entitlements.last_event_at IS NULL
         OR entitlements.last_event_at <= EXCLUDED.last_event_at`,
-    [to, moved.provider_ref, moved.product_id, moved.status, moved.expires_at, eventAt],
+    [to, moved.provider_ref, moved.product_id, moved.status, moved.expires_at, moved.period_type, eventAt],
   );
   return "applied";
 }
@@ -205,14 +221,15 @@ async function applyEvent(event: RevenueCatEvent): Promise<Outcome> {
     const eventAt = new Date(event.event_timestamp_ms).toISOString();
     const upsert = await client.query(
       `INSERT INTO entitlements
-         (user_id, source, provider_ref, product_id, status, expires_at, last_event_at, updated_at)
-       VALUES ($1, 'apple_iap', $2, $3, $4, $5, $6, now())
+         (user_id, source, provider_ref, product_id, status, expires_at, period_type, last_event_at, updated_at)
+       VALUES ($1, 'apple_iap', $2, $3, $4, $5, $6, $7, now())
        ON CONFLICT (user_id) WHERE source = 'apple_iap'
        DO UPDATE SET
          provider_ref  = EXCLUDED.provider_ref,
          product_id    = EXCLUDED.product_id,
          status        = EXCLUDED.status,
          expires_at    = EXCLUDED.expires_at,
+       period_type   = EXCLUDED.period_type,
          last_event_at = EXCLUDED.last_event_at,
          updated_at    = now()
        WHERE entitlements.last_event_at IS NULL
@@ -223,6 +240,7 @@ async function applyEvent(event: RevenueCatEvent): Promise<Outcome> {
         change.productId,
         change.active ? "active" : "inactive",
         change.expiresAt ? change.expiresAt.toISOString() : null,
+        change.periodType,
         eventAt,
       ],
     );

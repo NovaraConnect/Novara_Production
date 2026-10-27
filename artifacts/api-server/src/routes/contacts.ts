@@ -13,9 +13,10 @@ import { recalculateContactsForUser } from "../lib/recalculate";
 import { analyzeContactWithAI } from "../lib/enrich";
 import { logger } from "../lib/logger";
 import { computeNextFollowUp, resolveContactDates, utcDateString } from "../lib/followUpDates";
-import { contactLimitFor, FREE_TIER_LIMIT } from "../lib/entitlements";
+import { contactLimitFor, limitReachedBody } from "../lib/entitlements";
 
-// The Free ceiling is enforced on BOTH create paths (POST /contacts and
+// Who may add contacts (Free ceiling, or Pro / trial once a subscription is
+// required) is enforced on BOTH create paths (POST /contacts and
 // POST /contacts/import) through contactLimitFor() in lib/entitlements.ts.
 
 const router = Router();
@@ -101,11 +102,7 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
     );
     const limit = await contactLimitFor(userId);
     if (parseInt(countRow.count, 10) >= limit) {
-      res.status(403).json({
-        error: "Contact limit reached",
-        message: `Novara Free includes up to ${FREE_TIER_LIMIT} contacts. Novara Pro removes the limit.`,
-        code: "CONTACT_LIMIT_REACHED",
-      });
+      res.status(403).json(limitReachedBody());
       return;
     }
 
@@ -489,7 +486,7 @@ router.post("/contacts/import", requireAuth, async (req: Request, res: Response)
 
   // The free ceiling applies here as well. Without this, a user could import
   // an unlimited address book and never meet the limit that POST /contacts
-  // enforces — which would make FREE_TIER_LIMIT one API call from meaningless.
+  // enforces — which would make the limit one API call from meaningless.
   const { rows: [limitRow] } = await pool.query(
     "SELECT COUNT(*) AS count FROM contacts WHERE user_id = $1",
     [userId],
@@ -497,11 +494,7 @@ router.post("/contacts/import", requireAuth, async (req: Request, res: Response)
   const alreadyStored = parseInt(limitRow.count, 10);
   const limit = await contactLimitFor(userId);
   if (alreadyStored >= limit) {
-    res.status(403).json({
-      error: "Contact limit reached",
-      message: `Novara Free includes up to ${FREE_TIER_LIMIT} contacts. Novara Pro removes the limit.`,
-      code: "CONTACT_LIMIT_REACHED",
-    });
+    res.status(403).json(limitReachedBody());
     return;
   }
   // Partial imports are allowed: take what fits and report the remainder,
@@ -586,7 +579,7 @@ router.post("/contacts/import", requireAuth, async (req: Request, res: Response)
     imported,
     skipped,
     ...(skippedOverLimit > 0
-      ? { skippedOverLimit, limit: FREE_TIER_LIMIT, code: "CONTACT_LIMIT_REACHED" }
+      ? { skippedOverLimit, limit, code: "CONTACT_LIMIT_REACHED" }
       : {}),
   });
 });

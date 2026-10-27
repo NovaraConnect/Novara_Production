@@ -7,6 +7,7 @@ import { Router, type Request, type Response } from "express";
 import { isAiEnrichEnabled } from "../lib/enrich";
 import { isCardAiParseEnabled } from "../lib/cardAiParse";
 import { isLinkedInAiParseEnabled } from "../lib/linkedinAiParse";
+import { isPaywallEnabled, isSubscriptionRequired } from "../lib/entitlements";
 
 function flagOn(v: string | undefined): boolean {
   return !!v && ["1", "true", "on", "yes"].includes(v.trim().toLowerCase());
@@ -27,7 +28,11 @@ router.get("/features", (_req: Request, res: Response) => {
     // Shows the native Novara Pro paywall (iOS shell only). Off by default: it
     // must stay off until the App Store products, the RevenueCat webhook and a
     // TestFlight build with the purchase bridge are all live.
-    applePaywall: flagOn(process.env["IAP_PAYWALL_ENABLED"]),
+    applePaywall: isPaywallEnabled(),
+    // Adding contacts needs Novara Pro or its free trial. Off by default, and
+    // only ever on together with applePaywall. Turn it on once the app version
+    // that can sell Pro is live on the App Store.
+    subscriptionRequired: isSubscriptionRequired(),
   });
 });
 
