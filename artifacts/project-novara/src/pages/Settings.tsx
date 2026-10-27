@@ -71,7 +71,7 @@ function SettingsRow({
         <p className={cn("text-[15px] font-medium", destructive ? "text-destructive" : "text-foreground")}>{label}</p>
         {detail && <p className="mt-0.5 text-xs text-muted-foreground">{detail}</p>}
       </div>
-      {value && <span className="shrink-0 text-sm text-muted-foreground">{value}</span>}
+      {value && <span className="max-w-[45%] text-right text-sm leading-snug text-muted-foreground">{value}</span>}
       {onClick && <ChevronRight className={cn("h-4 w-4 shrink-0", destructive ? "text-destructive" : "text-muted-foreground")} aria-hidden="true" />}
     </>
   );
