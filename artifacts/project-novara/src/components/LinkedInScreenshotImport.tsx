@@ -1,6 +1,6 @@
 import { useState, useRef, useId } from "react";
-import { ImportOptionCard, LinkedInGlyph } from "@/components/ImportOptionCard";
-import { Camera, Image as ImageIcon, Loader2, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { ImportOptionCard } from "@/components/ImportOptionCard";
+import { Camera, Image as ImageIcon, Loader2, X, CheckCircle2, AlertCircle, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { MAX_FILE_BYTES, recognizeImageText } from "@/lib/imageOcr";
@@ -103,8 +103,8 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
 
   return (
     <ImportOptionCard
-      iconNode={<LinkedInGlyph />}
-      title="LinkedIn Profile"
+      icon={UserRound}
+      title="Import from LinkedIn"
       description="Photograph a LinkedIn profile on another screen, or select a screenshot from Photos."
     >
 
@@ -167,9 +167,9 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
       {/* ── Idle ── */}
       {status === "idle" && (
         <>
-          {/* Two equal targets, each with its helper note underneath. */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="min-w-0">
+
+          <div className="flex gap-2">
+            <div className="flex-1 min-w-0">
               <Button
                 type="button"
                 variant="outline"
@@ -181,10 +181,10 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
                 Take a Photo
               </Button>
               <p id={`${noteId}-camera`} className="mt-1 text-center text-[11px] leading-snug text-muted-foreground">
-                Capture a profile on another screen
+                Capture a profile instantly
               </p>
             </div>
-            <div className="min-w-0">
+            <div className="flex-1 min-w-0">
               <Button
                 type="button"
                 variant="outline"
@@ -200,8 +200,8 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
               </p>
             </div>
           </div>
-          <p className="text-[11px] text-muted-foreground mt-1.5">
-            Novara doesn't connect to LinkedIn or access private data.
+          <p className="text-[10px] italic text-muted-foreground mt-1.5">
+            Novara does not connect to LinkedIn or access private data.
           </p>
         </>
       )}
