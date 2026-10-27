@@ -191,12 +191,40 @@ export function trialTimeLeft(days: number): string {
   return `${days} ${days === 1 ? "day" : "days"} left`;
 }
 
-/** Short label for the plan, e.g. "Free Trial · 5 days left" or "Pro · Yearly". */
+/**
+ * The date access ends when the user has cancelled (auto-renew off) but is
+ * still within the paid period or trial. Null when it will renew, when that
+ * is not known, or when they are not Pro: the usual wording applies then.
+ */
+export function cancelledUntil(status: ProStatus | undefined): string | null {
+  if (!status?.pro || status.willRenew !== false || !status.expiresAt) return null;
+  return status.expiresAt;
+}
+
+/** "Nov 3" (short) or "November 3" (long), in the user's own locale and time zone. */
+export function formatAccessDate(iso: string, month: "short" | "long", locale?: string): string {
+  return new Date(iso).toLocaleDateString(locale, { month, day: "numeric" });
+}
+
+/** What the subscription screen says to someone who cancelled but still has access. */
+export function cancelledNotice(input: { isTrial: boolean; untilLong: string }): string {
+  return `You've cancelled. You keep Novara Pro until ${input.untilLong}, then the subscription ends. You won't be charged${input.isTrial ? "" : " again"}.`;
+}
+
+/**
+ * Short label for the plan, e.g. "Free Trial · 5 days left", "Pro · Yearly",
+ * or, once cancelled, "Cancelled · access until Nov 3". `cancelledUntilShort`
+ * is that date already formatted (formatAccessDate), or null.
+ */
 export function subscriptionLabel(
   plan: SubscriptionPlan,
   days: number | null,
   subscriptionRequired: boolean,
+  cancelledUntilShort: string | null = null,
 ): string {
+  if (cancelledUntilShort && (plan === "trial" || plan === "monthly" || plan === "annual")) {
+    return `Cancelled · access until ${cancelledUntilShort}`;
+  }
   switch (plan) {
     case "trial":
       return days === null ? "Free Trial" : `Free Trial · ${trialTimeLeft(days)}`;

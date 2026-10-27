@@ -32,6 +32,7 @@ how-to.
 | Layer | Where | What it does |
 |---|---|---|
 | Entitlement storage | `artifacts/api-server/migrations/0004_apple_iap_entitlements.sql` | `entitlements` (provider-neutral; Apple rows keyed by Clerk user ID) and `revenuecat_events` (idempotency log) |
+| Renewal marker | `migrations/0009_entitlements_will_renew.sql` | Adds `entitlements.will_renew`: false after CANCELLATION (auto-renew off), true after INITIAL_PURCHASE / RENEWAL / PRODUCT_CHANGE / UNCANCELLATION. Status endpoint returns it as `willRenew` |
 | Trial marker | `migrations/0007_entitlements_period_type.sql` | Adds `entitlements.period_type` (RevenueCat's TRIAL / NORMAL …), so a trial can be shown as one. Numbered 0007 because `feat/visual-refresh` uses 0005 and 0006 |
 | Read model | `api-server/src/lib/entitlements.ts` | `proStatusFor()` and `contactLimitFor()`. Access requires `status = active` **and** `expires_at > now()` at read time. A trial is access |
 | Status endpoint | `GET /api/entitlements/me` | `pro`, `expiresAt`, `state` (`trial` / `active` / `expired` / `none`) and `billingPeriod` (`monthly` / `annual`) |
@@ -138,7 +139,7 @@ this repository, in Info.plist, or in the app.
 Order matters. The API reads the `entitlements` table on every contact
 creation, so the migration must exist before the API that uses it is deployed.
 
-1. **Apply migrations `0004_apple_iap_entitlements.sql` and `0007_entitlements_period_type.sql` to production** (hand-applied, each in a transaction, 0004 first). The down files reverse them (0007 first). Verified on an empty database: both apply, re-apply, and reverse cleanly. `feat/visual-refresh`'s 0005 and 0006 touch other tables and can go before or after.
+1. **Apply migrations `0004_apple_iap_entitlements.sql`, `0007_entitlements_period_type.sql` and `0009_entitlements_will_renew.sql` to production** (hand-applied, each in a transaction, in that order). The down files reverse them (0007 first). Verified on an empty database: both apply, re-apply, and reverse cleanly. `feat/visual-refresh`'s 0005 and 0006 touch other tables and can go before or after.
 2. **Deploy the API** with `REVENUECAT_WEBHOOK_AUTH` set and both `IAP_PAYWALL_ENABLED` and `IAP_SUBSCRIPTION_REQUIRED` **unset**. Free users are unchanged (6 contacts).
 3. **Configure the RevenueCat webhook** (section 4, step 7) and send the test event.
 4. **Build the iOS app** with `RevenueCatPublicSDKKey` set, run `pod install` in `ios/App` (`Podfile.lock` already pins RevenueCat 5.97.0), raise the build number above 10, and upload a TestFlight build.
@@ -246,7 +247,9 @@ be built from a branch that includes PR #29.
 4. Choose Monthly or Yearly and tap "Start 7-day free trial". Apple's sheet says "1-week free trial" and "For testing purposes only. You will not be charged". Tap Subscribe, then OK. The app opens.
 5. Settings shows "Free Trial · 7 days left" (with the Settings redesign).
 6. To move time on: in Xcode open `NovaraPro.storekit`, then Editor → Time Rate, and pick a fast rate (for example 1 second = 1 day). The trial ends and turns into the paid plan ("Pro · Monthly" or "Pro · Yearly").
-7. To cancel, refund or expire: in Xcode, Debug → StoreKit → Manage Transactions. Select the subscription and use the buttons there. Switch back to the app (or relaunch it): once the subscription has ended, the subscription screen comes back and no second free trial is offered.
+7. To cancel, refund or expire: in Xcode, Debug → StoreKit → Manage Transactions. Select the subscription and use the buttons there. Switch back to the app (or relaunch it).
+   - Cancelling (turning auto-renew off) keeps access until the end date: Settings shows "Cancelled · access until Nov 3", and the subscription screen says "You've cancelled. You keep Novara Pro until November 3, then the subscription ends. You won't be charged." Turning auto-renew back on restores the usual wording.
+   - Once the subscription has ended, the subscription screen comes back and no second free trial is offered.
 8. To start again from scratch, delete all transactions in that same window.
 
 Verified on 2026-10-27 on an iOS 27 simulator (iPhone 17e) with a test page:
