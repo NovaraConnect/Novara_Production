@@ -15,10 +15,9 @@ import { useAuth } from "@clerk/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useFeatures } from "@/hooks/useFeatures";
+import { usePaywallAvailable } from "@/hooks/usePaywallAvailable";
 import { useProStatus, PRO_STATUS_KEY } from "@/hooks/useProStatus";
 import {
-  canUseNativePurchases,
   getNativeProProducts,
   identifyNativePurchases,
   manageNativeSubscriptions,
@@ -31,7 +30,7 @@ import {
   ANNUAL_SAVING_LABEL,
   AUTO_RENEW_NOTICE,
   PRO_PERIOD_LABEL,
-  isPaywallVisible,
+  TERMS_OF_USE_URL,
   waitForPro,
 } from "@/lib/purchases";
 import { fetchProStatus } from "@/lib/api";
@@ -42,17 +41,8 @@ export default function Paywall() {
   const [, setLocation] = useLocation();
   const { getToken, userId } = useAuth();
   const queryClient = useQueryClient();
-  const features = useFeatures();
   const { isPro } = useProStatus();
-
-  const visible = isPaywallVisible({
-    nativePurchases: canUseNativePurchases(),
-    applePaywallFlag: features.applePaywall,
-    // University-entitled users never see payment offers. Entitlement
-    // detection for university access arrives with that branch; until then
-    // no user is university-entitled on this branch.
-    universityEntitled: false,
-  });
+  const visible = usePaywallAvailable();
 
   const [products, setProducts] = useState<NativeProProduct[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -122,9 +112,13 @@ export default function Paywall() {
   };
 
   const restore = async () => {
+    if (!userId) return;
     setBusy("restore");
     setMessage(null);
     try {
+      // Restore under the signed-in account. Restoring while anonymous would
+      // leave the subscription on an identity the server ignores.
+      await identifyNativePurchases(userId);
       const result = await restoreNativePurchases();
       if (result.outcome === "restored") {
         const confirmed = await refreshStatus();
@@ -164,7 +158,7 @@ export default function Paywall() {
           <p className="text-base font-semibold text-foreground">Keep every contact, without a limit.</p>
           <ul className="space-y-2 text-sm text-foreground">
             <li className="flex gap-2"><Check className="w-4 h-4 mt-0.5 text-cooling" /> Unlimited contacts</li>
-            <li className="flex gap-2"><Check className="w-4 h-4 mt-0.5 text-cooling" /> Every Novara Pro feature</li>
+            <li className="flex gap-2"><Check className="w-4 h-4 mt-0.5 text-cooling" /> Import as many as you like from LinkedIn, business cards, QR codes and your iPhone contacts</li>
           </ul>
           <p className="text-xs text-muted-foreground">Free includes up to 6 contacts.</p>
         </section>
@@ -239,6 +233,8 @@ export default function Paywall() {
         </section>
 
         <p className="text-xs text-muted-foreground text-center">
+          <a className="underline" href={TERMS_OF_USE_URL} target="_blank" rel="noopener noreferrer">Terms of Use</a>
+          {" · "}
           <a className="underline" href="/privacy">Privacy Policy</a>
         </p>
       </main>

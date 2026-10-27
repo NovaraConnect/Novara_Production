@@ -14,6 +14,7 @@ import ContactDetail from "@/pages/ContactDetail";
 import EditContact from "@/pages/EditContact";
 import Settings from "@/pages/Settings";
 import Paywall from "@/pages/Paywall";
+import { SUBSCRIPTION_ROUTE } from "@/lib/purchases";
 import { useNativePurchaseIdentity } from "@/hooks/useNativePurchaseIdentity";
 import InstallGuide from "@/pages/InstallGuide";
 import InstallLanding from "@/pages/InstallLanding";
@@ -253,7 +254,7 @@ function Router() {
       <Route path="/contacts/:id/edit" component={() => <ProtectedRoute component={EditContact} />} />
       <Route path="/contacts/:id" component={() => <ProtectedRoute component={ContactDetail} />} />
       <Route path="/settings" component={() => <ProtectedRoute component={Settings} />} />
-      <Route path="/pro" component={() => <ProtectedRoute component={Paywall} />} />
+      <Route path={SUBSCRIPTION_ROUTE} component={() => <ProtectedRoute component={Paywall} />} />
       <Route path="/install" component={InstallGuide} />
       {/* Public and unauthenticated on purpose: this is the URL given to
           Apple in App Store Connect, and a reviewer has to be able to read

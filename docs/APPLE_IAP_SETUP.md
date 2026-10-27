@@ -1,6 +1,8 @@
 # Apple In-App Purchase for Novara Pro: setup and release
 
-Status: **implemented on `feat/apple-iap-individual`, not merged, not deployed.**
+Status: **implemented in two pull requests, not merged, not deployed:** the API in
+`feat/apple-iap-api` (PR #28) and the web paywall plus native bridge in
+`feat/apple-iap-web-native` (PR #29).
 The paywall is off by default behind `IAP_PAYWALL_ENABLED`. Nothing here is live
 until the manual steps in sections 3 and 4 are done and the release order in
 section 6 is followed.
@@ -23,7 +25,7 @@ how-to.
 | Flag | `GET /api/features` → `applePaywall` | Off unless `IAP_PAYWALL_ENABLED` is set |
 | Native module | `ios/App/App/Native/NovaraPurchases.swift` | RevenueCat SDK calls. Reports what Apple says; never decides Pro |
 | Bridge | `NovaraBridgeScript.swift` (version **3**), `NovaraRootViewController.swift` | `getProducts`, `identifyPurchases`, `purchase`, `restorePurchases`, `manageSubscriptions` |
-| Web | `src/lib/nativeBridge.ts`, `src/lib/purchases.ts`, `src/pages/Paywall.tsx`, `src/hooks/useProStatus.ts`, `src/hooks/useNativePurchaseIdentity.ts` | Native-only paywall at `/pro`; identity link; limit wall on Add Contact |
+| Web | `src/lib/nativeBridge.ts`, `src/lib/purchases.ts`, `src/pages/Paywall.tsx`, `src/hooks/useProStatus.ts`, `src/hooks/useNativePurchaseIdentity.ts` | Native-only paywall at `/pro` (`SUBSCRIPTION_ROUTE`); identity link; limit wall on Add Contact. `usePaywallAvailable()` says whether `/pro` can open; anything linking to it (Settings, Add Contact) checks it first |
 
 **Trust model.** A purchase result from StoreKit is never proof of Pro. After a
 purchase the app polls `GET /api/entitlements/me` until the webhook has written
@@ -75,7 +77,7 @@ Do these yourself. Nothing in this repository creates them.
 5. **Review metadata for each product:** a review screenshot of the paywall (taken from a TestFlight build), and a review note explaining that Novara Pro unlocks unlimited contacts.
 6. **Ranking within the group:** monthly and annual are at the same level (switching between them is up/down-grade). Confirm the ordering you want.
 7. **Sandbox testers:** Users and Access → Sandbox → add at least one tester with a unique email that is not a real Apple Account. Use it on the TestFlight device to test purchases without charge.
-8. **Subscription disclosures and App Review:** before you submit, check the current App Review Guidelines (section 3.1.2) and Schedule 2 of the Apple Developer Program License Agreement. The paywall copy in `src/lib/purchases.ts` (`AUTO_RENEW_NOTICE`) uses Apple's standard wording and has **not been verified against the live text** here. Add a Terms of Use link in App Store Connect and in the app. Apple's standard EULA is at `https://www.apple.com/legal/internet-services/itunes/dev/stdeula/`, unless you publish your own terms.
+8. **Subscription disclosures and App Review:** before you submit, check the current App Review Guidelines (section 3.1.2) and Schedule 2 of the Apple Developer Program License Agreement. The paywall copy in `src/lib/purchases.ts` (`AUTO_RENEW_NOTICE`) uses Apple's standard wording and has **not been verified against the live text** here. The paywall links Terms of Use to Apple's standard EULA (`TERMS_OF_USE_URL` in `src/lib/purchases.ts`, `https://www.apple.com/legal/internet-services/itunes/dev/stdeula/`) and the Privacy Policy to `/privacy`. Put the same Terms of Use link in App Store Connect (App Information → License Agreement, or in the description). If you publish your own terms, change both.
 9. **Submit the products** with the next app version so they are reviewed together with it.
 
 ---
@@ -120,7 +122,7 @@ creation, so the migration must exist before the API that uses it is deployed.
 1. **Apply migration `0004_apple_iap_entitlements.sql` to production** (hand-applied, in a transaction). The down file is `0004_apple_iap_entitlements.down.sql`. Verified on an empty database: applies, re-applies, and reverses cleanly.
 2. **Deploy the API** with `REVENUECAT_WEBHOOK_AUTH` set and `IAP_PAYWALL_ENABLED` **unset**. Contact limits now read the entitlement table. Free users are unchanged.
 3. **Configure the RevenueCat webhook** (section 4, step 7) and send the test event.
-4. **Build the iOS app** with `RevenueCatPublicSDKKey` set, run `pod install` in `ios/App` (this updates `Podfile.lock`; the lock file in this branch does not yet include RevenueCat), and upload a TestFlight build.
+4. **Build the iOS app** with `RevenueCatPublicSDKKey` set, run `pod install` in `ios/App` (`Podfile.lock` already pins RevenueCat 5.97.0), raise the build number above 10, and upload a TestFlight build.
 5. **Sandbox test** on a device with a sandbox tester (section 8).
 6. **Turn on the paywall:** set `IAP_PAYWALL_ENABLED=true` on the API. The web build reads it from `/api/features` and shows the paywall only in the native shell.
 7. Submit for App Review with the paywall visible.
@@ -164,19 +166,24 @@ On a TestFlight build with a sandbox tester signed in to the device's App Store:
 
 ## 9. Known gaps and risks
 
-- **`TRANSFER` events are recorded but not acted on.** If a subscription is transferred between Clerk users, access is not moved. Such transfers should not occur for Novara, since purchases are tied to the signed-in user.
+- **`TRANSFER` moves access.** If someone restores purchases while signed in to a different Novara account with the same Apple Account, RevenueCat transfers the subscription (its default restore behaviour) and the webhook moves Pro to the new Novara account and switches the old one off. Keep RevenueCat's restore behaviour on "Transfer to new App User ID".
+- **Refunds end access immediately.** RevenueCat reports an Apple refund as `CANCELLATION` with `cancel_reason = CUSTOMER_SUPPORT`; the webhook switches Pro off at once.
+- **Deploying the API before the migration** no longer breaks contact creation: the server logs an error and treats everyone as Free until `0004` is applied.
 - **Account deletion does not cancel Apple's subscription.** Only the user can cancel in their Apple settings. Deleting the account removes Novara's data, and the paywall copy should tell users to cancel first. This should be added to the account-deletion flow text before launch.
 - **Ask to Buy and pending purchases** report "pending". Pro starts when Apple approves and the webhook arrives.
-- **Compile and runtime verification.** The Swift code and the new Podfile line were written without an Xcode toolchain available here. The RevenueCat calls (`Purchases.configure(withAPIKey:)`, `getOfferings`, `logIn`, `purchase(package:)`, `restorePurchases`) follow the SDK 5.x API and must be compiled and exercised on a Mac before TestFlight.
+- **Runtime verification.** The app compiles with RevenueCat 5.97.0 on Xcode 27 (simulator build). A launch on a device or simulator and a real purchase still has to be exercised on a TestFlight build with a sandbox tester before release.
+- **Shared native files with PR #32.** `AppDelegate.swift`, `SceneDelegate.swift`, the Info.plist scene manifest and the version/build/team lines in `project.pbxproj` are byte-identical to PR #32 (`feat/add-contact-import-layout`), so the two merge cleanly in either order. Links and Universal Links are forwarded to Capacitor from `SceneDelegate`, not `AppDelegate`.
 - **Apple guideline text.** The paywall copy and the disclosures in section 3, step 8 must be checked against the live guidelines before submission.
-- **Feature list.** "Every Novara Pro feature" is a placeholder until the Pro feature list is written down (`BILLING_AND_UNIVERSITY_ACCESS_PLAN.md`, section 4A.5).
+- **Feature list.** The paywall lists only what Pro does today: unlimited contacts and unlimited imports. Add to it when the Pro feature list is written down (`BILLING_AND_UNIVERSITY_ACCESS_PLAN.md`, section 4A.5).
+- **Account deletion text.** Settings' delete-account dialog does not yet tell subscribers to cancel in their Apple Account first. Add that line when Settings is redesigned.
 - **Savings label.** "Save 16%" is fixed text derived from the planned prices. Update it if prices change.
 
 ---
 
 ## 10. Verification performed on this branch
 
-- API: 205 tests pass against a real Postgres 16 (a dedicated `novara_iap_test` database), including webhook authentication, idempotency, out-of-order events, anonymous and foreign-entitlement rejection, expiry, Pro import, and account deletion.
+- API: 211 tests pass against a real Postgres 16 (a dedicated `novara_iap_test` database), including webhook authentication, idempotency, out-of-order events, anonymous and foreign-entitlement rejection, expiry, refunds, transfers, Pro import, account deletion, and a missing `entitlements` table.
 - Migration: applied, re-applied, and reversed on an empty database.
-- Web: `npm run typecheck` clean; 201 tests pass (14 of them new: the paywall rules, the post-purchase wait, and the purchase bridge gating); the production web build succeeds.
-- Not yet verified: the native build (Xcode and `pod install`), a live RevenueCat sandbox purchase, and a live webhook delivery.
+- Web: `npm run typecheck` clean; 202 tests pass (15 of them new: the subscription route, the paywall rules, the post-purchase wait, and the purchase bridge gating); the production web build succeeds.
+- Native: `pod install` and an Xcode 27 simulator build succeed.
+- Not yet verified: a live RevenueCat sandbox purchase and a live webhook delivery.

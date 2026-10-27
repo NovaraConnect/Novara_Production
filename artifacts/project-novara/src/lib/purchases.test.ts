@@ -1,10 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { contactLimitApplies, isPaywallVisible, waitForPro } from "./purchases";
+import { contactLimitApplies, isPaywallVisible, SUBSCRIPTION_ROUTE, waitForPro } from "./purchases";
 import type { ProStatus } from "./api";
 
 const FREE: ProStatus = { pro: false, source: null, expiresAt: null };
 const PRO: ProStatus = { pro: true, source: "apple_iap", expiresAt: "2030-01-01T00:00:00.000Z" };
 const noSleep = async () => undefined;
+
+describe("SUBSCRIPTION_ROUTE", () => {
+  // Settings' "Manage Subscription" row and Add Contact link here. Renaming
+  // the route would break them, so a change has to be deliberate.
+  it("stays /pro", () => {
+    expect(SUBSCRIPTION_ROUTE).toBe("/pro");
+  });
+});
 
 describe("isPaywallVisible", () => {
   const on = { nativePurchases: true, applePaywallFlag: true, universityEntitled: false };

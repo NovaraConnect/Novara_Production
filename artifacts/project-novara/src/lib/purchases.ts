@@ -4,6 +4,15 @@
 // ============================================================================
 import type { ProStatus } from "./api";
 
+/** The Novara Pro subscription screen (pages/Paywall.tsx). Settings and Add
+ *  Contact link here. Keep this path stable: other screens depend on it. */
+export const SUBSCRIPTION_ROUTE = "/pro";
+
+/** Apple's standard licensed application end user agreement. Linked from the
+ *  paywall as the Terms of Use, which Apple requires for subscriptions. Replace
+ *  it if Novara publishes its own terms (and update App Store Connect too). */
+export const TERMS_OF_USE_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
+
 /** Pro period and display text. The price itself always comes from Apple
  *  (ProductPrice.priceString); nothing here is a price. */
 export const PRO_PERIOD_LABEL = { monthly: "per month", annual: "per year" } as const;

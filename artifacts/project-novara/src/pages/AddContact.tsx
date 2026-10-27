@@ -18,6 +18,9 @@ import { suggestPriority, suggestInitialFollowUp, deriveSuggestedCadence, MANUAL
 import { BusinessCardScanner, type ScannedContact } from "@/components/BusinessCardScanner";
 import { LinkedInScreenshotImport } from "@/components/LinkedInScreenshotImport";
 import type { LinkedInDraft } from "@/lib/linkedinParse";
+import { useProStatus } from "@/hooks/useProStatus";
+import { usePaywallAvailable } from "@/hooks/usePaywallAvailable";
+import { contactLimitApplies, SUBSCRIPTION_ROUTE } from "@/lib/purchases";
 import {
   planLinkedInImport,
   LINKEDIN_IMPORT_FIELDS,
@@ -27,9 +30,6 @@ import {
 import { QRScanner, type ScannedQRContact } from "@/components/QRScanner";
 import { NativeContactImport } from "@/components/NativeContactImport";
 import { useFeatures } from "@/hooks/useFeatures";
-import { useProStatus } from "@/hooks/useProStatus";
-import { canUseNativePurchases } from "@/lib/nativeBridge";
-import { contactLimitApplies, isPaywallVisible } from "@/lib/purchases";
 import { localDateString } from "@/lib/utils";
 
 const INITIAL_OPTIONS: Contact["initialFollowUpDays"][] = [1, 2, 3];
@@ -179,13 +179,7 @@ export default function AddContact() {
 
 
   // Deployment-level switch for showing the LinkedIn screenshot importer.
-  const { linkedinScreenshotImport, applePaywall } = useFeatures();
-  const proStatus = useProStatus();
-  const showPaywallLink = isPaywallVisible({
-    nativePurchases: canUseNativePurchases(),
-    applePaywallFlag: applePaywall,
-    universityEntitled: false,
-  }) && !proStatus.isPro;
+  const { linkedinScreenshotImport } = useFeatures();
 
   // Tracks what the last LinkedIn import wrote, so a second import can withdraw
   // it instead of leaving the previous profile's values behind.
@@ -223,6 +217,9 @@ export default function AddContact() {
 
   const removeInterest = (tag: string) => setInterests(prev => prev.filter(t => t !== tag));
 
+  // Pro removes the on-screen limit; the server enforces the real one.
+  const proStatus = useProStatus();
+  const showPaywallLink = usePaywallAvailable() && !proStatus.isPro;
   const atLimit = contactLimitApplies(proStatus) && contacts.length >= FREE_TIER_LIMIT;
 
   const onSubmit = async (values: FormValues) => {
@@ -275,7 +272,7 @@ export default function AddContact() {
               </p>
             </div>
             {showPaywallLink && (
-              <Button className="rounded-xl" onClick={() => setLocation("/pro")}>
+              <Button className="rounded-xl" onClick={() => setLocation(SUBSCRIPTION_ROUTE)}>
                 See Novara Pro
               </Button>
             )}
