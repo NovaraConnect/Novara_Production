@@ -88,12 +88,23 @@ describe("subscription plan and label", () => {
     expect(subscriptionPlanFor({ ...FREE, state: "expired", billingPeriod: "monthly" })).toBe("expired");
   });
 
-  it("counts trial days left, rounding up", () => {
-    const now = Date.parse("2026-11-01T12:00:00Z");
-    expect(daysLeft("2026-11-06T12:00:00Z", now)).toBe(5);
-    expect(daysLeft("2026-11-01T13:00:00Z", now)).toBe(1);
-    expect(daysLeft("2026-10-31T12:00:00Z", now)).toBe(0);
+  it("counts trial days left by calendar day in the user's time zone", () => {
+    // Local dates, so the test holds in any time zone.
+    const now = new Date(2026, 10, 1, 12, 0).getTime();
+    expect(daysLeft(new Date(2026, 10, 6, 12, 0).toISOString(), now)).toBe(5);
+    expect(daysLeft(new Date(2026, 10, 2, 9, 0).toISOString(), now)).toBe(1);
+    expect(daysLeft(new Date(2026, 10, 1, 18, 0).toISOString(), now)).toBe(0);
+    expect(daysLeft(new Date(2026, 9, 31, 12, 0).toISOString(), now)).toBe(0);
     expect(daysLeft(null, now)).toBeNull();
+  });
+
+  it("reads 7 for a 7-day trial even across a clock change", () => {
+    // Started 27 Oct 14:58, ends 3 Nov 14:58: 7 days and 1 hour in New York,
+    // where the clocks go back on 1 Nov. Used to show "8 days left".
+    const start = new Date(2026, 9, 27, 14, 58).getTime();
+    const end = new Date(2026, 10, 3, 14, 58).toISOString();
+    expect(daysLeft(end, start)).toBe(7);
+    expect(daysLeft(end, start + 60_000)).toBe(7);
   });
 
   it("labels each plan", () => {
