@@ -183,7 +183,7 @@ const SCREENS = [
   {
     src: shot("add-linkedin"),
     title: "Import from a LinkedIn screenshot",
-    caption: "Reads only the image you give it. Novara never connects to your LinkedIn account.",
+    caption: "Reads only the image you give it. Novara never connects to your LinkedIn account, so your data stays private.",
   },
 ];
 
