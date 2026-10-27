@@ -13,7 +13,7 @@
 //   • pricing and trial         docs/APPLE_IAP_SETUP.md, docs/BILLING_AND_UNIVERSITY_ACCESS_PLAN.md §4A
 //   • universities              same plan, §6: described only as a direction being explored
 //   • "nudges, never overrides" docs/Founder-Vision.md
-//   • screenshots               public/investors/, iPhone app with fictional demo contacts
+//   • screenshots               public/investors/, iOS app with fictional demo contacts
 //
 // Anything that could not be verified is a <Placeholder>. Do not replace one
 // with a number (users, revenue, market size) unless it is real.
@@ -337,13 +337,14 @@ export default function InvestorPage() {
               </div>
               <dl className="mt-12 grid max-w-lg grid-cols-3 gap-4 border-t border-white/10 pt-6 text-sm">
                 {[
-                  ["Platform", "iPhone app"],
+                  ["Platform", "iOS app", "Play Store coming soon"],
                   ["Model", "Subscription"],
                   ["Founded by", "Cloé Carmery, UF alum"],
-                ].map(([k, v]) => (
+                ].map(([k, v, note]) => (
                   <div key={k}>
                     <dt className="text-[#7D8BA3]">{k}</dt>
                     <dd className="mt-1 font-semibold text-white">{v}</dd>
+                    {note && <dd className="mt-0.5 text-xs text-[#8FA6FF]">{note}</dd>}
                   </div>
                 ))}
               </dl>
@@ -394,7 +395,7 @@ export default function InvestorPage() {
             <SectionHeading
               eyebrow="The product"
               title="Who needs you today, not everyone you’ve ever met."
-              intro="Novara opens on the handful of people worth reaching out to now. These are real screens from the iPhone app."
+              intro="Novara opens on the handful of people worth reaching out to now. These are real screens from the iOS app."
             />
           </div>
           <div className="mx-auto mt-14 max-w-6xl">
@@ -566,7 +567,7 @@ export default function InvestorPage() {
             </div>
             <div className="space-y-4 text-lg leading-relaxed text-[#4B5363]">
               <p>
-                Cloé founded and built Novara Connect, from the iPhone app to the
+                Cloé founded and built Novara Connect, from the iOS app to the
                 subscription business behind it.
               </p>
               <p>
@@ -580,7 +581,7 @@ export default function InvestorPage() {
               </p>
               <blockquote className="border-l-4 py-1 pl-5" style={{ borderColor: BRAND }}>
                 <p className="font-serif text-xl italic leading-snug text-[#08111F] sm:text-2xl">
-                  “I built Novara Connect to close that gap, from the iPhone app to the
+                  “I built Novara Connect to close that gap, from the iOS app to the
                   subscription business behind it.”
                 </p>
                 <footer className="mt-2 text-sm font-medium not-italic text-[#5B6272]">
