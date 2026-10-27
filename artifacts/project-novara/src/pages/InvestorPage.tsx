@@ -181,6 +181,11 @@ const SCREENS = [
     caption: "Contacts who match your career profile rise. One tap to mark contacted, schedule or remind.",
   },
   {
+    src: shot("conversation-starters"),
+    title: "Conversation starters",
+    caption: "Recent news about a contact’s company, refreshed daily, so every check-in has something to say.",
+  },
+  {
     src: shot("add-card"),
     title: "Scan a business card",
     caption: "Novara finds the card’s edges and fills in the details.",
@@ -399,9 +404,9 @@ export default function InvestorPage() {
             />
           </div>
           <div className="mx-auto mt-14 max-w-6xl">
-            <ul className="flex snap-x snap-mandatory gap-6 overflow-x-auto px-4 pb-4 sm:px-6 lg:grid lg:grid-cols-6 lg:gap-4 lg:overflow-visible lg:pb-0">
+            <ul className="flex snap-x snap-mandatory gap-6 overflow-x-auto px-4 pb-4 sm:px-6 lg:flex-wrap lg:justify-center lg:gap-x-8 lg:gap-y-14 lg:overflow-visible lg:pb-0">
               {SCREENS.map((s) => (
-                <li key={s.title} className="w-[62vw] max-w-[250px] shrink-0 snap-center lg:w-auto lg:max-w-none">
+                <li key={s.title} className="w-[62vw] max-w-[250px] shrink-0 snap-center lg:w-[230px]">
                   <PhoneFrame src={s.src} alt={s.title} />
                   <p className="mt-5 font-semibold leading-snug">{s.title}</p>
                   <p className="mt-1.5 text-sm leading-relaxed text-[#5B6272]">{s.caption}</p>
