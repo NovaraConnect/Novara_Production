@@ -45,7 +45,7 @@ const SANS = "'Plus Jakarta Sans', 'Inter', system-ui, sans-serif";
 const INVESTOR_EMAIL: string | null = null;
 
 /** The founder's LinkedIn profile. Until it is set, a placeholder shows. */
-const FOUNDER_LINKEDIN_URL: string | null = null;
+const FOUNDER_LINKEDIN_URL: string | null = "https://www.linkedin.com/in/cloecarmery/";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 const shot = (name: string) => `${basePath}/investors/${name}.jpg`;
@@ -334,7 +334,7 @@ export default function InvestorPage() {
                 {[
                   ["Platform", "iPhone app"],
                   ["Model", "Subscription"],
-                  ["Founded by", "UF alum"],
+                  ["Founded by", "Cloé Carmery, UF alum"],
                 ].map(([k, v]) => (
                   <div key={k}>
                     <dt className="text-[#7D8BA3]">{k}</dt>
@@ -555,6 +555,7 @@ export default function InvestorPage() {
                 <div>
                   <p className="font-serif text-3xl font-bold">Cloé Carmery</p>
                   <p className="mt-1 text-[#5B6272]">Founder · University of Florida alum</p>
+                  <p className="mt-0.5 text-sm text-[#7A8191]">Formerly L’Oréal · Current NextEra</p>
                 </div>
               </div>
             </div>
@@ -564,7 +565,11 @@ export default function InvestorPage() {
                 subscription business behind it.
               </p>
               <p>
-                <Placeholder>Founder bio: background, what you studied at UF, and the moment that made you build Novara</Placeholder>
+                French, a University of Florida alum, and a career that has run from L’Oréal
+                to NextEra: Cloé has spent years meeting people worth knowing. Along the way
+                came a simple realization. Networking is the easy part. The gap is in what
+                comes after: actually maintaining the network you’ve built. Novara exists to
+                close that gap.
               </p>
               <p className="text-base">
                 {FOUNDER_LINKEDIN_URL ? (
