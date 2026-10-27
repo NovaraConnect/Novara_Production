@@ -591,7 +591,7 @@ export default function InvestorPage() {
                     className="inline-flex items-center gap-1.5 font-semibold"
                     style={{ color: BRAND }}
                   >
-                    Cloé Carmery LinkedIn <ArrowRight className="h-4 w-4" />
+                    Cloé Carmery on LinkedIn <ArrowRight className="h-4 w-4" />
                   </a>
                 ) : (
                   <Placeholder>LinkedIn URL</Placeholder>
@@ -618,8 +618,8 @@ export default function InvestorPage() {
               If you invest in tools for the next generation of professionals, Cloé would
               love to show you Novara and hear what you think.
             </p>
-            <p className="mx-auto mt-4 max-w-xl text-sm text-[#C4CEDD]">
-              <Placeholder>Optional: what you’re raising and what it’s for</Placeholder>
+            <p className="mx-auto mt-4 max-w-xl text-lg font-semibold leading-relaxed text-white">
+              Novara is raising to scale and make students’ lives easier.
             </p>
             <div className="mt-10 flex flex-col items-center gap-3">
               {INVESTOR_EMAIL ? (
