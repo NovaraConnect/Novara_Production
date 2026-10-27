@@ -14,27 +14,19 @@
 // value to TRUE, which is what stops it being forced on people mid-session
 // before their real settings arrive. Do not change either default.
 //
-// NO NATIVE BUILD IS NEEDED. Clips are web assets under /onboarding/, not in
-// the binary, and Capacitor already compiles in the two WKWebView settings
-// inline muted video needs (allowsInlineMediaPlayback,
-// mediaTypesRequiringUserActionForPlayback). Build 8 plays this as shipped.
+// NO NATIVE BUILD IS NEEDED. The pictures are React components
+// (OnboardingScreens.tsx), drawn with the app's own tokens and components, so
+// they follow the current design and both themes without re-recording
+// anything. They replaced screen recordings of the old navy UI.
 //
 // WHY IT IS BUILT THE WAY IT IS
 // -----------------------------
-// The first version remounted a single <video> per step via `key={step}`. That
-// is what made it feel like five separate things rather than one sequence:
-// every Continue destroyed the element, started a fresh network fetch, and
-// showed an empty box until the first frame decoded. Hard cut, visible gap.
-//
-// So now:
-//   • ALL five <video> elements are mounted once and never unmounted. The
-//     whole payload is ~432 KB, so preloading every clip up front costs one
-//     cheap burst at open and makes every later step instant.
-//   • Steps CROSSFADE by opacity. The outgoing frame is still on screen while
-//     the incoming one appears, so there is never an empty container.
-//   • Inactive clips are paused rather than torn down, so each holds a decoded
-//     frame — its own poster. Nothing ever renders blank.
-//   • The frame is fixed: the media box, the copy block and the button all
+//   • ALL screens are mounted once and never unmounted, and steps CROSSFADE
+//     by opacity, so the outgoing screen is still there while the incoming
+//     one appears. There is never an empty frame.
+//   • Each screen is laid out at phone size and scaled to fit the frame, so
+//     it reads as a device-sized preview rather than a squashed page.
+//   • The frame is fixed: the picture, the copy block and the button all
 //     occupy the same space on every step, so only the CONTENT changes.
 //     The copy block has a min-height so a longer description cannot push the
 //     button around.
@@ -43,129 +35,89 @@
 //     stacking context scoped it, and the nav showed through the overlay.
 //
 // DEGRADES, NEVER TRAPS
-//   • a clip that fails falls back to that step's icon, per step
-//   • prefers-reduced-motion: no autoplay, no crossfade, icons instead
+//   • prefers-reduced-motion: no crossfade, no animated spotlight
 //   • Skip on every step including the last; Escape also closes
-//   • muted, so it can never make noise in a meeting
 //   • no step asks for Contacts, camera or notification permission
 // ============================================================================
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { ArrowRight, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { canPickNativeContact } from "@/lib/nativeBridge";
 import {
-  Activity, UserPlus, Sparkles, Newspaper, BellRing, Send, CalendarClock, Target,
-  ArrowRight, ChevronRight, type LucideIcon,
-} from "lucide-react";
+  MOCK_HEIGHT, MOCK_WIDTH, type MockScreen,
+  HealthScreen, GoalsScreen, FollowUpsScreen, ContactNowScreen, StartersScreen,
+  AddScreen, RememberScreen, NotifyScreen,
+} from "@/components/OnboardingScreens";
 
 interface Step {
   title: string;
   description: string;
-  /** Served from the web app, not the binary. Optional: no clip is fine. */
-  video?: string;
-  /** First frame as a small JPEG. Shown by the browser the instant the box
-   *  exists, so a step is NEVER blank while its clip arrives. ~20 KB each. */
-  poster?: string;
-  /** Shown when the clip fails, or when the user prefers reduced motion. */
-  icon: LucideIcon;
-  tone: string;
-  /** The one thing in the clip the copy is about, as a percentage rectangle
-   *  of the video frame. Everything outside it dims. Omit for no spotlight. */
-  focus?: { x: number; y: number; w: number; h: number };
+  /** The screen the step is about. It spotlights the one thing the copy
+   *  names, and everything else dims. */
+  screen: MockScreen;
 }
 
 // The product loop, in order: you meet someone, Novara remembers them,
 // understands the relationship, tells you when it needs attention, gives you
 // something to say, lets you act on it, and reminds you again later. Each beat
-// carries ONE idea, and each names the thing its clip is pointing at.
-const STEPS: Step[] = [
-  {
-    title: "Know where you stand",
-    description:
-      "Novara keeps the state of every relationship for you — warm, cooling, cold — so you never have to remember it yourself.",
-    video: "/onboarding/1-network.mp4",
-    poster: "/onboarding/1-network.jpg",
-    icon: Activity,
-    tone: "bg-primary/15 text-primary",
-    focus: { x: 4, y: 10, w: 92, h: 22 },
-  },
-  {
-    // Named by content, not position: the ARRAY is the source of order, and
-    // the number-prefixed names of the other clips are historical.
-    title: "Built around your goals",
-    description:
-      "Tell Novara what you're working towards. Contacts whose industry, role or interests match it rise in priority \u2014 the rest quietly settle.",
-    video: "/onboarding/goals.mp4",
-    poster: "/onboarding/goals.jpg",
-    icon: Target,
-    tone: "bg-priority-high-soft text-priority-high",
-    // The whole Career Profile card: the statement you write, the goals, and
-    // the line that explains the matching. That explanation IS the beat.
-    focus: { x: 2, y: 31, w: 96, h: 56 },
-  },
-  {
-    title: "See who needs you today",
-    description:
-      "Instead of wondering who you have not spoken to lately, Novara puts them at the top and tells you how overdue they are.",
-    video: "/onboarding/2-attention.mp4",
-    poster: "/onboarding/2-attention.jpg",
-    icon: Sparkles,
-    tone: "bg-cooling-soft text-cooling",
-    focus: { x: 4, y: 26, w: 92, h: 34 },
-  },
-  {
-    title: "Reach out in one tap",
-    description:
-      "Contact now opens the way you actually talk to them — text, email or LinkedIn — without hunting for the details.",
-    video: "/onboarding/3-contactnow.mp4",
-    poster: "/onboarding/3-contactnow.jpg",
-    icon: Send,
-    tone: "bg-warm-soft text-warm",
-    focus: { x: 49, y: 8, w: 48, h: 24 },
-  },
-  {
-    title: "Never open with \u201cjust checking in\u201d",
-    description:
-      "Novara pulls recent news about their company, so you always have a real reason to get back in touch.",
-    video: "/onboarding/4-starters.mp4",
-    poster: "/onboarding/4-starters.jpg",
-    icon: Newspaper,
-    tone: "bg-priority-medium-soft text-priority-medium",
-    focus: { x: 4, y: 31, w: 92, h: 33 },
-  },
-  {
-    title: "Add someone the moment you meet",
-    description:
-      "Scan a business card, import from your iPhone contacts, use a LinkedIn screenshot or a QR code \u2014 or just type them in. Seconds, right there at the event.",
-    video: "/onboarding/5-add.mp4",
-    poster: "/onboarding/5-add.jpg",
-    icon: UserPlus,
-    tone: "bg-priority-high-soft text-priority-high",
-    // Every route in, down to and including the "OR ENTER MANUALLY" divider:
-    // typing someone in by hand is a first-class option, not a fallback, and
-    // leaving it outside the ring implied otherwise.
-    focus: { x: 2, y: 8, w: 96, h: 81 },
-  },
-  {
-    title: "Then let Novara remember",
-    description:
-      "Every contact gets their own rhythm, and Novara sets the next date the moment you reach out.",
-    video: "/onboarding/6-remember.mp4",
-    poster: "/onboarding/6-remember.jpg",
-    icon: CalendarClock,
-    tone: "bg-primary/15 text-primary",
-    focus: { x: 4, y: 28, w: 92, h: 32 },
-  },
-  {
-    title: "It tells you when it's time",
-    description:
-      "A reminder arrives on the day, naming who it is and why now. Tap it and you land straight on them.",
-    video: "/onboarding/7-notify.mp4",
-    poster: "/onboarding/7-notify.jpg",
-    icon: BellRing,
-    tone: "bg-warm-soft text-warm",
-    // The banner itself, which sits at the very top of the frame.
-    focus: { x: 3, y: 1, w: 94, h: 10 },
-  },
-];
+// carries ONE idea, and each names the thing its screen is pointing at.
+//
+// Built at render rather than at import: whether the iPhone Contacts import
+// exists is only known once the native bridge is up.
+function buildSteps(): Step[] {
+  return [
+    {
+      title: "Know where you stand",
+      description:
+        "See your Network Health score, how it has moved since last month, and who is warm, cooling, cold or dormant.",
+      screen: HealthScreen,
+    },
+    {
+      title: "Built around your goals",
+      description:
+        "Tell Novara what you're working towards, and the contacts who can help you get there rise in priority.",
+      screen: GoalsScreen,
+    },
+    {
+      title: "See who needs you today",
+      description:
+        "Your Dashboard lists who is overdue and who is coming up, most important first, with exactly how long it has been.",
+      screen: FollowUpsScreen,
+    },
+    {
+      title: "Reach out in one tap",
+      description:
+        "Contact now opens the way you actually talk to them \u2014 text, email or LinkedIn \u2014 without hunting for the details.",
+      screen: ContactNowScreen,
+    },
+    {
+      title: "No more \u201cjust checking in\u201d",
+      description:
+        "Novara pulls recent news about their company, so you always have a real reason to get back in touch.",
+      screen: StartersScreen,
+    },
+    {
+      title: "Add someone in seconds",
+      description: canPickNativeContact()
+        ? "Type them in, or import from your iPhone contacts \u2014 photo included \u2014 a business card, a LinkedIn screenshot or a QR code."
+        : "Type them in, or scan a business card, a LinkedIn screenshot or a QR code, right there at the event.",
+      screen: AddScreen,
+    },
+    {
+      title: "Then let Novara remember",
+      description:
+        "Each contact gets their own rhythm, and Novara sets the next date when you reach out. It remembers birthdays too.",
+      screen: RememberScreen,
+    },
+    {
+      title: "It tells you when it's time",
+      description:
+        "A reminder arrives on the day \u2014 a follow-up that's due, or a birthday \u2014 and one tap takes you straight to them.",
+      screen: NotifyScreen,
+    },
+  ];
+}
 
 /** Long enough to read as a dissolve, short enough to feel instant. */
 const CROSSFADE_MS = 280;
@@ -184,37 +136,26 @@ interface OnboardingTourProps {
 
 export function OnboardingTour({ onComplete }: OnboardingTourProps) {
   const [step, setStep] = useState(0);
-  const [failed, setFailed] = useState<Record<number, boolean>>({});
+  const steps = useMemo(buildSteps, []);
   const reducedMotion = useMemo(prefersReducedMotion, []);
-  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0);
 
-  const current = STEPS[step];
-  const isLast = step === STEPS.length - 1;
+  const current = steps[step];
+  const isLast = step === steps.length - 1;
 
-  // Play only the step on screen, and rewind it so it always opens on its
-  // first frame rather than wherever it happened to be left. Everything else
-  // pauses, holding a decoded frame so the crossfade never reveals an empty
-  // box. Runs after paint, so tapping Continue is never gated on video work.
-  useEffect(() => {
-    if (reducedMotion) return;
-    videoRefs.current.forEach((el, i) => {
-      if (!el) return;
-      if (i === step) {
-        try {
-          el.currentTime = 0;
-        } catch {
-          // Seeking before metadata arrives throws on some engines; the clip
-          // simply starts wherever it is, which is still a real frame.
-        }
-        el.play().catch(() => {
-          // Autoplay can be refused (Low Power Mode). The first frame stays
-          // on screen, which is a perfectly good still.
-        });
-      } else {
-        el.pause();
-      }
-    });
-  }, [step, reducedMotion]);
+  // The screens are laid out at phone width; shrink them to the frame, which
+  // is sized by the viewport height. Measured before paint so they never
+  // appear at full size first.
+  useLayoutEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    const measure = () => setScale(frame.clientWidth / MOCK_WIDTH);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, []);
 
   const close = useCallback(() => onComplete(), [onComplete]);
 
@@ -240,7 +181,7 @@ export function OnboardingTour({ onComplete }: OnboardingTourProps) {
       <div className="mx-auto flex h-full w-full max-w-md flex-col px-6 pt-safe pb-safe">
         <div className="flex shrink-0 items-center justify-between py-3">
           <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            {step + 1} of {STEPS.length}
+            {step + 1} of {steps.length}
           </span>
           <button
             onClick={close}
@@ -251,76 +192,32 @@ export function OnboardingTour({ onComplete }: OnboardingTourProps) {
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-7">
-          {/* One container for the whole sequence. Width-capped so the clip
-              reads as a device-sized preview rather than a shrunken
-              screenshot, and fixed in place so nothing moves between steps. */}
-          <div // aspect matches the clips exactly (660x1338). It was 9/16, which is
-              // WIDER than the footage, so object-cover silently cropped the top
-              // and bottom off every step — which is why clips appeared to open
-              // mid-sentence.
-              className="relative h-[min(50vh,460px)] aspect-[660/1338] shrink-0 overflow-hidden rounded-[22px] border border-border bg-elevated">
-            {STEPS.map((s, i) => {
+          {/* One container for the whole sequence. Width-capped so the screen
+              reads as a device-sized preview, and fixed in place so nothing
+              moves between steps. */}
+          <div
+            ref={frameRef}
+            className="relative h-[min(50vh,460px)] aspect-[660/1338] shrink-0 overflow-hidden rounded-[22px] border border-border bg-background shadow-[var(--shadow-raised)]"
+            aria-hidden="true"
+          >
+            {steps.map(({ screen: Screen }, i) => {
               const visible = i === step;
-              const useIcon = reducedMotion || !s.video || failed[i];
-              if (useIcon) {
-                const Icon = s.icon;
-                return (
-                  <div
-                    key={i}
-                    className="absolute inset-0 flex items-center justify-center transition-opacity"
-                    style={{
-                      opacity: visible ? 1 : 0,
-                      transitionDuration: `${reducedMotion ? 0 : CROSSFADE_MS}ms`,
-                    }}
-                    aria-hidden={!visible}
-                  >
-                    <div className={`flex h-16 w-16 items-center justify-center rounded-2xl ${s.tone}`}>
-                      <Icon className="h-7 w-7" />
-                    </div>
-                  </div>
-                );
-              }
               return (
-                <video
+                <div
                   key={i}
-                  ref={(el) => {
-                    videoRefs.current[i] = el;
-                  }}
-                  className="absolute inset-0 h-full w-full object-contain transition-opacity"
+                  className="pointer-events-none absolute left-0 top-0 origin-top-left select-none transition-opacity"
                   style={{
+                    width: MOCK_WIDTH,
+                    height: MOCK_HEIGHT,
+                    transform: `scale(${scale})`,
                     opacity: visible ? 1 : 0,
-                    transitionDuration: `${CROSSFADE_MS}ms`,
+                    transitionDuration: `${reducedMotion ? 0 : CROSSFADE_MS}ms`,
                   }}
-                  src={s.video}
-                  poster={s.poster}
-                  muted
-                  playsInline
-                  loop
-                  // Every clip is fetched when onboarding opens, not when its
-                  // step arrives. ~432 KB total buys an instant Continue.
-                  preload="auto"
-                  aria-hidden="true"
-                  onError={() => setFailed((f) => ({ ...f, [i]: true }))}
-                />
+                >
+                  <Screen active={visible} />
+                </div>
               );
             })}
-
-            {/* Directs the eye at the one control the copy is about. Keyed on
-                the step so the ring re-animates each time, and pointer-events
-                are off so it can never intercept a tap. */}
-            {current.focus && !reducedMotion && (
-              <div
-                key={`focus-${step}`}
-                className="ob-focus pointer-events-none absolute rounded-2xl"
-                style={{
-                  left: `${current.focus.x}%`,
-                  top: `${current.focus.y}%`,
-                  width: `${current.focus.w}%`,
-                  height: `${current.focus.h}%`,
-                }}
-                aria-hidden="true"
-              />
-            )}
           </div>
 
           {/* min-height holds the frame steady: a three-line description on
@@ -340,7 +237,7 @@ export function OnboardingTour({ onComplete }: OnboardingTourProps) {
 
         <div className="shrink-0 pb-1 pt-2">
           <div className="mb-5 flex justify-center gap-1.5" aria-hidden="true">
-            {STEPS.map((_, i) => (
+            {steps.map((_, i) => (
               <div
                 key={i}
                 className={`h-1.5 rounded-full transition-all duration-300 ease-out ${
@@ -350,13 +247,14 @@ export function OnboardingTour({ onComplete }: OnboardingTourProps) {
             ))}
           </div>
 
-          <button
+          <Button
+            variant="cta"
             onClick={next}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3.5 text-[15px] font-semibold text-primary-foreground transition-transform duration-150 active:scale-[0.985]"
+            className="h-auto w-full gap-2 rounded-2xl px-4 py-3.5 text-[15px] font-semibold transition-transform duration-150 active:scale-[0.985]"
           >
             {isLast ? "Get started" : "Continue"}
             {isLast ? <ArrowRight className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
