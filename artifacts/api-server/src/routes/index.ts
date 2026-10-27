@@ -11,6 +11,7 @@ import parseCardRouter from "./parseCard";
 import parseLinkedInRouter from "./parseLinkedIn";
 import entitlementsRouter from "./entitlements";
 import revenuecatRouter from "./revenuecat";
+import storekitTestRouter from "./storekitTest";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,7 @@ router.use(parseCardRouter);
 router.use(parseLinkedInRouter);
 router.use(entitlementsRouter);
 router.use(revenuecatRouter);
+// Local development only; answers 404 everywhere else (see the file header).
+router.use(storekitTestRouter);
 
 export default router;

@@ -8,6 +8,7 @@ import { isAiEnrichEnabled } from "../lib/enrich";
 import { isCardAiParseEnabled } from "../lib/cardAiParse";
 import { isLinkedInAiParseEnabled } from "../lib/linkedinAiParse";
 import { isPaywallEnabled, isSubscriptionRequired } from "../lib/entitlements";
+import { isLocalStoreKitTestEnabled } from "./storekitTest";
 
 function flagOn(v: string | undefined): boolean {
   return !!v && ["1", "true", "on", "yes"].includes(v.trim().toLowerCase());
@@ -33,6 +34,9 @@ router.get("/features", (_req: Request, res: Response) => {
     // only ever on together with applePaywall. Turn it on once the app version
     // that can sell Pro is live on the App Store.
     subscriptionRequired: isSubscriptionRequired(),
+    // Local development only: the iOS "StoreKit Test" scheme reports simulator
+    // purchases to /api/dev/storekit-test/entitlement. Always false on Render.
+    localStoreKitTest: isLocalStoreKitTestEnabled(),
   });
 });
 

@@ -168,3 +168,56 @@ describe("subscription required (one Pro plan, 7-day trial)", () => {
     expect(billingPeriodFor(null)).toBeNull();
   });
 });
+
+describe("local StoreKit test entitlement (development only)", () => {
+  const PATH = "/api/dev/storekit-test/entitlement";
+  const KEYS = ["IAP_LOCAL_STOREKIT_TEST", "NODE_ENV", "RENDER"] as const;
+  const before: Record<string, string | undefined> = {};
+  beforeAll(() => { for (const k of KEYS) before[k] = process.env[k]; });
+  afterEach(() => {
+    for (const k of KEYS) {
+      if (before[k] === undefined) delete process.env[k];
+      else process.env[k] = before[k];
+    }
+  });
+
+  const report = (body: Record<string, unknown>) =>
+    request(app).post(PATH).set(authHeaders(USER)).send(body);
+  const trial = { active: true, productId: MONTHLY, expiresAt: new Date(Date.now() + 7 * DAY).toISOString(), isTrial: true };
+
+  it("does not exist unless switched on", async () => {
+    expect((await report(trial)).status).toBe(404);
+    expect((await me()).pro).toBe(false);
+  });
+
+  it("never works in production or on Render, even when switched on", async () => {
+    process.env["IAP_LOCAL_STOREKIT_TEST"] = "true";
+    process.env["NODE_ENV"] = "production";
+    expect((await report(trial)).status).toBe(404);
+    process.env["NODE_ENV"] = "development";
+    process.env["RENDER"] = "true";
+    expect((await report(trial)).status).toBe(404);
+    expect((await me()).pro).toBe(false);
+  });
+
+  it("locally, records a simulator trial, its renewal and its expiry", async () => {
+    process.env["IAP_LOCAL_STOREKIT_TEST"] = "true";
+    delete process.env["RENDER"];
+    expect((await report(trial)).body.outcome).toBe("applied");
+    expect(await me()).toMatchObject({ pro: true, state: "trial", billingPeriod: "monthly" });
+
+    await report({ active: true, productId: ANNUAL, expiresAt: new Date(Date.now() + 365 * DAY).toISOString(), isTrial: false });
+    expect(await me()).toMatchObject({ pro: true, state: "active", billingPeriod: "annual" });
+
+    await report({ active: false, productId: ANNUAL, expiresAt: new Date(Date.now() - 1000).toISOString(), isTrial: false });
+    expect(await me()).toMatchObject({ pro: false, state: "expired" });
+
+    const features = await request(app).get("/api/features");
+    expect(features.body.localStoreKitTest).toBe(true);
+  });
+
+  it("requires sign-in", async () => {
+    process.env["IAP_LOCAL_STOREKIT_TEST"] = "true";
+    expect((await request(app).post(PATH).send(trial)).status).toBe(401);
+  });
+});

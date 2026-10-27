@@ -15,12 +15,14 @@
 // subscription whose RevenueCat period_type is TRIAL, so it grants Pro exactly
 // like a paid period.
 //
-// WHO CAN ADD CONTACTS. Two switches on the API:
+// SUBSCRIBE TO START. Two switches on the API:
 //   - IAP_PAYWALL_ENABLED shows the paywall in purchase-capable app builds.
-//   - IAP_SUBSCRIPTION_REQUIRED (only with the paywall on) makes Pro or a trial
-//     the only way to add contacts. Without it the old Free ceiling applies.
-// Without a subscription nothing is taken away: existing contacts can still be
-// viewed, edited, deleted and followed up. Only adding and importing stop.
+//   - IAP_SUBSCRIPTION_REQUIRED (only with the paywall on) means there is no
+//     free plan: the web app shows the subscription screen in place of the app
+//     until the user has a trial or Pro, and this server refuses to add or
+//     import contacts without one. Without it the old Free ceiling applies.
+// Nothing is deleted when a subscription ends. Account deletion and sign-out
+// stay reachable without a subscription.
 // ============================================================================
 import { pool } from "../db";
 import { logger } from "./logger";
@@ -137,7 +139,7 @@ export function limitReachedBody(): { error: string; message: string; code: stri
   if (isSubscriptionRequired()) {
     return {
       error: "Subscription required",
-      message: "Adding contacts needs Novara Pro. Start a 7-day free trial in the Novara iPhone app. Your existing contacts stay as they are.",
+      message: "Novara needs an active subscription. Start the 7-day free trial in the Novara iPhone app. Your existing contacts are kept.",
       code: "SUBSCRIPTION_REQUIRED",
     };
   }
