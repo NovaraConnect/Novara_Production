@@ -239,8 +239,8 @@ export default function Paywall() {
         <section className="space-y-3">
           <p className="text-base font-semibold text-foreground">{headline}</p>
           <ul className="space-y-2 text-sm text-foreground">
-            <li className="flex gap-2"><Check className="w-4 h-4 mt-0.5 text-cooling" /> Unlimited contacts</li>
-            <li className="flex gap-2"><Check className="w-4 h-4 mt-0.5 text-cooling" /> Import as many as you like from LinkedIn, business cards, QR codes and your iPhone contacts</li>
+            <li className="flex gap-2"><Check className="w-4 h-4 mt-0.5 shrink-0 text-primary" /> Unlimited contacts</li>
+            <li className="flex gap-2"><Check className="w-4 h-4 mt-0.5 shrink-0 text-primary" /> Import as many as you like from LinkedIn, business cards, QR codes and your iPhone contacts</li>
           </ul>
           <p className="text-xs text-muted-foreground">{KEEP_YOUR_CONTACTS_NOTE}</p>
         </section>
@@ -277,12 +277,12 @@ export default function Paywall() {
                       onClick={() => setSelected(period)}
                       aria-pressed={selected === period}
                       className={`w-full text-left rounded-2xl border p-4 transition ${
-                        selected === period ? "border-cooling bg-cooling-soft" : "border-border bg-card"
+                        selected === period ? "border-2 border-primary bg-primary/10" : "border-border bg-card"
                       }`}
                     >
                       <div className="flex items-baseline justify-between">
                         <span className="font-semibold text-foreground">Novara Pro {title}</span>
-                        {saving && <span className="text-xs font-semibold text-cooling">{saving}</span>}
+                        {saving && <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">{saving}</span>}
                       </div>
                       {/* The amount billed is the most prominent price on the card
                           (App Review 3.1.2); the trial is secondary. */}
