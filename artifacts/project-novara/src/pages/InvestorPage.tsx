@@ -589,7 +589,7 @@ export default function InvestorPage() {
                     className="inline-flex items-center gap-1.5 font-semibold"
                     style={{ color: BRAND }}
                   >
-                    Cloé on LinkedIn <ArrowRight className="h-4 w-4" />
+                    Cloé Carmery LinkedIn <ArrowRight className="h-4 w-4" />
                   </a>
                 ) : (
                   <Placeholder>LinkedIn URL</Placeholder>
