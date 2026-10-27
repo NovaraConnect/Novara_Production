@@ -171,7 +171,7 @@ On a TestFlight build with a sandbox tester signed in to the device's App Store:
 - **Deploying the API before the migration** no longer breaks contact creation: the server logs an error and treats everyone as Free until `0004` is applied.
 - **Account deletion does not cancel Apple's subscription.** Only the user can cancel in their Apple settings. Deleting the account removes Novara's data, and the paywall copy should tell users to cancel first. This should be added to the account-deletion flow text before launch.
 - **Ask to Buy and pending purchases** report "pending". Pro starts when Apple approves and the webhook arrives.
-- **Runtime verification.** The app compiles with RevenueCat 5.97.0 on Xcode 27 (simulator build). A launch on a device or simulator and a real purchase still has to be exercised on a TestFlight build with a sandbox tester before release.
+- **Runtime verification.** The app compiles with RevenueCat 5.97.0 on Xcode 27 and launches on an iOS 27 simulator to the sign-in page. A real purchase still has to be exercised on a TestFlight build with a sandbox tester before release.
 - **Shared native files with PR #32.** `AppDelegate.swift`, `SceneDelegate.swift`, the Info.plist scene manifest and the version/build/team lines in `project.pbxproj` are byte-identical to PR #32 (`feat/add-contact-import-layout`), so the two merge cleanly in either order. Links and Universal Links are forwarded to Capacitor from `SceneDelegate`, not `AppDelegate`.
 - **Apple guideline text.** The paywall copy and the disclosures in section 3, step 8 must be checked against the live guidelines before submission.
 - **Feature list.** The paywall lists only what Pro does today: unlimited contacts and unlimited imports. Add to it when the Pro feature list is written down (`BILLING_AND_UNIVERSITY_ACCESS_PLAN.md`, section 4A.5).
@@ -185,5 +185,5 @@ On a TestFlight build with a sandbox tester signed in to the device's App Store:
 - API: 211 tests pass against a real Postgres 16 (a dedicated `novara_iap_test` database), including webhook authentication, idempotency, out-of-order events, anonymous and foreign-entitlement rejection, expiry, refunds, transfers, Pro import, account deletion, and a missing `entitlements` table.
 - Migration: applied, re-applied, and reversed on an empty database.
 - Web: `npm run typecheck` clean; 202 tests pass (15 of them new: the subscription route, the paywall rules, the post-purchase wait, and the purchase bridge gating); the production web build succeeds.
-- Native: `pod install` and an Xcode 27 simulator build succeed.
+- Native: `pod install`, an Xcode 27 simulator build, and a launch on an iOS 27 simulator (reaches the sign-in page) succeed.
 - Not yet verified: a live RevenueCat sandbox purchase and a live webhook delivery.
