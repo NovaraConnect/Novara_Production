@@ -8,6 +8,10 @@
 // The page never decides Pro itself. After Apple reports a purchase, it polls
 // the server (GET /api/entitlements/me) until the RevenueCat webhook has
 // written the entitlement.
+//
+// One plan, monthly or annual, each with a 7-day free trial that Apple runs.
+// The trial is offered only when Apple says this Apple Account can still have
+// it (NativeProProduct.trialDays > 0); otherwise the page shows plain prices.
 // ============================================================================
 import { useEffect, useState } from "react";
 import { Redirect, useLocation } from "wouter";
@@ -17,6 +21,7 @@ import { ArrowLeft, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePaywallAvailable } from "@/hooks/usePaywallAvailable";
 import { useProStatus, PRO_STATUS_KEY } from "@/hooks/useProStatus";
+import { useSubscriptionState } from "@/hooks/useSubscriptionState";
 import {
   getNativeProProducts,
   identifyNativePurchases,
@@ -29,8 +34,11 @@ import {
 import {
   ANNUAL_SAVING_LABEL,
   AUTO_RENEW_NOTICE,
+  KEEP_YOUR_CONTACTS_NOTE,
   PRO_PERIOD_LABEL,
   TERMS_OF_USE_URL,
+  trialNotice,
+  trialTimeLeft,
   waitForPro,
 } from "@/lib/purchases";
 import { fetchProStatus } from "@/lib/api";
@@ -42,6 +50,7 @@ export default function Paywall() {
   const { getToken, userId } = useAuth();
   const queryClient = useQueryClient();
   const { isPro } = useProStatus();
+  const subscription = useSubscriptionState();
   const visible = usePaywallAvailable();
 
   const [products, setProducts] = useState<NativeProProduct[] | null>(null);
@@ -74,6 +83,7 @@ export default function Paywall() {
   const monthly = products?.find((p) => p.period === "monthly");
   const annual = products?.find((p) => p.period === "annual");
   const chosen = selected === "monthly" ? monthly : annual;
+  const trialDays = chosen?.trialDays && chosen.trialDays > 0 ? chosen.trialDays : 0;
 
   const refreshStatus = async (): Promise<boolean> => {
     const confirmed = await waitForPro(() => fetchProStatus(getToken));
@@ -97,7 +107,9 @@ export default function Paywall() {
       const confirmed = await refreshStatus();
       setMessage(
         confirmed
-          ? "Novara Pro is active. Thank you."
+          ? trialDays > 0
+            ? `Your ${trialDays}-day free trial has started. Enjoy Novara Pro.`
+            : "Novara Pro is active. Thank you."
           : "Apple has your purchase. It can take a minute to appear here. Use Restore Purchases if it doesn't.",
       );
     } catch (err) {
@@ -155,17 +167,21 @@ export default function Paywall() {
 
       <main className="flex-1 px-4 py-6 space-y-6">
         <section className="space-y-3">
-          <p className="text-base font-semibold text-foreground">Keep every contact, without a limit.</p>
+          <p className="text-base font-semibold text-foreground">Add everyone you meet, without a limit.</p>
           <ul className="space-y-2 text-sm text-foreground">
             <li className="flex gap-2"><Check className="w-4 h-4 mt-0.5 text-cooling" /> Unlimited contacts</li>
             <li className="flex gap-2"><Check className="w-4 h-4 mt-0.5 text-cooling" /> Import as many as you like from LinkedIn, business cards, QR codes and your iPhone contacts</li>
           </ul>
-          <p className="text-xs text-muted-foreground">Free includes up to 6 contacts.</p>
+          <p className="text-xs text-muted-foreground">{KEEP_YOUR_CONTACTS_NOTE}</p>
         </section>
 
         {isPro ? (
           <section className="space-y-3">
-            <p className="text-sm text-foreground">You're on Novara Pro.</p>
+            <p className="text-sm text-foreground">
+              {subscription.plan === "trial"
+                ? `You're on the Novara Pro free trial${subscription.daysLeft === null ? "" : ` (${trialTimeLeft(subscription.daysLeft)})`}. Your subscription starts when it ends unless you cancel in your Apple Account settings.`
+                : `You're on ${subscription.label}.`}
+            </p>
             <Button variant="outline" className="w-full rounded-xl" onClick={manage} disabled={busy !== null}>
               Manage Subscription
             </Button>
@@ -199,7 +215,9 @@ export default function Paywall() {
                         {saving && <span className="text-xs font-semibold text-cooling">{saving}</span>}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {product.priceString} {PRO_PERIOD_LABEL[period]}
+                        {product.trialDays && product.trialDays > 0
+                          ? `${product.trialDays} days free, then ${product.priceString} ${PRO_PERIOD_LABEL[period]}`
+                          : `${product.priceString} ${PRO_PERIOD_LABEL[period]}`}
                       </div>
                     </button>
                   ) : null,
@@ -211,8 +229,20 @@ export default function Paywall() {
                   onClick={subscribe}
                   disabled={!chosen || busy !== null}
                 >
-                  {busy === "purchase" ? <Loader2 className="w-4 h-4 animate-spin" /> : "Subscribe"}
+                  {busy === "purchase" ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : trialDays > 0 ? (
+                    `Start ${trialDays}-day free trial`
+                  ) : (
+                    "Subscribe"
+                  )}
                 </Button>
+                {chosen && trialDays > 0 && (
+                  <p className="text-xs text-foreground leading-relaxed">
+                    Free for {trialDays} days, then {chosen.priceString} {PRO_PERIOD_LABEL[selected]}.{" "}
+                    {trialNotice(trialDays)}
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground leading-relaxed">{AUTO_RENEW_NOTICE}</p>
               </>
             )}

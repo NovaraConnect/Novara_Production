@@ -18,9 +18,8 @@ import { suggestPriority, suggestInitialFollowUp, deriveSuggestedCadence, MANUAL
 import { BusinessCardScanner, type ScannedContact } from "@/components/BusinessCardScanner";
 import { LinkedInScreenshotImport } from "@/components/LinkedInScreenshotImport";
 import type { LinkedInDraft } from "@/lib/linkedinParse";
-import { useProStatus } from "@/hooks/useProStatus";
-import { usePaywallAvailable } from "@/hooks/usePaywallAvailable";
-import { contactLimitApplies, SUBSCRIPTION_ROUTE } from "@/lib/purchases";
+import { useAddContactAccess } from "@/hooks/useAddContactAccess";
+import { FREE_TIER_LIMIT, SUBSCRIPTION_ROUTE } from "@/lib/purchases";
 import {
   planLinkedInImport,
   LINKEDIN_IMPORT_FIELDS,
@@ -74,8 +73,6 @@ function labelDays(days: number): string {
   if (days === 180) return "6 months";
   return `${days} days`;
 }
-
-const FREE_TIER_LIMIT = 6;
 
 export default function AddContact() {
   const [, setLocation] = useLocation();
@@ -217,10 +214,10 @@ export default function AddContact() {
 
   const removeInterest = (tag: string) => setInterests(prev => prev.filter(t => t !== tag));
 
-  // Pro removes the on-screen limit; the server enforces the real one.
-  const proStatus = useProStatus();
-  const showPaywallLink = usePaywallAvailable() && !proStatus.isPro;
-  const atLimit = contactLimitApplies(proStatus) && contacts.length >= FREE_TIER_LIMIT;
+  // The Free ceiling, or Pro / trial once a subscription is required. The
+  // server enforces the real rule; this only decides what the screen shows.
+  const { wall, showPaywallLink } = useAddContactAccess(contacts.length);
+  const atLimit = wall !== null;
 
   const onSubmit = async (values: FormValues) => {
     if (atLimit) return;
@@ -239,7 +236,9 @@ export default function AddContact() {
       setLocation("/contacts");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("limit") || msg.includes("403")) {
+      if (msg.includes("Subscription required")) {
+        toast.error("Adding contacts needs Novara Pro.");
+      } else if (msg.includes("limit") || msg.includes("403")) {
         toast.error(`You've reached the ${FREE_TIER_LIMIT}-contact limit.`);
       } else {
         toast.error("Failed to save contact. Please try again.");
@@ -266,14 +265,14 @@ export default function AddContact() {
               <span className="text-2xl">🎯</span>
             </div>
             <div>
-              <p className="text-base font-bold text-foreground mb-1">You've reached the contact limit</p>
+              <p className="text-base font-bold text-foreground mb-1">{wall?.title}</p>
               <p className="text-sm text-muted-foreground max-w-[280px]">
-                Novara Free includes up to {FREE_TIER_LIMIT} contacts. Novara Pro removes the limit.
+                {wall?.message}
               </p>
             </div>
             {showPaywallLink && (
               <Button className="rounded-xl" onClick={() => setLocation(SUBSCRIPTION_ROUTE)}>
-                See Novara Pro
+                {wall?.action}
               </Button>
             )}
             <Button variant="outline" className="rounded-xl" onClick={() => window.history.back()}>

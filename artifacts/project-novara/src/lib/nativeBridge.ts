@@ -58,6 +58,9 @@ export interface NativeProProduct {
   period: ProPeriod;
   /** Apple's localized price, e.g. "$4.99". Display this, never a constant. */
   priceString: string;
+  /** Days of free trial this Apple Account would get on this plan, or 0 when it
+   *  has had the trial already (Apple allows one) or eligibility is unknown. */
+  trialDays?: number;
 }
 
 export type NativePurchaseOutcome = "purchased" | "pending" | "cancelled";

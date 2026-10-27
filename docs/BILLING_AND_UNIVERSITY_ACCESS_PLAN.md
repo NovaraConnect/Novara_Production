@@ -47,7 +47,7 @@ These were checked directly, not assumed.
 - Its `project-novara` hooks `useBilling.ts` and `useFeatures.ts` were modified by that commit (file timestamps differ from the rest of the tree).
 
 **Constraints already agreed:**
-- Individual launch pricing is **proposed** in section 4A: Free up to 6 contacts; Pro Monthly $4.99/month; Pro Annual $49.99/year. Pending Apple IAP implementation and App Store review. The earlier $7.99–9.99 range is superseded.
+- Individual launch pricing is **decided** (2026-10-27) in section 4A: one plan, Novara Pro, $4.99/month or $49.99/year, each with a 7-day free trial, no contact limit. Pending App Store review. The earlier six-contact Free plan and the $7.99–9.99 range are superseded.
 - Stripe is the web payment rail only. Apple In-App Purchase is required for any digital subscription purchased inside the iOS app.
 - Universities pay an annual campus license by invoice or purchase order, Net 30, as organizations. Students never self-assign access from a `.edu` address. University access has no per-student cap.
 
@@ -144,20 +144,20 @@ The shipped iOS app is a web view shell. StoreKit needs a native bridge, so the 
 
 ---
 
-## 4A. Individual launch pricing and Apple IAP setup (PROPOSED)
+## 4A. Individual launch pricing and Apple IAP setup
 
-> **Status: proposed pricing, pending Apple IAP implementation and App Store review.** No Apple product exists yet. Nothing here is configured in App Store Connect, RevenueCat, or the app. Prices must be confirmed against Apple's price tiers before they are entered.
+> **Status: decided by the owner on 2026-10-27:** "Go with one Pro plan: 7-day free trial, then $4.99/month or $49.99/year, no contact limits." Implemented in PRs #28 and #29 (see `docs/APPLE_IAP_SETUP.md`), pending App Store review. No Apple product exists yet. Prices must be confirmed against Apple's price tiers before they are entered.
 
 ### 4A.1 Plans
 
 | Plan | Price | Contacts | Notes |
 |---|---|---|---|
-| Free | $0 | Up to 6 | The six-contact free plan is the product trial. |
-| Novara Pro Monthly | $4.99 per month | Unlimited | Complete Pro feature set. Auto-renewing. |
-| Novara Pro Annual | $49.99 per year | Unlimited | Complete Pro feature set. Auto-renewing. |
+| Novara Pro Monthly | 7 days free, then $4.99 per month | Unlimited | Complete Pro feature set. Auto-renewing. |
+| Novara Pro Annual | 7 days free, then $49.99 per year | Unlimited | Complete Pro feature set. Auto-renewing. |
 
 - **No lifetime plan** at launch.
-- **No additional free trial or introductory offer** at launch. The six-contact free plan is the trial.
+- **7-day free trial** on both plans, as an Apple introductory offer. Apple allows one per subscription group per Apple Account.
+- **No free plan once a subscription is required.** Without Pro or the trial, a user keeps every contact and can view, edit, delete and follow them up, but cannot add or import new ones. Until the `IAP_SUBSCRIPTION_REQUIRED` switch is turned on (after the new app version is live), Free keeps the 6-contact limit.
 - **University-entitled users** remain unlimited and never see individual payment offers, upgrade prompts, or Pro pricing. This applies whether the entitlement comes from an invitation or (future) SSO.
 - **Web (Stripe):** no consumer web price is set. Consumer web checkout is out of this release (section 5).
 
@@ -177,7 +177,7 @@ The shipped iOS app is a web view shell. StoreKit needs a native bridge, so the 
 | Monthly price | $4.99 (US tier, to confirm) | Confirm the matching Apple tier exists for each storefront. Use Apple's localized prices in the app. |
 | Annual price | $49.99 (US tier, to confirm) | As above. |
 | Subscription period | 1 month; 1 year | Both at least seven days (guideline 3.1.2(a)). |
-| Introductory offer / free trial | None | Decision above. |
+| Introductory offer / free trial | Free, 1 week, on both products | Decision above. |
 
 Environment variable names (section 8) carry these IDs: `REVENUECAT_PRODUCT_MONTHLY_ID`, `REVENUECAT_PRODUCT_ANNUAL_ID`. Values live in the secret store, not in git, and are read from the environment rather than hard-coded.
 
@@ -188,7 +188,7 @@ Environment variable names (section 8) carry these IDs: `REVENUECAT_PRODUCT_MONT
 3. **Show renewal terms** in plain language before purchase: the plan renews automatically unless cancelled at least 24 hours before the end of the current period (confirm the exact cancellation wording against Apple's current requirements), and how to manage the subscription.
 4. **Describe what the customer gets** before asking them to subscribe (guideline 3.1.2(c)): unlimited contacts and the complete Pro feature set, listed.
 5. **Savings copy** on annual only, using the single figure in 4A.2.
-6. **No free-trial wording** anywhere: no "try free", "free trial", or "start free", since no trial exists. The free plan may be described as "Free: up to 6 contacts".
+6. **Trial wording must be true for the person reading it.** The paywall shows "7 days free, then $X per period" and "Start 7-day free trial" only when Apple confirms the Apple Account can still get the trial; otherwise it shows plain prices. It also says how to avoid being charged (cancel at least 24 hours before the trial ends).
 7. **No lifetime wording**.
 8. **Restore purchases** is visible on the paywall (guideline 3.1.1 requires a restore mechanism for restorable purchases).
 9. **Manage subscription** link goes to Apple's subscription page.
@@ -202,7 +202,7 @@ Account and setup
 - [ ] Paid Apps Agreement and banking reconfirmed in App Store Connect.
 - [ ] Subscription group "Novara Pro" created; both products added with the IDs in 4A.3.
 - [ ] Price tiers chosen for $4.99 and $49.99, and confirmed available in the storefronts the app will sell in.
-- [ ] No introductory offers or trials configured on either product.
+- [ ] Introductory offer configured on both products: Free, 1 week, all storefronts.
 - [ ] No lifetime or non-subscription SKU created for Pro.
 
 Metadata and review
@@ -219,11 +219,11 @@ App behaviour
 - [ ] Upgrade and downgrade between monthly and annual works inside the group, with no duplicate subscription (guideline 3.1.2(b)).
 - [ ] Expired or cancelled state removes Pro access only when Apple/RevenueCat report it inactive (no added grace).
 - [ ] Individual paywall hidden for university-entitled users, and for any user who already has an active entitlement from another source.
-- [ ] Copy review: no free-trial, lifetime, or pricing text that the app does not deliver.
+- [ ] Copy review: no trial, lifetime, or pricing text that the app does not deliver.
 - [ ] Account deletion path available in the app, if Apple's current rules still require it at submission. Tracked as an open risk in section 12.
 
 Testing
-- [ ] Sandbox: purchase, renewal, cancellation, expiry, restore, upgrade, downgrade.
+- [ ] Sandbox: trial start, trial conversion, cancellation during the trial, purchase, renewal, cancellation, expiry, restore, upgrade, downgrade, and no second trial for the same Apple Account.
 - [ ] Server: webhook or REST verification grants and removes `apple_iap` entitlements, with duplicate-event handling.
 - [ ] Legal review of subscription copy (decision 7 in section 9).
 
@@ -376,8 +376,8 @@ Note: `VITE_*` values are public in the browser bundle. Only publishable keys be
 Answered 2026-10-21: Q1 (Capacitor), Q4 (no consumer Stripe in this release), Q5 (no extra grace period beyond Apple/RevenueCat state). The remaining questions stay open.
 
 1. **Which iOS client is shipped?** The web-in-shell app (`project-novara`) or the Expo app (`novara-mobile`)? This determines Option A vs B.
-2. **Prices:** proposed in section 4A ($4.99 per month; $49.99 per year; no trial, no lifetime). Pending Apple IAP implementation and App Store review.
-3. **Pro contents:** the exact list of features that become Pro. The 6-contact free limit stays on Free; Pro is unlimited. The feature list is still to be written down (section 4A.5).
+2. **Prices:** decided in section 4A ($4.99 per month; $49.99 per year; 7-day free trial; no lifetime). Pending App Store review.
+3. **Pro contents:** Pro is the only plan; adding and importing contacts need it once a subscription is required. A longer feature list is still to be written down (section 4A.5).
 4. **Launch scope:** iOS only first, or iOS and web together?
 5. **Grace period:** withdrawn for Apple purchases. Apple/RevenueCat state is authoritative (decision 6). Any future Stripe grace period is decided with the Stripe work.
 6. **University pricing:** resolved in section 6.4 (annual campus license, tiered by enrollment band, unlimited students, invoice Net 30). Still open: who creates organizations (recommended: platform staff) and whether to confirm the band prices with counsel.

@@ -35,5 +35,6 @@ export function useFeatures() {
     linkedinAiParse: data?.linkedinAiParse ?? false,
     linkedinScreenshotImport: data?.linkedinScreenshotImport ?? false,
     applePaywall: data?.applePaywall ?? false,
+    subscriptionRequired: data?.subscriptionRequired ?? false,
   };
 }

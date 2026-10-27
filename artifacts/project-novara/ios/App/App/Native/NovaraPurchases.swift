@@ -51,6 +51,11 @@ enum NovaraPurchases {
     private static let notConfigured = "Subscriptions aren't set up in this version of the app."
 
     /// The Novara Pro plans Apple has resolved for this device.
+    ///
+    /// `trialDays` is the free trial this Apple Account would get on that plan,
+    /// or 0. Apple gives the introductory offer once per subscription group, so
+    /// it is checked per account: someone who already had the trial must not be
+    /// promised it again. Anything short of a confirmed "eligible" reports 0.
     static func products(completion: @escaping (Result<Any, Error>) -> Void) {
         guard configureIfNeeded() else {
             completion(.failure(unavailable(notConfigured)))
@@ -61,22 +66,40 @@ enum NovaraPurchases {
                 completion(.failure(error))
                 return
             }
-            var products: [[String: Any]] = []
-            for package in offerings?.current?.availablePackages ?? [] {
-                let period: String
-                switch package.packageType {
-                case .monthly: period = "monthly"
-                case .annual: period = "annual"
-                default: continue
-                }
-                products.append([
-                    "productId": package.storeProduct.productIdentifier,
-                    "period": period,
-                    "priceString": package.storeProduct.localizedPriceString,
-                ])
+            let packages = (offerings?.current?.availablePackages ?? []).filter {
+                $0.packageType == .monthly || $0.packageType == .annual
             }
-            completion(.success(["products": products]))
+            let ids = packages.map { $0.storeProduct.productIdentifier }
+            Purchases.shared.checkTrialOrIntroDiscountEligibility(productIdentifiers: ids) { eligibility in
+                let products: [[String: Any]] = packages.map { package in
+                    let product = package.storeProduct
+                    return [
+                        "productId": product.productIdentifier,
+                        "period": package.packageType == .annual ? "annual" : "monthly",
+                        "priceString": product.localizedPriceString,
+                        "trialDays": freeTrialDays(product, eligibility[product.productIdentifier]),
+                    ]
+                }
+                completion(.success(["products": products]))
+            }
         }
+    }
+
+    /// Length of the product's free-trial introductory offer in days, or 0 when
+    /// it has none or this Apple Account is not (or not known to be) eligible.
+    private static func freeTrialDays(_ product: StoreProduct, _ eligibility: IntroEligibility?) -> Int {
+        guard eligibility?.status == .eligible,
+              let intro = product.introductoryDiscount,
+              intro.paymentMode == .freeTrial else { return 0 }
+        let unitDays: Int
+        switch intro.subscriptionPeriod.unit {
+        case .day: unitDays = 1
+        case .week: unitDays = 7
+        case .month: unitDays = 30
+        case .year: unitDays = 365
+        @unknown default: return 0
+        }
+        return intro.subscriptionPeriod.value * unitDays * max(intro.numberOfPeriods, 1)
     }
 
     /// Links the RevenueCat identity to the signed-in Clerk user ID.

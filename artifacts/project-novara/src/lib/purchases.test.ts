@@ -1,9 +1,24 @@
 import { describe, it, expect } from "vitest";
-import { contactLimitApplies, isPaywallVisible, SUBSCRIPTION_ROUTE, waitForPro } from "./purchases";
+import {
+  addContactBlock,
+  daysLeft,
+  FREE_TIER_LIMIT,
+  isPaywallVisible,
+  subscriptionLabel,
+  subscriptionPlanFor,
+  SUBSCRIPTION_ROUTE,
+  waitForPro,
+} from "./purchases";
 import type { ProStatus } from "./api";
 
-const FREE: ProStatus = { pro: false, source: null, expiresAt: null };
-const PRO: ProStatus = { pro: true, source: "apple_iap", expiresAt: "2030-01-01T00:00:00.000Z" };
+const FREE: ProStatus = { pro: false, source: null, expiresAt: null, state: "none", billingPeriod: null };
+const PRO: ProStatus = {
+  pro: true,
+  source: "apple_iap",
+  expiresAt: "2030-01-01T00:00:00.000Z",
+  state: "active",
+  billingPeriod: "monthly",
+};
 const noSleep = async () => undefined;
 
 describe("SUBSCRIPTION_ROUTE", () => {
@@ -34,17 +49,59 @@ describe("isPaywallVisible", () => {
   });
 });
 
-describe("contactLimitApplies", () => {
-  it("applies the Free limit to a known Free user", () => {
-    expect(contactLimitApplies({ isKnown: true, isPro: false })).toBe(true);
-  });
+describe("addContactBlock", () => {
+  const base = { isKnown: true, isPro: false, subscriptionRequired: false, contactCount: 0 };
 
-  it("lifts the limit for a known Pro user", () => {
-    expect(contactLimitApplies({ isKnown: true, isPro: true })).toBe(false);
+  it("before a subscription is required, Free users stop at the ceiling", () => {
+    expect(addContactBlock({ ...base, contactCount: FREE_TIER_LIMIT - 1 })).toBeNull();
+    expect(addContactBlock({ ...base, contactCount: FREE_TIER_LIMIT })).toBe("limit");
+    expect(addContactBlock({ ...base, isPro: true, contactCount: 50 })).toBeNull();
   });
 
   it("keeps the Free limit while the status is unknown", () => {
-    expect(contactLimitApplies({ isKnown: false, isPro: false })).toBe(true);
+    expect(addContactBlock({ ...base, isKnown: false, contactCount: FREE_TIER_LIMIT })).toBe("limit");
+  });
+
+  it("once a subscription is required, anyone without Pro or a trial is asked to subscribe", () => {
+    const required = { ...base, subscriptionRequired: true };
+    expect(addContactBlock(required)).toBe("subscription");
+    expect(addContactBlock({ ...required, isPro: true, contactCount: 500 })).toBeNull();
+  });
+
+  it("does not flash the subscription wall while the status is loading", () => {
+    expect(addContactBlock({ ...base, subscriptionRequired: true, isKnown: false })).toBeNull();
+  });
+});
+
+describe("subscription plan and label", () => {
+  const trial: ProStatus = { ...PRO, state: "trial", billingPeriod: "annual" };
+
+  it("maps the server status to one plan", () => {
+    expect(subscriptionPlanFor(undefined)).toBe("none");
+    expect(subscriptionPlanFor(FREE)).toBe("none");
+    expect(subscriptionPlanFor(trial)).toBe("trial");
+    expect(subscriptionPlanFor(PRO)).toBe("monthly");
+    expect(subscriptionPlanFor({ ...PRO, billingPeriod: "annual" })).toBe("annual");
+    expect(subscriptionPlanFor({ ...FREE, state: "expired", billingPeriod: "monthly" })).toBe("expired");
+  });
+
+  it("counts trial days left, rounding up", () => {
+    const now = Date.parse("2026-11-01T12:00:00Z");
+    expect(daysLeft("2026-11-06T12:00:00Z", now)).toBe(5);
+    expect(daysLeft("2026-11-01T13:00:00Z", now)).toBe(1);
+    expect(daysLeft("2026-10-31T12:00:00Z", now)).toBe(0);
+    expect(daysLeft(null, now)).toBeNull();
+  });
+
+  it("labels each plan", () => {
+    expect(subscriptionLabel("trial", 5, true)).toBe("Free trial · 5 days left");
+    expect(subscriptionLabel("trial", 1, true)).toBe("Free trial · 1 day left");
+    expect(subscriptionLabel("trial", 0, true)).toBe("Free trial · ends today");
+    expect(subscriptionLabel("monthly", null, true)).toBe("Novara Pro · Monthly");
+    expect(subscriptionLabel("annual", null, true)).toBe("Novara Pro · Annual");
+    expect(subscriptionLabel("expired", null, true)).toBe("Subscription ended");
+    expect(subscriptionLabel("none", null, true)).toBe("Not subscribed");
+    expect(subscriptionLabel("none", null, false)).toBe("Free Plan");
   });
 });
 

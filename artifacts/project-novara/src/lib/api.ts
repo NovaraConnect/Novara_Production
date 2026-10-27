@@ -82,6 +82,7 @@ export async function createContact(
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as { code?: string; message?: string };
     if (body.code === "CONTACT_LIMIT_REACHED") throw new Error("Contact limit reached");
+    if (body.code === "SUBSCRIPTION_REQUIRED") throw new Error("Subscription required");
     throw new Error("Failed to create contact");
   }
   return res.json();
@@ -216,6 +217,9 @@ export interface Features {
    *  until the App Store products, the RevenueCat webhook and the purchase
    *  build are all live. */
   applePaywall: boolean;
+  /** Whether adding contacts needs Novara Pro or its free trial. Only ever on
+   *  together with applePaywall. Off: Free keeps the 6-contact limit. */
+  subscriptionRequired: boolean;
 }
 
 const FEATURES_CACHE_KEY = "novara.features.lastKnown";
@@ -238,6 +242,7 @@ export function readCachedFeatures(): Features | null {
       linkedinAiParse: !!data?.linkedinAiParse,
       linkedinScreenshotImport: !!data?.linkedinScreenshotImport,
       applePaywall: !!data?.applePaywall,
+      subscriptionRequired: !!data?.subscriptionRequired,
     };
   } catch {
     return null;
@@ -261,6 +266,7 @@ export async function fetchFeatures(getToken: GetAuthToken): Promise<Features> {
     linkedinAiParse: !!data?.linkedinAiParse,
     linkedinScreenshotImport: !!data?.linkedinScreenshotImport,
     applePaywall: !!data?.applePaywall,
+    subscriptionRequired: !!data?.subscriptionRequired,
   };
 
   try {
@@ -302,11 +308,20 @@ export async function enrichContact(
 
 // ── Subscription status ──────────────────────────────────────────────────────
 
+/** Where the user stands: in the free trial, on a paid period, lapsed, or
+ *  never subscribed. */
+export type SubscriptionState = "trial" | "active" | "expired" | "none";
+
 /** The server's view of the signed-in user's Novara Pro status. */
 export interface ProStatus {
+  /** True during the free trial and during a paid period. */
   pro: boolean;
   source: "apple_iap" | null;
+  /** End of the current period (the trial end during a trial), or null when not Pro. */
   expiresAt: string | null;
+  state: SubscriptionState;
+  /** Monthly or annual. During a trial, the plan it turns into. */
+  billingPeriod: "monthly" | "annual" | null;
 }
 
 /** Throws on failure. Callers decide what an unknown status means for the UI;
@@ -320,5 +335,9 @@ export async function fetchProStatus(getToken: GetAuthToken): Promise<ProStatus>
     pro: data?.pro === true,
     source: data?.source === "apple_iap" ? "apple_iap" : null,
     expiresAt: typeof data?.expiresAt === "string" ? data.expiresAt : null,
+    state: (["trial", "active", "expired", "none"] as const).find((s) => s === data?.state)
+      // An API from before trials existed only reports `pro`.
+      ?? (data?.pro === true ? "active" : "none"),
+    billingPeriod: data?.billingPeriod === "monthly" || data?.billingPeriod === "annual" ? data.billingPeriod : null,
   };
 }
