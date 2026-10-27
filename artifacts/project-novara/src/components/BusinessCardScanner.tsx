@@ -276,7 +276,7 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
           </div>
           <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">
             {hasNativeScanner
-              ? "Hold the card in the frame — Novara finds the edges and reads it on your iPhone. You can scan both sides."
+              ? "Hold the card in the frame — Novara finds the edges and reads it."
               : "Good lighting, card filling the frame. First scan takes 5–15 seconds. If the camera doesn't open, use "}
             {!hasNativeScanner && <span className="font-medium">Choose Photo</span>}
             {!hasNativeScanner && "."}

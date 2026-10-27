@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Loader2, Wand2, X, Clock, RefreshCw, Plus, ChevronDown, ChevronUp, Pencil } from "lucide-react";
-import { ImportOptionCard } from "@/components/ImportOptionCard";
+import { ArrowLeft, Loader2, Wand2, X, Clock, RefreshCw, Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,7 +26,6 @@ import {
 } from "@/lib/linkedinImportDraft";
 import { QRScanner, type ScannedQRContact } from "@/components/QRScanner";
 import { NativeContactImport } from "@/components/NativeContactImport";
-import { useFeatures } from "@/hooks/useFeatures";
 import { localDateString } from "@/lib/utils";
 
 const INITIAL_OPTIONS: Contact["initialFollowUpDays"][] = [1, 2, 3];
@@ -176,9 +174,6 @@ export default function AddContact() {
 
 
 
-  // Deployment-level switch for showing the LinkedIn screenshot importer.
-  const { linkedinScreenshotImport } = useFeatures();
-
   // Tracks what the last LinkedIn import wrote, so a second import can withdraw
   // it instead of leaving the previous profile's values behind.
   const lastLinkedInImport = useRef<AppliedImport>({});
@@ -279,12 +274,8 @@ export default function AddContact() {
               Add from
             </p>
 
-            {/* LinkedIn Profile import — hidden unless the deployment enables
-                LINKEDIN_SCREENSHOT_IMPORT, so it can be switched off without a
-                deploy. */}
-            {linkedinScreenshotImport && (
-              <LinkedInScreenshotImport onExtracted={handleLinkedInExtracted} />
-            )}
+            {/* LinkedIn Profile import — always shown. */}
+            <LinkedInScreenshotImport onExtracted={handleLinkedInExtracted} />
 
             {/* Business Card Scanner */}
             <BusinessCardScanner onExtracted={handleCardScanned} />
@@ -303,18 +294,6 @@ export default function AddContact() {
               </span>
               <span className="h-px flex-1 bg-border" />
             </div>
-
-            {/* Enter Manually — a card that brings the form below into focus. */}
-            <ImportOptionCard
-              icon={Pencil}
-              title="Enter Manually"
-              description="Add a contact by typing the details yourself."
-              onClick={() => {
-                const first = document.querySelector<HTMLInputElement>('[data-testid="input-firstname"]');
-                first?.scrollIntoView({ behavior: "smooth", block: "center" });
-                first?.focus();
-              }}
-            />
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
