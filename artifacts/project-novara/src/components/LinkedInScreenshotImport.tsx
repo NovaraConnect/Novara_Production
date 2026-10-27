@@ -1,6 +1,6 @@
 import { useState, useRef, useId } from "react";
-import { ImportOptionCard } from "@/components/ImportOptionCard";
-import { Camera, Image as ImageIcon, Loader2, X, CheckCircle2, AlertCircle, UserRound } from "lucide-react";
+import { ImportOptionCard, LinkedInGlyph } from "@/components/ImportOptionCard";
+import { Camera, Image as ImageIcon, Loader2, X, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { MAX_FILE_BYTES, recognizeImageText } from "@/lib/imageOcr";
@@ -16,9 +16,9 @@ interface LinkedInScreenshotImportProps {
 
 type Status = "idle" | "processing" | "done" | "error";
 
-// Deliberately no LinkedIn logo/brandmark and no brand colour — a neutral
-// "scan text" glyph. This is user-controlled screenshot import, not a LinkedIn
-// integration. OCR runs on-device; the image is never uploaded, stored, or
+// Labelled with the plain letters "in" in the app's own blue (LinkedInGlyph),
+// not LinkedIn's logo or brand colour. This is user-controlled screenshot
+// import, not a LinkedIn integration. OCR runs on-device; the image is never uploaded, stored, or
 // logged; nothing is saved until the user reviews and taps Save.
 export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImportProps) {
   const [status, setStatus] = useState<Status>("idle");
@@ -103,7 +103,7 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
 
   return (
     <ImportOptionCard
-      icon={UserRound}
+      iconNode={<LinkedInGlyph />}
       title="Import from LinkedIn"
       description="Photograph a LinkedIn profile on another screen, or select a screenshot from Photos."
     >
