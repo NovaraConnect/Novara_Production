@@ -6,10 +6,10 @@ import type { LucideIcon } from "lucide-react";
 export function LinkedInGlyph() {
   return (
     <span
-      className="w-11 h-11 flex items-center justify-center shrink-0 text-primary"
+      className="w-9 h-9 flex items-center justify-center shrink-0 text-primary"
       aria-hidden="true"
     >
-      <span className="text-[24px] font-bold leading-none tracking-tight">in</span>
+      <span className="text-[20px] font-bold leading-none tracking-tight">in</span>
     </span>
   );
 }
@@ -49,8 +49,8 @@ export function ImportOptionCard({
   const tile =
     iconNode ??
     (Icon ? (
-      <span className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0" aria-hidden="true">
-        <Icon className="w-5 h-5 text-primary" />
+      <span className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0" aria-hidden="true">
+        <Icon className="w-[18px] h-[18px] text-primary" />
       </span>
     ) : null);
 
@@ -58,13 +58,15 @@ export function ImportOptionCard({
     <div className="flex items-center gap-3">
       {tile}
       <div className="min-w-0 flex-1">
-        <p className="text-[15px] font-bold text-primary leading-snug">{title}</p>
-        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{description}</p>
+        <p className="text-[14px] font-bold text-primary leading-snug">{title}</p>
+        <p className="text-xs text-muted-foreground leading-snug">{description}</p>
       </div>
     </div>
   );
 
-  const shell = "mb-3 rounded-2xl border border-primary/15 bg-primary/[0.06] p-4 shadow-sm";
+  // Kept compact so every option, through Enter Manually, fits on one phone
+  // screen without scrolling.
+  const shell = "mb-2 rounded-2xl border border-primary/15 bg-primary/[0.06] px-3 py-2.5 shadow-sm";
 
   // An option with no button of its own is one big target; one with buttons
   // keeps them as the targets, so the card stays a plain container.
@@ -86,7 +88,7 @@ export function ImportOptionCard({
   return (
     <div className={shell}>
       {header}
-      {children ? <div className="mt-4">{children}</div> : null}
+      {children ? <div className="mt-2.5">{children}</div> : null}
     </div>
   );
 }

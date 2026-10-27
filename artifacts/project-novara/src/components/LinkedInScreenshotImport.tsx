@@ -168,19 +168,19 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
       {status === "idle" && (
         <>
           {/* Two equal targets, each with its helper note underneath. */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-2">
             <div className="min-w-0">
               <Button
                 type="button"
                 variant="outline"
-                className="w-full h-11 gap-1.5 px-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-[13px] font-semibold shadow-sm"
+                className="w-full h-9 gap-1.5 px-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-[13px] font-semibold shadow-sm"
                 onClick={() => cameraRef.current?.click()}
                 aria-describedby={`${noteId}-camera`}
               >
                 <Camera className="w-4 h-4 shrink-0" />
                 Take a Photo
               </Button>
-              <p id={`${noteId}-camera`} className="mt-1.5 text-center text-[11px] leading-snug text-muted-foreground">
+              <p id={`${noteId}-camera`} className="mt-1 text-center text-[11px] leading-snug text-muted-foreground">
                 Capture a profile on another screen
               </p>
             </div>
@@ -188,19 +188,19 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
               <Button
                 type="button"
                 variant="outline"
-                className="w-full h-11 gap-1.5 px-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-[13px] font-semibold shadow-sm"
+                className="w-full h-9 gap-1.5 px-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-[13px] font-semibold shadow-sm"
                 onClick={() => libraryRef.current?.click()}
                 aria-describedby={`${noteId}-library`}
               >
                 <ImageIcon className="w-4 h-4 shrink-0" />
                 Choose Screenshot
               </Button>
-              <p id={`${noteId}-library`} className="mt-1.5 text-center text-[11px] leading-snug text-muted-foreground">
+              <p id={`${noteId}-library`} className="mt-1 text-center text-[11px] leading-snug text-muted-foreground">
                 Select from your photo library
               </p>
             </div>
           </div>
-          <p className="text-[11px] text-muted-foreground mt-3">
+          <p className="text-[11px] text-muted-foreground mt-1.5">
             Novara doesn't connect to LinkedIn or access private data.
           </p>
         </>

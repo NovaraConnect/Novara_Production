@@ -257,7 +257,7 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
             <Button
               type="button"
               variant="outline"
-              className="flex-1 h-11 gap-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-sm font-semibold shadow-sm"
+              className="flex-1 h-9 gap-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-sm font-semibold shadow-sm"
               onClick={hasNativeScanner ? handleNativeScan : () => cameraRef.current?.click()}
               data-testid="button-scan-card"
             >
@@ -267,14 +267,14 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
             <Button
               type="button"
               variant="outline"
-              className="flex-1 h-11 gap-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-sm font-semibold shadow-sm"
+              className="flex-1 h-9 gap-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-sm font-semibold shadow-sm"
               onClick={() => libraryRef.current?.click()}
             >
               <ImageIcon className="w-4 h-4" />
               Choose Photo
             </Button>
           </div>
-          <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+          <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">
             {hasNativeScanner
               ? "Hold the card in the frame — Novara finds the edges and reads it on your iPhone. You can scan both sides."
               : "Good lighting, card filling the frame. First scan takes 5–15 seconds. If the camera doesn't open, use "}

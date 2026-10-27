@@ -253,7 +253,7 @@ export default function AddContact() {
         <h1 className="font-serif text-xl font-bold tracking-tight text-foreground">Add Contact</h1>
       </header>
 
-      <main className="flex-1 px-4 py-6">
+      <main className="flex-1 px-4 pt-4 pb-6">
         {/* Contact limit wall */}
         {atLimit && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
@@ -275,12 +275,9 @@ export default function AddContact() {
         {!atLimit && (
           <>
             {/* Section label for the options below. */}
-            <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
               Add from
             </p>
-
-            {/* Business Card Scanner */}
-            <BusinessCardScanner onExtracted={handleCardScanned} />
 
             {/* LinkedIn Profile import — hidden unless the deployment enables
                 LINKEDIN_SCREENSHOT_IMPORT, so it can be switched off without a
@@ -288,6 +285,9 @@ export default function AddContact() {
             {linkedinScreenshotImport && (
               <LinkedInScreenshotImport onExtracted={handleLinkedInExtracted} />
             )}
+
+            {/* Business Card Scanner */}
+            <BusinessCardScanner onExtracted={handleCardScanned} />
 
             {/* QR Code Scanner */}
             <QRScanner onExtracted={handleQRScanned} />
@@ -297,7 +297,7 @@ export default function AddContact() {
             <NativeContactImport onExtracted={handleCardScanned} />
 
             {/* Divider between the no-typing options and the form itself. */}
-            <div className="flex items-center gap-3 mt-5 mb-4">
+            <div className="flex items-center gap-3 mt-3 mb-2">
               <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground shrink-0">
                 Or enter manually
               </span>
