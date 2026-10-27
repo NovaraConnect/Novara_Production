@@ -64,11 +64,14 @@ function PhoneFrame({
   alt,
   className = "",
   eager = false,
+  island = true,
 }: {
   src: string;
   alt: string;
   className?: string;
   eager?: boolean;
+  /** False for a screenshot that already shows its own Dynamic Island. */
+  island?: boolean;
 }) {
   return (
     <div
@@ -84,7 +87,9 @@ function PhoneFrame({
           className="block h-auto w-full"
         />
         {/* Dynamic Island: sits between the clock and the status icons. */}
-        <div className="absolute left-1/2 top-[1.6%] h-[3.1%] w-[30%] -translate-x-1/2 rounded-full bg-[#0B0F17]" />
+        {island && (
+          <div className="absolute left-1/2 top-[1.6%] h-[3.1%] w-[30%] -translate-x-1/2 rounded-full bg-[#0B0F17]" />
+        )}
       </div>
     </div>
   );
@@ -159,7 +164,7 @@ const PROBLEMS = [
   },
 ];
 
-const SCREENS = [
+const SCREENS: { src: string; title: string; caption: string; island?: boolean }[] = [
   {
     src: shot("dashboard"),
     title: "Network Health",
@@ -171,9 +176,15 @@ const SCREENS = [
     caption: "Warm, Cooling, Cold or Dormant, with a priority and where you met.",
   },
   {
+    src: shot("career-profile"),
+    title: "Start with a career profile",
+    caption: "Say where you’re headed. Each contact’s base priority comes from how well they match it; goals you add bump matching contacts further.",
+    island: false,
+  },
+  {
     src: shot("contact"),
     title: "Priority follows your goals",
-    caption: "Contacts aligned with your career goals rise. One tap to mark contacted, schedule or remind.",
+    caption: "Contacts who match your career profile rise. One tap to mark contacted, schedule or remind.",
   },
   {
     src: shot("add-card"),
@@ -196,7 +207,7 @@ const STEPS = [
   {
     icon: Target,
     title: "Tell Novara what you’re working towards",
-    body: "A short career statement and goals. Novara suggests who matters most for that direction, and you can always override it.",
+    body: "A short career profile sets each contact’s base priority by how well they match it. Goals you add bump matching contacts further, and you can always override it.",
   },
   {
     icon: CalendarClock,
@@ -393,10 +404,10 @@ export default function InvestorPage() {
             />
           </div>
           <div className="mx-auto mt-14 max-w-6xl">
-            <ul className="flex snap-x snap-mandatory gap-6 overflow-x-auto px-4 pb-4 sm:px-6 lg:grid lg:grid-cols-5 lg:gap-5 lg:overflow-visible lg:pb-0">
+            <ul className="flex snap-x snap-mandatory gap-6 overflow-x-auto px-4 pb-4 sm:px-6 lg:grid lg:grid-cols-6 lg:gap-4 lg:overflow-visible lg:pb-0">
               {SCREENS.map((s) => (
                 <li key={s.title} className="w-[62vw] max-w-[250px] shrink-0 snap-center lg:w-auto lg:max-w-none">
-                  <PhoneFrame src={s.src} alt={s.title} />
+                  <PhoneFrame src={s.src} alt={s.title} island={s.island} />
                   <p className="mt-5 font-semibold leading-snug">{s.title}</p>
                   <p className="mt-1.5 text-sm leading-relaxed text-[#5B6272]">{s.caption}</p>
                 </li>
@@ -436,8 +447,8 @@ export default function InvestorPage() {
                 <span className="font-semibold text-[#08111F]">
                   The algorithm nudges; it never overrides you.
                 </span>{" "}
-                Goal-based suggestions move a contact’s priority by at most one level, and a
-                priority you set yourself is never recalculated. Novara reads only the images
+                Priority is only ever a suggestion: a priority you set yourself is never
+                recalculated. Novara reads only the images
                 you give it, and it never connects to your LinkedIn account.
               </p>
             </div>
