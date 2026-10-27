@@ -39,6 +39,8 @@ export type Contact = {
   updated_at: Date;
   /** Small JPEG data URL; absent until migration 0006 adds the column. */
   photo?: string | null;
+  /** Month and day, "--MM-DD"; absent until migration 0008. */
+  birthday?: string | null;
 };
 
 export function toDateStr(val: Date | string): string {
@@ -76,6 +78,7 @@ export function dbToContact(row: Contact) {
     nextFollowUpDate: toDateStr(row.next_follow_up_date),
     notes: row.notes ?? undefined,
     photo: row.photo ?? undefined,
+    birthday: row.birthday ?? undefined,
     createdAt: typeof row.created_at === "string"
       ? row.created_at
       : (row.created_at as Date).toISOString(),

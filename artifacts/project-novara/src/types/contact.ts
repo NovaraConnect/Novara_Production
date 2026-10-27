@@ -28,6 +28,8 @@ export interface Contact {
   notes?: string;
   /** Small square JPEG data URL, shown instead of the initials. */
   photo?: string;
+  /** Month and day, "--MM-DD". */
+  birthday?: string;
   createdAt: string;
 }
 

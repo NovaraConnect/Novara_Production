@@ -125,6 +125,40 @@ router.post("/contacts/recalculate", requireAuth, async (req: Request, res: Resp
   }
 });
 
+// Birthday: month and day as "--MM-DD" (no year), or null/"" to clear.
+// Saved after the main insert/update so the long statements above stay as
+// they are; absent from the request means "leave it alone".
+const BIRTHDAY_RE = /^--(\d{2})-(\d{2})$/;
+
+function parseBirthday(v: unknown): { ok: true; value: string | null | undefined } | { ok: false } {
+  if (v === undefined) return { ok: true, value: undefined };
+  if (v === null || v === "") return { ok: true, value: null };
+  if (typeof v !== "string") return { ok: false };
+  const m = BIRTHDAY_RE.exec(v);
+  if (!m) return { ok: false };
+  const month = Number(m[1]), day = Number(m[2]);
+  // Checked against 2000, a leap year, so 29 February is allowed.
+  const d = new Date(Date.UTC(2000, month - 1, day));
+  if (d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day) return { ok: false };
+  return { ok: true, value: v };
+}
+
+async function hasBirthdayColumn(): Promise<boolean> {
+  const { rows } = await pool.query(
+    "SELECT 1 FROM information_schema.columns WHERE table_name = 'contacts' AND column_name = 'birthday'",
+  );
+  return rows.length > 0;
+}
+
+async function applyBirthday<T extends { id: string }>(contact: T, value: string | null | undefined, userId: string): Promise<T> {
+  if (value === undefined || !(await hasBirthdayColumn())) return contact;
+  const { rows } = await pool.query(
+    "UPDATE contacts SET birthday = $1 WHERE id = $2 AND user_id = $3 RETURNING *",
+    [value, contact.id, userId],
+  );
+  return rows[0] ?? contact;
+}
+
 // POST /api/contacts
 router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as AuthedRequest).userId;
@@ -137,6 +171,12 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
   } = req.body;
 
   const preferredMethod = normalizePreferred(preferredContactMethod);
+
+  const birthday = parseBirthday(req.body.birthday);
+  if (!birthday.ok) {
+    res.status(400).json({ error: "Birthday must be a real month and day, as --MM-DD" });
+    return;
+  }
 
   if (!firstName || !lastName || !company) {
     res.status(400).json({ error: "firstName, lastName, company are required" });
@@ -267,7 +307,7 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
         dates.firstContactDate, dates.lastInteractionDate, nextFollowUp,
       ],
     );
-    res.status(201).json(dbToContact(contact));
+    res.status(201).json(dbToContact(await applyBirthday(contact, birthday.value, userId)));
   } catch (err) {
     console.error("[contacts POST] DB error:", err);
     res.status(500).json({ error: "Failed to create contact", detail: err instanceof Error ? err.message : String(err) });
@@ -305,6 +345,12 @@ router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
     priorityOverride, currentPriority: manualPriority, cadenceOverride,
     preferredContactMethod, firstContactDate, lastInteractionDate,
   } = req.body;
+
+  const birthday = parseBirthday(req.body.birthday);
+  if (!birthday.ok) {
+    res.status(400).json({ error: "Birthday must be a real month and day, as --MM-DD" });
+    return;
+  }
 
   const preferredMethod = normalizePreferred(preferredContactMethod);
 
@@ -477,7 +523,7 @@ router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
         dates.firstContactDate, dates.lastInteractionDate,
       ],
     );
-    res.json(dbToContact(contact));
+    res.json(dbToContact(await applyBirthday(contact, birthday.value, userId)));
   } catch (err) {
     console.error("[contacts PUT] DB error:", err);
     res.status(500).json({ error: "Failed to update contact", detail: err instanceof Error ? err.message : String(err) });

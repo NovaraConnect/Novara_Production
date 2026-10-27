@@ -9,6 +9,19 @@ function daysBetween(a: Date, b: Date): number {
   return Math.floor((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+/** True when a "--MM-DD" birthday falls on `today` (UTC date). A 29
+ *  February birthday is celebrated on 28 February in non-leap years. */
+export function isBirthdayToday(birthday: string | null | undefined, today: Date): boolean {
+  const m = birthday ? /^--(\d{2})-(\d{2})$/.exec(birthday) : null;
+  if (!m) return false;
+  const month = Number(m[1]), day = Number(m[2]);
+  const tMonth = today.getUTCMonth() + 1, tDay = today.getUTCDate();
+  if (month === tMonth && day === tDay) return true;
+  const year = today.getUTCFullYear();
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  return month === 2 && day === 29 && !leap && tMonth === 2 && tDay === 28;
+}
+
 async function runDailyNotifications(): Promise<void> {
   logger.info("Running daily notification check");
   const today = new Date();
@@ -18,13 +31,15 @@ async function runDailyNotifications(): Promise<void> {
   yesterday.setDate(yesterday.getDate() - 1);
 
   try {
+    // SELECT * so notify_birthdays (migration 0008) is read when present.
     const { rows: users } = await pool.query<{
       user_id: string;
       notify_due_today: boolean;
       notify_overdue: boolean;
       notify_status_change: boolean;
+      notify_birthdays?: boolean;
     }>(`
-      SELECT user_id, notify_due_today, notify_overdue, notify_status_change
+      SELECT *
       FROM user_settings
       WHERE push_enabled = TRUE
     `);
@@ -62,9 +77,9 @@ async function runDailyNotifications(): Promise<void> {
         last_name: string;
         next_follow_up_date: Date;
         follow_up_cadence_days: number;
+        birthday?: string | null;
       }>(
-        `SELECT id, first_name, last_name, next_follow_up_date, follow_up_cadence_days
-         FROM contacts WHERE user_id = $1`,
+        `SELECT * FROM contacts WHERE user_id = $1`,
         [user.user_id],
       );
 
@@ -135,6 +150,20 @@ async function runDailyNotifications(): Promise<void> {
             });
           }
         }
+      }
+
+      // Birthdays go first: they only happen once a year, so they must not be
+      // the ones dropped by the five-a-day cap below.
+      if (user.notify_birthdays ?? true) {
+        const birthdays = contacts.filter((c) => isBirthdayToday(c.birthday, today));
+        notifications.unshift(
+          ...birthdays.map((c) => ({
+            title: `It's ${c.first_name}'s birthday today`,
+            body: `A good moment to reach out to ${c.first_name} ${c.last_name}.`,
+            tag: `birthday-${c.id}`,
+            url: `/contacts/${c.id}`,
+          })),
+        );
       }
 
       const toSend = notifications.slice(0, 5);

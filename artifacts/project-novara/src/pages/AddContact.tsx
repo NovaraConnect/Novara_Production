@@ -27,6 +27,7 @@ import {
 import { QRScanner, type ScannedQRContact } from "@/components/QRScanner";
 import { NativeContactImport, type PossibleDuplicate } from "@/components/NativeContactImport";
 import { ContactAvatar } from "@/components/ContactAvatar";
+import { BirthdayInput } from "@/components/BirthdayInput";
 import { setContactPhoto } from "@/lib/api";
 import { CONTACTS_KEY } from "@/hooks/useContacts";
 import { useQueryClient } from "@tanstack/react-query";
@@ -97,6 +98,7 @@ export default function AddContact() {
   // The address-book photo from an iPhone Contacts import, saved onto the
   // contact as soon as it has been created.
   const [importedPhoto, setImportedPhoto] = useState<string | null>(null);
+  const [birthday, setBirthday] = useState("");
   const { getToken } = useAuth();
   const queryClient = useQueryClient();
   const { addContact, contacts } = useContacts();
@@ -261,6 +263,7 @@ export default function AddContact() {
         preferredContactMethod: values.preferredContactMethod === "none" ? undefined : values.preferredContactMethod,
         initialFollowUpDays: values.initialFollowUpDays as Contact["initialFollowUpDays"],
         followUpCadenceDays: values.followUpCadenceDays as Contact["followUpCadenceDays"],
+        ...(birthday ? { birthday } : {}),
       } as any);
       if (importedPhoto && created?.id) {
         // The contact is already saved, so a failed photo upload only costs
@@ -439,6 +442,12 @@ export default function AddContact() {
               )} />
             </div>
             <p className="text-xs text-muted-foreground">Leave "Last spoke" blank if you haven't been in touch since you met.</p>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium leading-none">Birthday <span className="text-muted-foreground font-normal">(optional)</span></p>
+              <BirthdayInput value={birthday} onChange={setBirthday} />
+              <p className="text-xs text-muted-foreground">Novara reminds you on the day.</p>
+            </div>
 
             {/* ── PRIMARY SAVE ──────────────────────────────── */}
             <Button
