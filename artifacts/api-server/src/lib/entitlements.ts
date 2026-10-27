@@ -54,9 +54,21 @@ export interface ProStatus {
   state: SubscriptionState;
   /** The plan chosen, from the Apple product. During a trial, the plan it turns into. */
   billingPeriod: BillingPeriod | null;
+  /**
+   * While Pro: true if it renews at expiresAt, false if the user cancelled
+   * (access ends at expiresAt), null if not known. Always null when not Pro.
+   */
+  willRenew: boolean | null;
 }
 
-const NOT_PRO: ProStatus = { pro: false, source: null, expiresAt: null, state: "none", billingPeriod: null };
+const NOT_PRO: ProStatus = {
+  pro: false,
+  source: null,
+  expiresAt: null,
+  state: "none",
+  billingPeriod: null,
+  willRenew: null,
+};
 
 function flagOn(v: string | undefined): boolean {
   return !!v && ["1", "true", "on", "yes"].includes(v.trim().toLowerCase());
@@ -86,10 +98,16 @@ export function billingPeriodFor(productId: string | null): BillingPeriod | null
 
 /** The user's Novara Pro status right now. */
 export async function proStatusFor(userId: string): Promise<ProStatus> {
-  let rows: { status: string; expires_at: Date | null; product_id: string | null; period_type: string | null }[];
+  let rows: {
+    status: string;
+    expires_at: Date | null;
+    product_id: string | null;
+    period_type: string | null;
+    will_renew: boolean | null;
+  }[];
   try {
     ({ rows } = await pool.query(
-      `SELECT status, expires_at, product_id, period_type
+      `SELECT status, expires_at, product_id, period_type, will_renew
          FROM entitlements
         WHERE user_id = $1
           AND source = 'apple_iap'
@@ -98,12 +116,14 @@ export async function proStatusFor(userId: string): Promise<ProStatus> {
     ));
   } catch (err) {
     // 42P01 = undefined_table, 42703 = undefined_column: this API was deployed
-    // before migrations 0004 / 0007. Nobody can have bought Pro yet, so answer
+    // before migrations 0004 / 0007 / 0009. Nobody can have bought Pro yet, so answer
     // "not subscribed" instead of failing every contact creation. Any other
     // error still propagates.
     const code = (err as { code?: string }).code;
     if (code !== "42P01" && code !== "42703") throw err;
-    logger.error("entitlements schema missing; apply migrations 0004_apple_iap_entitlements.sql and 0007_entitlements_period_type.sql");
+    logger.error(
+      "entitlements schema missing; apply migrations 0004_apple_iap_entitlements.sql, 0007_entitlements_period_type.sql and 0009_entitlements_will_renew.sql",
+    );
     return NOT_PRO;
   }
   const row = rows[0];
@@ -120,6 +140,7 @@ export async function proStatusFor(userId: string): Promise<ProStatus> {
     expiresAt: expiresAt.toISOString(),
     state: row.period_type === "TRIAL" ? "trial" : "active",
     billingPeriod,
+    willRenew: typeof row.will_renew === "boolean" ? row.will_renew : null,
   };
 }
 

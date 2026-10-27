@@ -22,6 +22,11 @@
 // so the app can say "Free trial, 3 days left". Converting to paid arrives as a
 // RENEWAL with period_type NORMAL; a trial cancelled in time ends in EXPIRATION.
 //
+// WILL IT RENEW. CANCELLATION means auto-renew was turned off (access lasts
+// until expiration_at_ms); UNCANCELLATION, INITIAL_PURCHASE, RENEWAL and
+// PRODUCT_CHANGE mean it will renew. Other events leave the stored answer as
+// it was. The app uses it to say "Cancelled · access until Nov 3".
+//
 // TRANSFER. When an Apple Account that already paid restores purchases while
 // signed in to a different Novara account, RevenueCat moves the subscription
 // and sends TRANSFER (which has no app_user_id). We move the Apple row to the
@@ -74,6 +79,10 @@ const GRANTING = new Set([
 /** cancel_reason RevenueCat sends with CANCELLATION when Apple refunded the period. */
 const REFUND_REASON = "CUSTOMER_SUPPORT";
 
+/** Events that mean the subscription will renew. CANCELLATION and the ending
+ *  events mean it won't; anything else says nothing either way. */
+const RENEWS = new Set(["INITIAL_PURCHASE", "RENEWAL", "PRODUCT_CHANGE", "UNCANCELLATION"]);
+
 /** Events after which Novara Pro is no longer granted. */
 const ENDING = new Set(["EXPIRATION"]);
 
@@ -95,6 +104,8 @@ export function entitlementChangeFor(event: RevenueCatEvent):
       productId: string | null;
       providerRef: string | null;
       periodType: string | null;
+      /** True or false when the event says; null when it doesn't. */
+      willRenew: boolean | null;
     }
   | null {
   if (!CLERK_USER_ID.test(event.app_user_id)) return null;
@@ -105,14 +116,18 @@ export function entitlementChangeFor(event: RevenueCatEvent):
   const productId = event.product_id ?? null;
   const providerRef = event.original_transaction_id ?? null;
   const periodType = typeof event.period_type === "string" ? event.period_type : null;
+  const willRenew =
+    RENEWS.has(event.type) ? true
+    : event.type === "CANCELLATION" || ENDING.has(event.type) ? false
+    : null;
 
   if (ENDING.has(event.type) || (event.type === "CANCELLATION" && event.cancel_reason === REFUND_REASON)) {
-    return { active: false, expiresAt, productId, providerRef, periodType };
+    return { active: false, expiresAt, productId, providerRef, periodType, willRenew };
   }
   if (GRANTING.has(event.type)) {
     // A grant without an end date is not one we will honour.
     if (!expiresAt) return null;
-    return { active: true, expiresAt, productId, providerRef, periodType };
+    return { active: true, expiresAt, productId, providerRef, periodType, willRenew };
   }
   // TEST, PRODUCT_CHANGE without expiry, and anything new: recorded, not acted on.
   // TRANSFER is handled separately (applyTransfer).
@@ -145,8 +160,9 @@ async function applyTransfer(client: PoolClient, event: RevenueCatEvent): Promis
     status: string;
     expires_at: Date | null;
     period_type: string | null;
+    will_renew: boolean | null;
   }>(
-    `SELECT provider_ref, product_id, status, expires_at, period_type
+    `SELECT provider_ref, product_id, status, expires_at, period_type, will_renew
        FROM entitlements
       WHERE source = 'apple_iap' AND user_id = ANY($1)
         AND (last_event_at IS NULL OR last_event_at <= $2)
@@ -167,8 +183,8 @@ async function applyTransfer(client: PoolClient, event: RevenueCatEvent): Promis
   );
   await client.query(
     `INSERT INTO entitlements
-       (user_id, source, provider_ref, product_id, status, expires_at, period_type, last_event_at, updated_at)
-     VALUES ($1, 'apple_iap', $2, $3, $4, $5, $6, $7, now())
+       (user_id, source, provider_ref, product_id, status, expires_at, period_type, will_renew, last_event_at, updated_at)
+     VALUES ($1, 'apple_iap', $2, $3, $4, $5, $6, $7, $8, now())
      ON CONFLICT (user_id) WHERE source = 'apple_iap'
      DO UPDATE SET
        provider_ref  = EXCLUDED.provider_ref,
@@ -176,11 +192,12 @@ async function applyTransfer(client: PoolClient, event: RevenueCatEvent): Promis
        status        = EXCLUDED.status,
        expires_at    = EXCLUDED.expires_at,
        period_type   = EXCLUDED.period_type,
+       will_renew    = EXCLUDED.will_renew,
        last_event_at = EXCLUDED.last_event_at,
        updated_at    = now()
      WHERE entitlements.last_event_at IS NULL
         OR entitlements.last_event_at <= EXCLUDED.last_event_at`,
-    [to, moved.provider_ref, moved.product_id, moved.status, moved.expires_at, moved.period_type, eventAt],
+    [to, moved.provider_ref, moved.product_id, moved.status, moved.expires_at, moved.period_type, moved.will_renew, eventAt],
   );
   return "applied";
 }
@@ -221,8 +238,8 @@ async function applyEvent(event: RevenueCatEvent): Promise<Outcome> {
     const eventAt = new Date(event.event_timestamp_ms).toISOString();
     const upsert = await client.query(
       `INSERT INTO entitlements
-         (user_id, source, provider_ref, product_id, status, expires_at, period_type, last_event_at, updated_at)
-       VALUES ($1, 'apple_iap', $2, $3, $4, $5, $6, $7, now())
+         (user_id, source, provider_ref, product_id, status, expires_at, period_type, will_renew, last_event_at, updated_at)
+       VALUES ($1, 'apple_iap', $2, $3, $4, $5, $6, $7, $8, now())
        ON CONFLICT (user_id) WHERE source = 'apple_iap'
        DO UPDATE SET
          provider_ref  = EXCLUDED.provider_ref,
@@ -230,6 +247,7 @@ async function applyEvent(event: RevenueCatEvent): Promise<Outcome> {
          status        = EXCLUDED.status,
          expires_at    = EXCLUDED.expires_at,
        period_type   = EXCLUDED.period_type,
+         will_renew    = COALESCE(EXCLUDED.will_renew, entitlements.will_renew),
          last_event_at = EXCLUDED.last_event_at,
          updated_at    = now()
        WHERE entitlements.last_event_at IS NULL
@@ -241,6 +259,7 @@ async function applyEvent(event: RevenueCatEvent): Promise<Outcome> {
         change.active ? "active" : "inactive",
         change.expiresAt ? change.expiresAt.toISOString() : null,
         change.periodType,
+        change.willRenew,
         eventAt,
       ],
     );
