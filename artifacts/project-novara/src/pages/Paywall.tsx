@@ -42,6 +42,8 @@ import {
 } from "@/lib/nativeBridge";
 import {
   annualSavingLabel,
+  cancelledNotice,
+  formatAccessDate,
   KEEP_YOUR_CONTACTS_NOTE,
   PRO_BILLED_LABEL,
   PRO_PERIOD_LABEL,
@@ -248,7 +250,12 @@ export default function Paywall() {
         {isPro ? (
           <section className="space-y-3">
             <p className="text-sm text-foreground">
-              {subscription.plan === "trial"
+              {subscription.cancelled && subscription.accessUntil
+                ? cancelledNotice({
+                    isTrial: subscription.plan === "trial",
+                    untilLong: formatAccessDate(subscription.accessUntil, "long"),
+                  })
+                : subscription.plan === "trial"
                 ? `You're on the Novara Pro free trial${subscription.daysLeft === null ? "" : ` (${trialTimeLeft(subscription.daysLeft)})`}. Your subscription starts when it ends unless you cancel in your Apple Account settings.`
                 : `You're on ${subscription.label}.`}
             </p>

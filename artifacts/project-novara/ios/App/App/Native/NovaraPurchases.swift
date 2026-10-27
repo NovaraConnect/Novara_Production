@@ -347,6 +347,19 @@ enum NovaraLocalStoreKit {
         run(completion) { try await currentEntitlement() }
     }
 
+    /// Whether auto-renew is on for this subscription (off once the user
+    /// cancels in Xcode's transaction manager), or nil when StoreKit can't say.
+    private static func willAutoRenew(_ transaction: StoreKit.Transaction) async -> Bool? {
+        guard let product = try? await StoreKit.Product.products(for: [transaction.productID]).first,
+              let statuses = try? await product.subscription?.status else { return nil }
+        let status = statuses.first { status in
+            if case .verified(let t) = status.transaction { return t.originalID == transaction.originalID }
+            return false
+        } ?? statuses.first
+        guard let status, case .verified(let renewal) = status.renewalInfo else { return nil }
+        return renewal.willAutoRenew
+    }
+
     private static func currentEntitlement() async throws -> [String: Any] {
         var latest: StoreKit.Transaction?
         for id in productIds {
@@ -370,6 +383,7 @@ enum NovaraLocalStoreKit {
             "productId": transaction.productID,
             "expiresAt": expires.map { ISO8601DateFormatter().string(from: $0) } ?? NSNull(),
             "isTrial": isTrial,
+            "willRenew": await willAutoRenew(transaction) ?? NSNull(),
         ]
     }
 }

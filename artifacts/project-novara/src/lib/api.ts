@@ -327,6 +327,9 @@ export interface ProStatus {
   state: SubscriptionState;
   /** Monthly or annual. During a trial, the plan it turns into. */
   billingPeriod: "monthly" | "annual" | null;
+  /** While Pro: true if it renews at expiresAt, false if cancelled (access
+   *  ends at expiresAt), null if not known. Null when not Pro. */
+  willRenew: boolean | null;
 }
 
 /** Throws on failure. Callers decide what an unknown status means for the UI;
@@ -344,6 +347,7 @@ export async function fetchProStatus(getToken: GetAuthToken): Promise<ProStatus>
       // An API from before trials existed only reports `pro`.
       ?? (data?.pro === true ? "active" : "none"),
     billingPeriod: data?.billingPeriod === "monthly" || data?.billingPeriod === "annual" ? data.billingPeriod : null,
+    willRenew: typeof data?.willRenew === "boolean" ? data.willRenew : null,
   };
 }
 
@@ -352,7 +356,13 @@ export async function fetchProStatus(getToken: GetAuthToken): Promise<ProStatus>
  *  everywhere except a developer's own machine. */
 export async function reportLocalStoreKitEntitlement(
   getToken: GetAuthToken,
-  entitlement: { active: boolean; productId: string | null; expiresAt: string | null; isTrial: boolean },
+  entitlement: {
+    active: boolean;
+    productId: string | null;
+    expiresAt: string | null;
+    isTrial: boolean;
+    willRenew?: boolean | null;
+  },
 ): Promise<void> {
   const res = await apiFetch(getToken, "/api/dev/storekit-test/entitlement", {
     method: "POST",

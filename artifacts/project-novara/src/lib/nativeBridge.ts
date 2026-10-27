@@ -76,6 +76,8 @@ export interface LocalStoreKitEntitlement {
   productId: string | null;
   expiresAt: string | null;
   isTrial: boolean;
+  /** Auto-renew on (true) or cancelled (false); null when StoreKit can't say. */
+  willRenew?: boolean | null;
 }
 
 export interface NativeRestoreResult {

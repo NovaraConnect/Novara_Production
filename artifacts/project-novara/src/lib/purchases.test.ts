@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   addContactBlock,
   annualSavingLabel,
+  cancelledNotice,
+  cancelledUntil,
+  formatAccessDate,
   daysLeft,
   FREE_TIER_LIMIT,
   isPaywallVisible,
@@ -14,13 +17,14 @@ import {
 } from "./purchases";
 import type { ProStatus } from "./api";
 
-const FREE: ProStatus = { pro: false, source: null, expiresAt: null, state: "none", billingPeriod: null };
+const FREE: ProStatus = { pro: false, source: null, expiresAt: null, state: "none", billingPeriod: null, willRenew: null };
 const PRO: ProStatus = {
   pro: true,
   source: "apple_iap",
   expiresAt: "2030-01-01T00:00:00.000Z",
   state: "active",
   billingPeriod: "monthly",
+  willRenew: true,
 };
 const noSleep = async () => undefined;
 
@@ -176,6 +180,43 @@ describe("annualSavingLabel", () => {
     expect(annualSavingLabel(4.99, undefined)).toBeNull();
     expect(annualSavingLabel(4.99, 59.88)).toBeNull();
     expect(annualSavingLabel(4.99, 70)).toBeNull();
+  });
+});
+
+describe("cancelled subscriptions (auto-renew off, access continues)", () => {
+  const END = "2026-11-03T19:58:00.000Z";
+  const trial: ProStatus = { ...PRO, state: "trial", expiresAt: END, willRenew: true };
+
+  it("is cancelled only when the server says it won't renew and access continues", () => {
+    expect(cancelledUntil({ ...trial, willRenew: false })).toBe(END);
+    expect(cancelledUntil(trial)).toBeNull();
+    // Unknown keeps today's wording.
+    expect(cancelledUntil({ ...trial, willRenew: null })).toBeNull();
+    // Not Pro: "Subscription ended" applies instead.
+    expect(cancelledUntil({ ...FREE, state: "expired", willRenew: false })).toBeNull();
+    expect(cancelledUntil(undefined)).toBeNull();
+  });
+
+  it("labels it 'Cancelled · access until <date>' for trial and paid plans", () => {
+    expect(subscriptionLabel("trial", 7, true, "Nov 3")).toBe("Cancelled · access until Nov 3");
+    expect(subscriptionLabel("monthly", null, true, "Nov 3")).toBe("Cancelled · access until Nov 3");
+    expect(subscriptionLabel("annual", null, true, "Nov 3")).toBe("Cancelled · access until Nov 3");
+    // Without a cancellation date the usual label stays.
+    expect(subscriptionLabel("trial", 7, true, null)).toBe("Free Trial · 7 days left");
+    expect(subscriptionLabel("expired", null, true, "Nov 3")).toBe("Subscription ended");
+  });
+
+  it("formats the date with a short or long month in the user's locale", () => {
+    const local = new Date(2026, 10, 3, 12, 0).toISOString();
+    expect(formatAccessDate(local, "short", "en-US")).toBe("Nov 3");
+    expect(formatAccessDate(local, "long", "en-US")).toBe("November 3");
+  });
+
+  it("says plainly when access ends and that there is no charge", () => {
+    expect(cancelledNotice({ isTrial: true, untilLong: "November 3" })).toBe(
+      "You've cancelled. You keep Novara Pro until November 3, then the subscription ends. You won't be charged.",
+    );
+    expect(cancelledNotice({ isTrial: false, untilLong: "November 3" })).toContain("You won't be charged again.");
   });
 });
 
