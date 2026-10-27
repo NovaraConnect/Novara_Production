@@ -170,7 +170,7 @@ export default function Dashboard() {
 
         <FollowUpCard
           title="Overdue Follow-ups"
-          icon={<Clock className="h-4 w-4 text-overdue" aria-hidden="true" />}
+          icon={<Clock className="h-4 w-4 text-foreground" aria-hidden="true" />}
           contacts={overdue}
           tone="overdue"
         />
