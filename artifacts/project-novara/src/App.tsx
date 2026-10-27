@@ -26,6 +26,7 @@ import DemoContactDetail from "@/pages/DemoContactDetail";
 import LandingPage from "@/pages/LandingPage";
 import UxPreview from "@/pages/UxPreview";
 import PitchPage from "@/pages/PitchPage";
+import InvestorPage from "@/pages/InvestorPage";
 import NotFound from "@/pages/not-found";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import Support from "@/pages/Support";
@@ -271,6 +272,8 @@ function Router() {
       <Route path="/ux" component={UxPreview} />
       <Route path="/demo" component={LandingPage} />
       <Route path="/pitch" component={PitchPage} />
+      {/* Public: a link sent to investors, who have no account. */}
+      <Route path="/investors" component={InvestorPage} />
       <Route component={NotFound} />
     </Switch>
   );

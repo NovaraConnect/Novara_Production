@@ -26,14 +26,15 @@ export function useInstallPrompt() {
 
 export default function InstallPrompt() {
   const [dismissed, setDismissed] = useState(false);
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
 
   useEffect(() => {
     const key = "novara_install_dismissed";
     if (localStorage.getItem(key) === "1") setDismissed(true);
   }, []);
 
-  if (dismissed || isInstalledExperience()) return null;
+  // The investor page is read by people who aren't going to install the app.
+  if (dismissed || isInstalledExperience() || location === "/investors") return null;
 
   const platform = detectPlatform();
 
