@@ -64,14 +64,11 @@ function PhoneFrame({
   alt,
   className = "",
   eager = false,
-  island = true,
 }: {
   src: string;
   alt: string;
   className?: string;
   eager?: boolean;
-  /** False for a screenshot that already shows its own Dynamic Island. */
-  island?: boolean;
 }) {
   return (
     <div
@@ -87,9 +84,7 @@ function PhoneFrame({
           className="block h-auto w-full"
         />
         {/* Dynamic Island: sits between the clock and the status icons. */}
-        {island && (
-          <div className="absolute left-1/2 top-[1.6%] h-[3.1%] w-[30%] -translate-x-1/2 rounded-full bg-[#0B0F17]" />
-        )}
+        <div className="absolute left-1/2 top-[1.6%] h-[3.1%] w-[30%] -translate-x-1/2 rounded-full bg-[#0B0F17]" />
       </div>
     </div>
   );
@@ -164,7 +159,7 @@ const PROBLEMS = [
   },
 ];
 
-const SCREENS: { src: string; title: string; caption: string; island?: boolean }[] = [
+const SCREENS = [
   {
     src: shot("dashboard"),
     title: "Network Health",
@@ -179,7 +174,6 @@ const SCREENS: { src: string; title: string; caption: string; island?: boolean }
     src: shot("career-profile"),
     title: "Start with a career profile",
     caption: "Say where you’re headed. Each contact’s base priority comes from how well they match it; goals you add bump matching contacts further.",
-    island: false,
   },
   {
     src: shot("contact"),
@@ -407,7 +401,7 @@ export default function InvestorPage() {
             <ul className="flex snap-x snap-mandatory gap-6 overflow-x-auto px-4 pb-4 sm:px-6 lg:grid lg:grid-cols-6 lg:gap-4 lg:overflow-visible lg:pb-0">
               {SCREENS.map((s) => (
                 <li key={s.title} className="w-[62vw] max-w-[250px] shrink-0 snap-center lg:w-auto lg:max-w-none">
-                  <PhoneFrame src={s.src} alt={s.title} island={s.island} />
+                  <PhoneFrame src={s.src} alt={s.title} />
                   <p className="mt-5 font-semibold leading-snug">{s.title}</p>
                   <p className="mt-1.5 text-sm leading-relaxed text-[#5B6272]">{s.caption}</p>
                 </li>
