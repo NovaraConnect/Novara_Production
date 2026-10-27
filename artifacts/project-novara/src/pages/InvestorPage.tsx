@@ -565,8 +565,10 @@ export default function InvestorPage() {
                 subscription business behind it.
               </p>
               <p>
-                French, a University of Florida alum, and a career that has run from L’Oréal
-                to NextEra: Cloé has spent years meeting people worth knowing. Along the way
+                A first-generation immigrant who moved from France to the US alone at 18, a
+                University of Florida alum, and a career that has run from L’Oréal to NextEra:
+                Cloé has spent years building a network from scratch and meeting people worth
+                knowing. Along the way
                 came a simple realization. Networking is the easy part. The gap is in what
                 comes after: actually maintaining the network you’ve built. Novara exists to
                 close that gap.
