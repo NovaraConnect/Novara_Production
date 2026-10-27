@@ -13,6 +13,8 @@ const buttonVariants = cva(
         default:
            // @replit: no hover, and add primary border
            "bg-primary text-primary-foreground border border-primary-border",
+        // Call-to-action: white, with text, icon and outline in the CTA blue.
+        cta: "bg-card text-cta border border-cta shadow-sm hover:bg-cta/5",
         destructive:
           "bg-destructive text-destructive-foreground shadow-sm border-destructive-border",
         outline:

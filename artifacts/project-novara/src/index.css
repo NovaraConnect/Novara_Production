@@ -77,6 +77,8 @@
   /* Button chrome. button.tsx references these; before this they resolved to
      nothing, which is why buttons had no visible edge or pressed state. */
   --color-primary-border: hsl(var(--primary-border));
+  --color-cta: hsl(var(--cta));
+  --color-cta-foreground: hsl(var(--cta-foreground));
   --color-secondary-border: hsl(var(--secondary-border));
   --color-destructive-border: hsl(var(--destructive-border));
 
@@ -156,6 +158,10 @@
 
   /* ---- button chrome the Replit scaffold referenced but never defined ---- */
   --primary-border: 228 60% 34%;
+  /* Call-to-action buttons: outlined in the brand blue (#2941A3), so every
+     "do this next" button on Add Contact reads as the same action. */
+  --cta: 228 60% 40%;
+  --cta-foreground: 0 0% 100%;
   --secondary-border: 220 15% 86%;
   --destructive-border: 0 72% 40%;
   --button-outline: hsl(220 15% 82%);
@@ -248,6 +254,8 @@
   --destructive-foreground: 217 55% 9%;
 
   --primary-border: 228 90% 64%;
+  --cta: 228 100% 72%;
+  --cta-foreground: 0 0% 100%;
   --secondary-border: 214 24% 26%;
   --destructive-border: 353 60% 45%;
   --button-outline: hsl(214 24% 28%);
