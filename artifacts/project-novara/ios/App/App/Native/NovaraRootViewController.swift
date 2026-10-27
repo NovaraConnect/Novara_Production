@@ -361,6 +361,44 @@ final class NovaraRootViewController: UIViewController {
         }
     }
 
+    /// Hands a text file the web app built (the contacts export) to the share
+    /// sheet: Save to Files, Mail, AirDrop. A web view cannot download files,
+    /// so this is how Export Data reaches the user. Resolves true when the
+    /// file was shared, false when the sheet was dismissed.
+    private func presentShareSheet(params: [String: Any], respond: @escaping (Result<Any, Error>) -> Void) {
+        guard let text = params["text"] as? String, let rawName = params["name"] as? String else {
+            respond(.failure(NSError(domain: "Novara", code: -1,
+                                     userInfo: [NSLocalizedDescriptionKey: "Nothing to share"])))
+            return
+        }
+        // Only a file name from the web side, never a path.
+        let name = (rawName as NSString).lastPathComponent
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(name.isEmpty ? "novara-export.csv" : name)
+        do {
+            try text.write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            respond(.failure(error))
+            return
+        }
+        let sheet = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        sheet.completionWithItemsHandler = { _, completed, _, error in
+            try? FileManager.default.removeItem(at: url)
+            if let error {
+                respond(.failure(error))
+            } else {
+                respond(.success(completed))
+            }
+        }
+        // On iPad the sheet is a popover and needs something to point at.
+        if let popover = sheet.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+        present(sheet, animated: true)
+    }
+
     private func presentCardScanner(respond: @escaping (Result<Any, Error>) -> Void) {
         let scanner = NovaraCardScanner()
         cardScanner = scanner
@@ -434,6 +472,22 @@ extension NovaraRootViewController: NovaraWebViewControllerDelegate {
             presentContactPicker(respond: respond)
         case "scanCard":
             presentCardScanner(respond: respond)
+        case "shareFile":
+            presentShareSheet(params: params, respond: respond)
+        case "getProducts":
+            NovaraPurchases.products(completion: respond)
+        case "identifyPurchases":
+            NovaraPurchases.identify(userId: params["userId"] as? String ?? "", completion: respond)
+        case "purchase":
+            NovaraPurchases.purchase(productId: params["productId"] as? String ?? "", completion: respond)
+        case "restorePurchases":
+            NovaraPurchases.restore(completion: respond)
+        case "manageSubscriptions":
+            NovaraPurchases.openSubscriptionSettings(completion: respond)
+        #if DEBUG
+        case "localStoreKitEntitlement" where NovaraPurchases.isLocalStoreKitTest:
+            NovaraLocalStoreKit.entitlement(completion: respond)
+        #endif
         default:
             respond(.failure(NSError(domain: "Novara", code: -1,
                                      userInfo: [NSLocalizedDescriptionKey: "Unsupported native request"])))

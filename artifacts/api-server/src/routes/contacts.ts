@@ -13,10 +13,11 @@ import { recalculateContactsForUser } from "../lib/recalculate";
 import { analyzeContactWithAI } from "../lib/enrich";
 import { logger } from "../lib/logger";
 import { computeNextFollowUp, resolveContactDates, utcDateString } from "../lib/followUpDates";
+import { contactLimitFor, limitReachedBody } from "../lib/entitlements";
 
-/** Novara Free ceiling. Enforced on BOTH create paths — POST /contacts and
- *  POST /contacts/import — so the limit cannot be bypassed by importing. */
-const FREE_TIER_LIMIT = 6;
+// Who may add contacts (Free ceiling, or Pro / trial once a subscription is
+// required) is enforced on BOTH create paths (POST /contacts and
+// POST /contacts/import) through contactLimitFor() in lib/entitlements.ts.
 
 const router = Router();
 
@@ -45,6 +46,69 @@ router.get("/contacts", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// PUT /api/contacts/:id/photo  { photo: "data:image/jpeg;base64,..." }
+// The app crops and shrinks photos before upload; this only checks shape and
+// size, so a contact list carrying every photo stays small.
+const MAX_PHOTO_CHARS = 200_000;
+const PHOTO_PREFIX = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/;
+
+async function hasPhotoColumn(): Promise<boolean> {
+  const { rows } = await pool.query(
+    "SELECT 1 FROM information_schema.columns WHERE table_name = 'contacts' AND column_name = 'photo'",
+  );
+  return rows.length > 0;
+}
+
+router.put("/contacts/:id/photo", requireAuth, async (req: Request, res: Response) => {
+  const userId = (req as AuthedRequest).userId;
+  const photo = (req.body as { photo?: unknown })?.photo;
+  if (typeof photo !== "string" || photo.length > MAX_PHOTO_CHARS || !PHOTO_PREFIX.test(photo)) {
+    res.status(400).json({ error: "Photo must be a JPEG, PNG or WebP image under 150 KB" });
+    return;
+  }
+  try {
+    if (!(await hasPhotoColumn())) {
+      res.status(503).json({ error: "Contact photos aren't available yet" });
+      return;
+    }
+    const { rows } = await pool.query(
+      "UPDATE contacts SET photo = $1, updated_at = now() WHERE id = $2 AND user_id = $3 RETURNING *",
+      [photo, req.params.id, userId],
+    );
+    if (!rows[0]) {
+      res.status(404).json({ error: "Contact not found" });
+      return;
+    }
+    res.json(dbToContact(rows[0]));
+  } catch (err) {
+    logger.error({ err }, "Saving contact photo failed");
+    res.status(500).json({ error: "Failed to save photo" });
+  }
+});
+
+// DELETE /api/contacts/:id/photo — back to initials.
+router.delete("/contacts/:id/photo", requireAuth, async (req: Request, res: Response) => {
+  const userId = (req as AuthedRequest).userId;
+  try {
+    if (!(await hasPhotoColumn())) {
+      res.status(503).json({ error: "Contact photos aren't available yet" });
+      return;
+    }
+    const { rows } = await pool.query(
+      "UPDATE contacts SET photo = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 RETURNING *",
+      [req.params.id, userId],
+    );
+    if (!rows[0]) {
+      res.status(404).json({ error: "Contact not found" });
+      return;
+    }
+    res.json(dbToContact(rows[0]));
+  } catch (err) {
+    logger.error({ err }, "Removing contact photo failed");
+    res.status(500).json({ error: "Failed to remove photo" });
+  }
+});
+
 // POST /api/contacts/recalculate  — authenticated, idempotent maintenance.
 // Recomputes AI Suggested Priority + automatic cadence for the caller's
 // non-overridden contacts and returns a report. Safe to run repeatedly.
@@ -62,6 +126,40 @@ router.post("/contacts/recalculate", requireAuth, async (req: Request, res: Resp
   }
 });
 
+// Birthday: month and day as "--MM-DD" (no year), or null/"" to clear.
+// Saved after the main insert/update so the long statements above stay as
+// they are; absent from the request means "leave it alone".
+const BIRTHDAY_RE = /^--(\d{2})-(\d{2})$/;
+
+function parseBirthday(v: unknown): { ok: true; value: string | null | undefined } | { ok: false } {
+  if (v === undefined) return { ok: true, value: undefined };
+  if (v === null || v === "") return { ok: true, value: null };
+  if (typeof v !== "string") return { ok: false };
+  const m = BIRTHDAY_RE.exec(v);
+  if (!m) return { ok: false };
+  const month = Number(m[1]), day = Number(m[2]);
+  // Checked against 2000, a leap year, so 29 February is allowed.
+  const d = new Date(Date.UTC(2000, month - 1, day));
+  if (d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day) return { ok: false };
+  return { ok: true, value: v };
+}
+
+async function hasBirthdayColumn(): Promise<boolean> {
+  const { rows } = await pool.query(
+    "SELECT 1 FROM information_schema.columns WHERE table_name = 'contacts' AND column_name = 'birthday'",
+  );
+  return rows.length > 0;
+}
+
+async function applyBirthday<T extends { id: string }>(contact: T, value: string | null | undefined, userId: string): Promise<T> {
+  if (value === undefined || !(await hasBirthdayColumn())) return contact;
+  const { rows } = await pool.query(
+    "UPDATE contacts SET birthday = $1 WHERE id = $2 AND user_id = $3 RETURNING *",
+    [value, contact.id, userId],
+  );
+  return rows[0] ?? contact;
+}
+
 // POST /api/contacts
 router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
   const userId = (req as AuthedRequest).userId;
@@ -74,6 +172,12 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
   } = req.body;
 
   const preferredMethod = normalizePreferred(preferredContactMethod);
+
+  const birthday = parseBirthday(req.body.birthday);
+  if (!birthday.ok) {
+    res.status(400).json({ error: "Birthday must be a real month and day, as --MM-DD" });
+    return;
+  }
 
   if (!firstName || !lastName || !company) {
     res.status(400).json({ error: "firstName, lastName, company are required" });
@@ -99,12 +203,9 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
       "SELECT COUNT(*) AS count FROM contacts WHERE user_id = $1",
       [userId],
     );
-    if (parseInt(countRow.count, 10) >= FREE_TIER_LIMIT) {
-      res.status(403).json({
-        error: "Contact limit reached",
-        message: `Novara Free includes up to ${FREE_TIER_LIMIT} contacts. Novara Pro removes the limit.`,
-        code: "CONTACT_LIMIT_REACHED",
-      });
+    const limit = await contactLimitFor(userId);
+    if (parseInt(countRow.count, 10) >= limit) {
+      res.status(403).json(limitReachedBody());
       return;
     }
 
@@ -204,7 +305,7 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
         dates.firstContactDate, dates.lastInteractionDate, nextFollowUp,
       ],
     );
-    res.status(201).json(dbToContact(contact));
+    res.status(201).json(dbToContact(await applyBirthday(contact, birthday.value, userId)));
   } catch (err) {
     console.error("[contacts POST] DB error:", err);
     res.status(500).json({ error: "Failed to create contact", detail: err instanceof Error ? err.message : String(err) });
@@ -242,6 +343,12 @@ router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
     priorityOverride, currentPriority: manualPriority, cadenceOverride,
     preferredContactMethod, firstContactDate, lastInteractionDate,
   } = req.body;
+
+  const birthday = parseBirthday(req.body.birthday);
+  if (!birthday.ok) {
+    res.status(400).json({ error: "Birthday must be a real month and day, as --MM-DD" });
+    return;
+  }
 
   const preferredMethod = normalizePreferred(preferredContactMethod);
 
@@ -414,7 +521,7 @@ router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
         dates.firstContactDate, dates.lastInteractionDate,
       ],
     );
-    res.json(dbToContact(contact));
+    res.json(dbToContact(await applyBirthday(contact, birthday.value, userId)));
   } catch (err) {
     console.error("[contacts PUT] DB error:", err);
     res.status(500).json({ error: "Failed to update contact", detail: err instanceof Error ? err.message : String(err) });
@@ -488,23 +595,20 @@ router.post("/contacts/import", requireAuth, async (req: Request, res: Response)
 
   // The free ceiling applies here as well. Without this, a user could import
   // an unlimited address book and never meet the limit that POST /contacts
-  // enforces — which would make FREE_TIER_LIMIT one API call from meaningless.
+  // enforces — which would make the limit one API call from meaningless.
   const { rows: [limitRow] } = await pool.query(
     "SELECT COUNT(*) AS count FROM contacts WHERE user_id = $1",
     [userId],
   );
   const alreadyStored = parseInt(limitRow.count, 10);
-  if (alreadyStored >= FREE_TIER_LIMIT) {
-    res.status(403).json({
-      error: "Contact limit reached",
-      message: `Novara Free includes up to ${FREE_TIER_LIMIT} contacts. Novara Pro removes the limit.`,
-      code: "CONTACT_LIMIT_REACHED",
-    });
+  const limit = await contactLimitFor(userId);
+  if (alreadyStored >= limit) {
+    res.status(403).json(limitReachedBody());
     return;
   }
   // Partial imports are allowed: take what fits and report the remainder,
   // rather than rejecting a whole batch because its tail overflows.
-  const capacity = FREE_TIER_LIMIT - alreadyStored;
+  const capacity = limit - alreadyStored;
 
   const { rows: [settingsRow] } = await pool.query(
     "SELECT career_goals, career_statement, goal_tags FROM user_settings WHERE user_id = $1",
@@ -584,7 +688,7 @@ router.post("/contacts/import", requireAuth, async (req: Request, res: Response)
     imported,
     skipped,
     ...(skippedOverLimit > 0
-      ? { skippedOverLimit, limit: FREE_TIER_LIMIT, code: "CONTACT_LIMIT_REACHED" }
+      ? { skippedOverLimit, limit, code: "CONTACT_LIMIT_REACHED" }
       : {}),
   });
 });

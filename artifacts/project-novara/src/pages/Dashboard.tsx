@@ -1,21 +1,26 @@
 import { Link } from "wouter";
-import { computeHealthScore, computeStatus, getDaysPastDue, formatDate } from "@/lib/utils";
+import { computeHealthScore, computeStatus, getDaysPastDue, formatDate, describeFollowUp, cn } from "@/lib/utils";
 import { BottomNav } from "@/components/BottomNav";
-import { ContactCard } from "@/components/ContactCard";
-import { Plus, Loader2, Users, Clock, Info, ChevronRight, Target } from "lucide-react";
+import { ContactAvatar } from "@/components/ContactAvatar";
+import { StatusBadge } from "@/components/StatusBadge";
+import { RecentActivity } from "@/components/RecentActivity";
+import { ScoreRing } from "@/components/ScoreRing";
+import { useHealthTrend } from "@/hooks/useHealthTrend";
+import { Plus, Loader2, Users, Info, ChevronRight, Target, Search, CalendarDays, Clock, TrendingUp, TrendingDown } from "lucide-react";
+import type { Contact } from "@/types/contact";
 import { Button } from "@/components/ui/button";
 import { useContacts } from "@/hooks/useContacts";
 import { Redirect } from "wouter";
 import { useSettings } from "@/hooks/useSettings";
-import { useUser } from "@clerk/react";
 
 export default function Dashboard() {
   const { contacts, isLoading } = useContacts();
   const { settings, isLoading: settingsLoading, updateSettings } = useSettings();
-  const { user } = useUser();
   const connectedContacts = contacts.filter(c => c.connectionStatus === "connected");
   const pipelineCount = contacts.filter(c => c.connectionStatus === "pipeline").length;
   const healthScore = computeHealthScore(connectedContacts);
+  const lastMonth = useHealthTrend();
+  const healthChange = lastMonth ? healthScore - lastMonth.score : null;
   const stats = connectedContacts.reduce(
     (acc, contact) => {
       const status = computeStatus(contact);
@@ -24,19 +29,20 @@ export default function Dashboard() {
     },
     { Warm: 0, Cooling: 0, Cold: 0, Dormant: 0 } as Record<string, number>
   );
-  const overdueContacts = connectedContacts
+  // Overdue: highest priority first, then longest overdue. Upcoming: soonest
+  // first. Each card shows the first few; "View all" goes to Contacts.
+  const priorityOrder: Record<string, number> = { High: 0, Medium: 1, Low: 2 };
+  const overdue = connectedContacts
     .filter(c => getDaysPastDue(c) > 0)
     .sort((a, b) => {
-      const priorityOrder: Record<string, number> = { High: 0, Medium: 1, Low: 2 };
       const aPriority = priorityOrder[a.currentPriority ?? a.importance] ?? 1;
       const bPriority = priorityOrder[b.currentPriority ?? b.importance] ?? 1;
       if (aPriority !== bPriority) return aPriority - bPriority;
       return getDaysPastDue(b) - getDaysPastDue(a);
     });
-  const warmContacts = connectedContacts.filter(c => computeStatus(c) === "Warm");
-  const maxOverdueDays = overdueContacts.length > 0
-    ? Math.max(...overdueContacts.map(c => getDaysPastDue(c)))
-    : 0;
+  const upcoming = connectedContacts
+    .filter(c => getDaysPastDue(c) === 0)
+    .sort((a, b) => (a.nextFollowUpDate ?? "").localeCompare(b.nextFollowUpDate ?? ""));
   if (isLoading || settingsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -56,19 +62,26 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background pb-nav">
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border/50 pt-safe pb-4 px-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-serif text-2xl font-bold tracking-tight text-foreground">
-              {user?.firstName ? `Hi, ${user.firstName}` : "Novara"}
-            </h1>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="font-serif text-3xl font-bold tracking-tight text-foreground">Novara</h1>
             <p className="text-sm text-muted-foreground mt-0.5">Your network at a glance</p>
           </div>
-          <Link href="/add">
-            <Button size="sm" className="gap-1.5">
-              <Plus className="h-4 w-4" />
-              Add
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href="/contacts#search"
+              aria-label="Search contacts"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-border/60 bg-card text-foreground shadow-sm transition-colors hover:bg-elevated"
+            >
+              <Search className="h-[18px] w-[18px]" />
+            </Link>
+            <Link href="/add">
+              <Button size="sm" className="h-10 gap-1.5 rounded-xl px-4">
+                <Plus className="h-4 w-4" />
+                Add
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -78,7 +91,7 @@ export default function Dashboard() {
           className="surface-card block p-4 mb-4 transition-colors hover:bg-elevated"
         >
           <div className="flex items-center justify-between mb-3">
-            <span className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+            <span className="flex items-center gap-1.5 text-[15px] font-semibold text-foreground">
               Network Health
               <Info
                 className="h-3.5 w-3.5 text-muted-foreground"
@@ -87,17 +100,29 @@ export default function Dashboard() {
             </span>
             <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </div>
-          {/* The serif numeral is the focal point of the module, so it gets its
-              own breathing room. leading-none clips the serif's descender space
-              and pulled the tiles up against the baseline, so the space is put
-              back explicitly (pt-1/pb-5) rather than by loosening leading,
-              which would throw the numeral off its optical centre. The "/100"
-              is nudged to sit on the numeral's baseline rather than the box's. */}
-          <div className="flex items-baseline gap-2 pt-1 pb-5">
-            <span className="font-serif text-5xl font-bold leading-none tracking-tight text-foreground tabular-nums">
-              {healthScore}
-            </span>
-            <span className="text-sm text-muted-foreground">/100</span>
+          <div className="flex items-center gap-4 pb-5">
+            <ScoreRing score={healthScore} />
+            <div className="min-w-0">
+              <p className="text-sm text-muted-foreground">out of 100</p>
+              {/* Shown once there is a month of history to compare with. */}
+              {healthChange !== null && (
+                <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold tabular-nums",
+                      healthChange > 0 && "bg-warm-soft text-warm",
+                      healthChange < 0 && "bg-cold-soft text-cold",
+                      healthChange === 0 && "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {healthChange > 0 && <TrendingUp className="h-3 w-3" aria-hidden="true" />}
+                    {healthChange < 0 && <TrendingDown className="h-3 w-3" aria-hidden="true" />}
+                    {healthChange > 0 ? `+${healthChange}` : healthChange === 0 ? "No change" : `−${-healthChange}`}
+                  </span>
+                  vs last month
+                </p>
+              )}
+            </div>
           </div>
           {/* Four tinted wells rather than pastel blocks: the semantic hue is
               carried by the number and a translucent wash, so the tiles read
@@ -133,55 +158,30 @@ export default function Dashboard() {
           >
             <div className="flex items-center gap-2.5">
               <Target className="w-6 h-6 text-primary shrink-0" />
-              <p className="flex-1 text-[15px] font-bold text-primary">Set your career goals</p>
+              <p className="flex-1 text-[15px] font-bold text-primary">Set your career profile</p>
               <ChevronRight className="w-4 h-4 text-primary/60 shrink-0" aria-hidden="true" />
             </div>
             <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-              Novara raises the priority of contacts who can help you get there, and lets the rest
-              settle. Until they are set, every contact keeps its base priority.
+              Tell Novara what you're working towards. It raises the priority of contacts who can
+              help you get there; until then, every contact keeps its base priority.
             </p>
           </Link>
         )}
 
-        {overdueContacts.length > 0 && (
-          <div className="mb-4">
-            <Link href="/contacts" className="flex items-center gap-2 mb-2 group">
-              <Clock className="h-4 w-4 text-overdue" />
-              <h2 className="flex-1 text-sm font-semibold text-foreground">Overdue Follow-ups</h2>
-              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" aria-hidden="true" />
-            </Link>
-            <div className="mb-3 flex items-center justify-between rounded-xl border border-overdue/20 bg-overdue-soft px-3 py-2">
-              <span className="text-xs font-medium text-overdue">{overdueContacts.length} follow-up{overdueContacts.length > 1 ? "s" : ""} overdue</span>
-              <span className="text-xs text-overdue">Oldest: {maxOverdueDays} day{maxOverdueDays !== 1 ? "s" : ""}</span>
-            </div>
-            <div className="space-y-3">
-              {overdueContacts.map(contact => {
-                const daysPast = getDaysPastDue(contact);
-                return (
-                  <ContactCard
-                    key={contact.id}
-                    contact={contact}
-                    showOverdueBadge
-                    overdaysPast={daysPast}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        )}
-        {warmContacts.length > 0 && (
-          <div className="mb-4">
-            <h2 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-warm inline-block" />
-              On Track
-            </h2>
-            <div className="space-y-3">
-              {warmContacts.map(contact => (
-                <ContactCard key={contact.id} contact={contact} />
-              ))}
-            </div>
-          </div>
-        )}
+        <FollowUpCard
+          title="Overdue Follow-ups"
+          icon={<Clock className="h-4 w-4 text-foreground" aria-hidden="true" />}
+          contacts={overdue}
+          tone="overdue"
+        />
+        <FollowUpCard
+          title="Upcoming Follow-ups"
+          icon={<CalendarDays className="h-4 w-4 text-foreground" aria-hidden="true" />}
+          contacts={upcoming}
+        />
+        <div className="mb-4">
+          <RecentActivity contacts={connectedContacts} />
+        </div>
         {connectedContacts.length === 0 && (
           <div className="text-center py-16">
             <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -206,5 +206,69 @@ export default function Dashboard() {
       </div>
       <BottomNav />
     </div>
+  );
+}
+
+/** A Dashboard list of follow-ups: the first three, each with when it is due,
+ *  and "View all" to Contacts. Renders nothing when the list is empty. */
+function FollowUpCard({
+  title,
+  icon,
+  contacts,
+  tone,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  contacts: Contact[];
+  tone?: "overdue";
+}) {
+  if (contacts.length === 0) return null;
+  return (
+    <section
+      className={cn("surface-card px-4 pt-4 pb-1 mb-4", tone === "overdue" && "border-overdue/25")}
+      aria-label={title}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        {icon}
+        <h2 className="flex-1 text-[15px] font-semibold text-foreground">
+          {title}
+          {tone === "overdue" && (
+            <span className="ml-2 rounded-full bg-overdue-soft px-2 py-0.5 align-middle text-xs font-semibold text-overdue">
+              {contacts.length}
+            </span>
+          )}
+        </h2>
+        <Link href="/contacts" className="flex items-center gap-0.5 text-sm font-medium text-primary">
+          View all
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
+      </div>
+      <div className="divide-y divide-border/60">
+        {contacts.slice(0, 3).map(contact => {
+          const due = describeFollowUp(contact);
+          return (
+            <Link key={contact.id} href={`/contacts/${contact.id}`} className="flex items-center gap-3 py-3">
+              <ContactAvatar firstName={contact.firstName} lastName={contact.lastName} photo={contact.photo} size={44} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="truncate text-[15px] font-semibold text-foreground">
+                    {contact.firstName} {contact.lastName}
+                  </p>
+                  <StatusBadge status={computeStatus(contact)} className="shrink-0 text-[11px]" />
+                </div>
+                <p className="truncate text-sm text-muted-foreground">
+                  {contact.role}{contact.role && contact.company ? " · " : ""}{contact.company}
+                </p>
+                <p className={cn("mt-1 flex items-center gap-1 text-xs", due.overdue ? "text-overdue" : "text-muted-foreground")}>
+                  <CalendarDays className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  {due.label} · {formatDate(contact.nextFollowUpDate)}
+                </p>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            </Link>
+          );
+        })}
+      </div>
+    </section>
   );
 }

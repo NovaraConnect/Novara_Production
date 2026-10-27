@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useContacts } from "@/hooks/useContacts";
+import { BirthdayInput } from "@/components/BirthdayInput";
 import { Contact } from "@/types/contact";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,6 +76,7 @@ export default function EditContact() {
   }, [contact, contacts.length, setLocation]);
 
   const [interests, setInterests] = useState<string[]>([]);
+  const [birthday, setBirthday] = useState("");
   const [interestInput, setInterestInput] = useState("");
   const [priorityOverride, setPriorityOverride] = useState(false);
   const [overridePriority, setOverridePriority] = useState<"High" | "Medium" | "Low">("Medium");
@@ -125,6 +127,7 @@ export default function EditContact() {
           : "",
       });
       setInterests(contact.interests ?? []);
+      setBirthday(contact.birthday ?? "");
       setPriorityOverride(contact.priorityOverride ?? false);
       setOverridePriority(contact.currentPriority ?? contact.importance);
       setCadenceOverride(contact.cadenceOverride ?? false);
@@ -173,6 +176,8 @@ export default function EditContact() {
           preferredContactMethod: values.preferredContactMethod === "none" ? undefined : values.preferredContactMethod,
           initialFollowUpDays: values.initialFollowUpDays as Contact["initialFollowUpDays"],
           followUpCadenceDays: values.followUpCadenceDays as Contact["followUpCadenceDays"],
+          // Choosing "Month" or "Day" again clears it.
+          birthday: birthday || (contact.birthday ? null : undefined),
         } as any
       });
       setLocation(`/contacts/${contact.id}`);
@@ -276,6 +281,12 @@ export default function EditContact() {
               )} />
             </div>
             <p className="text-xs text-muted-foreground">Leave "Last spoke" blank if you haven't been in touch since you met.</p>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium leading-none">Birthday <span className="text-muted-foreground font-normal">(optional)</span></p>
+              <BirthdayInput value={birthday} onChange={setBirthday} />
+              <p className="text-xs text-muted-foreground">Novara reminds you on the day.</p>
+            </div>
 
             {/* Contact Profile for dynamic priority */}
             <div className="rounded-2xl border border-border/50 bg-card shadow-sm p-5 space-y-4">

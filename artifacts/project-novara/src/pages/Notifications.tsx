@@ -242,6 +242,12 @@ export default function Notifications() {
                 onChange={(v) => void updateSettings({ notifyStatusChange: v })}
               />
               <NotifToggleRow
+                label="Birthdays"
+                description="On a contact's birthday — a good reason to reach out."
+                checked={settings.notifyBirthdays}
+                onChange={(v) => void updateSettings({ notifyBirthdays: v })}
+              />
+              <NotifToggleRow
                 label="Weekly digest"
                 description="Monday summary of your network health and overdue contacts."
                 checked={settings.notifyWeeklyDigest}

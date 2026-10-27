@@ -1,7 +1,6 @@
 import { useState, useRef } from "react";
-import { ImportOptionCard } from "@/components/ImportOptionCard";
-import { Camera, Image as ImageIcon, Loader2, X, ScanLine, CheckCircle2, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ImportOptionCard, ImportPrimaryButton, ImportSecondaryButton, InfoRow } from "@/components/ImportOptionCard";
+import { Camera, Image as ImageIcon, Loader2, X, CheckCircle2, AlertCircle, Lightbulb } from "lucide-react";
 import { toast } from "sonner";
 import { extractContactFields, type ScannedContact } from "@/lib/businessCardParse";
 import { mergeCardResult } from "@/lib/cardMerge";
@@ -187,9 +186,22 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
 
   return (
     <ImportOptionCard
-      icon={ScanLine}
-      title="Scan Business Card"
-      description="Take a photo or upload an image to auto-fill contact fields."
+      icon={Camera}
+      title="Scan a business card"
+      description={
+        hasNativeScanner
+          ? "Take a photo or choose an image. Novara finds the edges and fills in the details for you."
+          : "Take a photo or choose an image, and Novara fills in the details for you."
+      }
+      info={
+        <InfoRow icon={Lightbulb} title="Tips for best results">
+          <ul className="list-disc space-y-0.5 pl-4">
+            <li>Hold the card flat and fill the frame</li>
+            <li>Make sure it's well lit</li>
+            {!hasNativeScanner && <li>If the camera doesn't open, use Choose Photo</li>}
+          </ul>
+        </InfoRow>
+      }
     >
 
       {/* ── Processing ── */}
@@ -253,34 +265,17 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
       {/* ── Idle: two buttons ── */}
       {status === "idle" && (
         <>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1 h-11 gap-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-sm font-semibold shadow-sm"
-              onClick={hasNativeScanner ? handleNativeScan : () => cameraRef.current?.click()}
-              data-testid="button-scan-card"
-            >
-              <Camera className="w-4 h-4" />
-              {hasNativeScanner ? "Scan Card" : "Take Photo"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1 h-11 gap-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-sm font-semibold shadow-sm"
-              onClick={() => libraryRef.current?.click()}
-            >
-              <ImageIcon className="w-4 h-4" />
-              Choose Photo
-            </Button>
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
-            {hasNativeScanner
-              ? "Hold the card in the frame — Novara finds the edges and reads it on your iPhone. You can scan both sides."
-              : "Good lighting, card filling the frame. First scan takes 5–15 seconds. If the camera doesn't open, use "}
-            {!hasNativeScanner && <span className="font-medium">Choose Photo</span>}
-            {!hasNativeScanner && "."}
-          </p>
+          <ImportPrimaryButton
+            onClick={hasNativeScanner ? handleNativeScan : () => cameraRef.current?.click()}
+            data-testid="button-scan-card"
+          >
+            <Camera />
+            Scan Card
+          </ImportPrimaryButton>
+          <ImportSecondaryButton onClick={() => libraryRef.current?.click()}>
+            <ImageIcon />
+            Choose Photo
+          </ImportSecondaryButton>
         </>
       )}
 

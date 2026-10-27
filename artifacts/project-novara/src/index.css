@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
 @layer theme, base, clerk, components, utilities;
 @import "tailwindcss";
 @import '@clerk/themes/shadcn.css';
@@ -77,13 +77,17 @@
   /* Button chrome. button.tsx references these; before this they resolved to
      nothing, which is why buttons had no visible edge or pressed state. */
   --color-primary-border: hsl(var(--primary-border));
+  --color-cta: hsl(var(--cta));
+  --color-cta-foreground: hsl(var(--cta-foreground));
   --color-secondary-border: hsl(var(--secondary-border));
   --color-destructive-border: hsl(var(--destructive-border));
 
   --color-overdue: var(--overdue);
   --color-overdue-soft: var(--overdue-soft);
 
-  --font-sans: 'Plus Jakarta Sans', sans-serif;
+  /* Apple's system font (SF Pro) on iPhone and Mac, as in the design; Inter,
+     its closest match, everywhere else. */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
   --font-serif: 'Playfair Display', serif;
   --radius: .5rem;
 }
@@ -154,6 +158,10 @@
 
   /* ---- button chrome the Replit scaffold referenced but never defined ---- */
   --primary-border: 228 60% 34%;
+  /* Call-to-action buttons: outlined in the brand blue (#2941A3), so every
+     "do this next" button on Add Contact reads as the same action. */
+  --cta: 228 60% 40%;
+  --cta-foreground: 0 0% 100%;
   --secondary-border: 220 15% 86%;
   --destructive-border: 0 72% 40%;
   --button-outline: hsl(220 15% 82%);
@@ -246,6 +254,8 @@
   --destructive-foreground: 217 55% 9%;
 
   --primary-border: 228 90% 64%;
+  --cta: 228 100% 72%;
+  --cta-foreground: 0 0% 100%;
   --secondary-border: 214 24% 26%;
   --destructive-border: 353 60% 45%;
   --button-outline: hsl(214 24% 28%);

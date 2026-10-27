@@ -2,9 +2,11 @@ import { useRoute, useLocation, Link } from "wouter";
 import { useState, useEffect } from "react";
 import { formatDate, computeStatus } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
+import { ContactPhotoEditor } from "@/components/ContactPhotoEditor";
+import { formatBirthday } from "@/components/BirthdayInput";
 import { ImportanceBadge } from "@/components/ImportanceBadge";
 import {
-  ArrowLeft, Edit2, Trash2, Linkedin, MapPin, AlignLeft, CalendarDays,
+  ArrowLeft, Edit2, Trash2, Linkedin, MapPin, AlignLeft, CalendarDays, Cake,
   CheckCircle2, Bell, CalendarPlus, ExternalLink, Newspaper, Loader2, RefreshCw,
   Mail, Phone, TrendingUp, TrendingDown, Briefcase, Tag, Send, MessageSquare,
 } from "lucide-react";
@@ -230,6 +232,9 @@ export default function ContactDetail() {
       <main className="flex-1 px-4 py-4">
         {/* Header */}
         <div className="mb-8">
+          <div className="mb-4">
+            <ContactPhotoEditor contact={contact} />
+          </div>
           <h1 className="font-serif text-3xl font-bold tracking-tight text-foreground mb-1 leading-tight">
             {contact.firstName} {contact.lastName}
           </h1>
@@ -406,6 +411,18 @@ export default function ContactDetail() {
                 <div>
                   <p className="text-xs text-muted-foreground">First contact date</p>
                   <p className="text-sm font-medium text-foreground">{formatDate(contact.firstContactDate)}</p>
+                </div>
+              </div>
+            )}
+
+            {formatBirthday(contact.birthday) && (
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-secondary/80 flex items-center justify-center shrink-0">
+                  <Cake className="w-4 h-4 text-foreground/70" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Birthday</p>
+                  <p className="text-sm font-medium text-foreground">{formatBirthday(contact.birthday)}</p>
                 </div>
               </div>
             )}

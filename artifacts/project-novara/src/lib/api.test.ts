@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { apiFetch, fetchContacts, fetchFeatures, readCachedFeatures } from "./api";
+import { apiFetch, fetchContacts, fetchFeatures, fetchProStatus, readCachedFeatures } from "./api";
 
 describe("apiFetch", () => {
   beforeEach(() => {
@@ -118,5 +118,35 @@ describe("fetchFeatures", () => {
 
     expect(features.linkedinScreenshotImport).toBe(false);
     expect(readCachedFeatures()?.linkedinScreenshotImport).toBe(false);
+  });
+});
+
+describe("fetchProStatus", () => {
+  const getToken = () => Promise.resolve("test-token-123");
+  beforeEach(() => vi.restoreAllMocks());
+
+  it("reads the trial state and billing period", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({
+        pro: true, source: "apple_iap", expiresAt: "2030-01-01T00:00:00.000Z", state: "trial", billingPeriod: "annual",
+      }), { status: 200 }),
+    );
+    expect(await fetchProStatus(getToken)).toMatchObject({ pro: true, state: "trial", billingPeriod: "annual", willRenew: null });
+  });
+
+  it("fills in the state from an API that predates trials", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ pro: true, source: "apple_iap", expiresAt: "2030-01-01T00:00:00.000Z" }), { status: 200 }),
+    );
+    expect(await fetchProStatus(getToken)).toMatchObject({ pro: true, state: "active", billingPeriod: null });
+  });
+
+  it("reads whether the subscription will renew", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({
+        pro: true, source: "apple_iap", expiresAt: "2030-01-01T00:00:00.000Z", state: "active", billingPeriod: "monthly", willRenew: false,
+      }), { status: 200 }),
+    );
+    expect(await fetchProStatus(getToken)).toMatchObject({ pro: true, willRenew: false });
   });
 });

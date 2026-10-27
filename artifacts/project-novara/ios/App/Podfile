@@ -16,9 +16,17 @@ end
 
 target 'Novara Connect' do
   capacitor_pods
-  # Add your Pods here
+  # Apple In-App Purchase for Novara Pro (see docs/APPLE_IAP_SETUP.md).
+  pod 'RevenueCat', '~> 5.2'
 end
 
 post_install do |installer|
   assertDeploymentTarget(installer)
+  # Pods default to iOS 14.0; current Xcode simulators need 15.0+.
+  # Match the app's own minimum (15.0) so every pod builds.
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+    end
+  end
 end

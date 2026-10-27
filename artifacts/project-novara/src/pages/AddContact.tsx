@@ -18,6 +18,8 @@ import { suggestPriority, suggestInitialFollowUp, deriveSuggestedCadence, MANUAL
 import { BusinessCardScanner, type ScannedContact } from "@/components/BusinessCardScanner";
 import { LinkedInScreenshotImport } from "@/components/LinkedInScreenshotImport";
 import type { LinkedInDraft } from "@/lib/linkedinParse";
+import { useAddContactAccess } from "@/hooks/useAddContactAccess";
+import { FREE_TIER_LIMIT, SUBSCRIPTION_ROUTE } from "@/lib/purchases";
 import {
   planLinkedInImport,
   LINKEDIN_IMPORT_FIELDS,
@@ -25,9 +27,34 @@ import {
   type FormSnapshot,
 } from "@/lib/linkedinImportDraft";
 import { QRScanner, type ScannedQRContact } from "@/components/QRScanner";
-import { NativeContactImport } from "@/components/NativeContactImport";
-import { useFeatures } from "@/hooks/useFeatures";
-import { localDateString } from "@/lib/utils";
+import { NativeContactImport, type PossibleDuplicate } from "@/components/NativeContactImport";
+import { canPickNativeContact } from "@/lib/nativeBridge";
+import { ContactAvatar } from "@/components/ContactAvatar";
+import { BirthdayInput } from "@/components/BirthdayInput";
+import { setContactPhoto } from "@/lib/api";
+import { CONTACTS_KEY } from "@/hooks/useContacts";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/react";
+import { localDateString, cn } from "@/lib/utils";
+
+type AddTab = "manual" | "contacts" | "card" | "linkedin" | "qr";
+const ADD_TABS: { id: AddTab; label: string }[] = [
+  { id: "manual", label: "Manual" },
+  { id: "contacts", label: "Contacts" },
+  { id: "card", label: "Business card" },
+  { id: "linkedin", label: "LinkedIn" },
+  { id: "qr", label: "QR Code" },
+];
+
+/** A small uppercase heading over each group of the manual form. */
+function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-4">
+      <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
+      {children}
+    </section>
+  );
+}
 
 const INITIAL_OPTIONS: Contact["initialFollowUpDays"][] = [1, 2, 3];
 const CADENCE_OPTIONS: Contact["followUpCadenceDays"][] = [...MANUAL_CADENCE_OPTIONS];
@@ -72,10 +99,22 @@ function labelDays(days: number): string {
   return `${days} days`;
 }
 
-const FREE_TIER_LIMIT = 6;
-
 export default function AddContact() {
   const [, setLocation] = useLocation();
+
+  // The tabs at the top: Manual is the form, each other tab is one way to
+  // fill it without typing. Anything an importer reads lands in the form, so a
+  // successful import switches to Manual to review it. Contacts only exists in
+  // the iPhone app, where the native picker does.
+  const [tab, setTab] = useState<AddTab>("manual");
+  const tabs = ADD_TABS.filter(t => t.id !== "contacts" || canPickNativeContact());
+  const [duplicate, setDuplicate] = useState<PossibleDuplicate | null>(null);
+  // The address-book photo from an iPhone Contacts import, saved onto the
+  // contact as soon as it has been created.
+  const [importedPhoto, setImportedPhoto] = useState<string | null>(null);
+  const [birthday, setBirthday] = useState("");
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
   const { addContact, contacts } = useContacts();
   const { settings } = useSettings();
   const [showDetails, setShowDetails] = useState(false);
@@ -147,6 +186,7 @@ export default function AddContact() {
     setImportanceOverridden(false);
     setInitialOverridden(false);
     setCadenceOverridden(false);
+    setTab("manual");
   }, [form]);
 
   const handleCardScanned = useCallback((data: ScannedContact & { linkedinUrl?: string }) => {
@@ -171,12 +211,19 @@ export default function AddContact() {
     setImportanceOverridden(false);
     setInitialOverridden(false);
     setCadenceOverridden(false);
+    setTab("manual");
   }, [form]);
 
 
 
-  // Deployment-level switch for showing the LinkedIn screenshot importer.
-  const { linkedinScreenshotImport } = useFeatures();
+  const handleContactImported = useCallback(
+    (data: ScannedContact & { linkedinUrl?: string; photo?: string }, possibleDuplicate: PossibleDuplicate | null) => {
+      handleCardScanned(data);
+      setDuplicate(possibleDuplicate);
+      setImportedPhoto(data.photo ?? null);
+    },
+    [handleCardScanned],
+  );
 
   // Tracks what the last LinkedIn import wrote, so a second import can withdraw
   // it instead of leaving the previous profile's values behind.
@@ -203,6 +250,7 @@ export default function AddContact() {
     setImportanceOverridden(false);
     setInitialOverridden(false);
     setCadenceOverridden(false);
+    setTab("manual");
   }, [form]);
 
   const addInterest = () => {
@@ -214,12 +262,15 @@ export default function AddContact() {
 
   const removeInterest = (tag: string) => setInterests(prev => prev.filter(t => t !== tag));
 
-  const atLimit = contacts.length >= FREE_TIER_LIMIT;
+  // The Free ceiling, or Pro / trial once a subscription is required. The
+  // server enforces the real rule; this only decides what the screen shows.
+  const { wall, showPaywallLink } = useAddContactAccess(contacts.length);
+  const atLimit = wall !== null;
 
   const onSubmit = async (values: FormValues) => {
     if (atLimit) return;
     try {
-      await addContact.mutateAsync({
+      const created = await addContact.mutateAsync({
         ...values,
         interests,
         // Persist manual overrides so recalculation never overwrites them.
@@ -229,11 +280,24 @@ export default function AddContact() {
         preferredContactMethod: values.preferredContactMethod === "none" ? undefined : values.preferredContactMethod,
         initialFollowUpDays: values.initialFollowUpDays as Contact["initialFollowUpDays"],
         followUpCadenceDays: values.followUpCadenceDays as Contact["followUpCadenceDays"],
+        ...(birthday ? { birthday } : {}),
       } as any);
+      if (importedPhoto && created?.id) {
+        // The contact is already saved, so a failed photo upload only costs
+        // the photo, never the contact.
+        try {
+          await setContactPhoto(getToken, created.id, importedPhoto);
+          await queryClient.invalidateQueries({ queryKey: CONTACTS_KEY });
+        } catch {
+          toast.error("Contact saved, but its photo couldn't be added.");
+        }
+      }
       setLocation("/contacts");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("limit") || msg.includes("403")) {
+      if (msg.includes("Subscription required")) {
+        toast.error("Adding contacts needs Novara Pro.");
+      } else if (msg.includes("limit") || msg.includes("403")) {
         toast.error(`You've reached the ${FREE_TIER_LIMIT}-contact limit.`);
       } else {
         toast.error("Failed to save contact. Please try again.");
@@ -252,7 +316,7 @@ export default function AddContact() {
         <h1 className="font-serif text-xl font-bold tracking-tight text-foreground">Add Contact</h1>
       </header>
 
-      <main className="flex-1 px-4 py-6">
+      <main className="flex-1 px-4 pt-4 pb-6">
         {/* Contact limit wall */}
         {atLimit && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
@@ -260,11 +324,16 @@ export default function AddContact() {
               <span className="text-2xl">🎯</span>
             </div>
             <div>
-              <p className="text-base font-bold text-foreground mb-1">You've reached the contact limit</p>
+              <p className="text-base font-bold text-foreground mb-1">{wall?.title}</p>
               <p className="text-sm text-muted-foreground max-w-[280px]">
-                Novara Free includes up to {FREE_TIER_LIMIT} contacts. Novara Pro removes the limit.
+                {wall?.message}
               </p>
             </div>
+            {showPaywallLink && (
+              <Button variant="cta" className="rounded-xl" onClick={() => setLocation(SUBSCRIPTION_ROUTE)}>
+                {wall?.action}
+              </Button>
+            )}
             <Button variant="outline" className="rounded-xl" onClick={() => window.history.back()}>
               Back to contacts
             </Button>
@@ -273,46 +342,89 @@ export default function AddContact() {
 
         {!atLimit && (
           <>
-            {/* Import from the iPhone's own Contacts. Renders nothing in a
-                browser, and nothing in an app build without the native picker. */}
-            <NativeContactImport onExtracted={handleCardScanned} />
-
-            {/* Business Card Scanner */}
-            <BusinessCardScanner onExtracted={handleCardScanned} />
-
-            {/* LinkedIn Screenshot Import — hidden unless the deployment enables
-                LINKEDIN_SCREENSHOT_IMPORT, so it can be switched off without a
-                deploy. */}
-            {linkedinScreenshotImport && (
-              <LinkedInScreenshotImport onExtracted={handleLinkedInExtracted} />
-            )}
-
-            {/* QR Code Scanner */}
-            <QRScanner onExtracted={handleQRScanned} />
-
-            {/* Divider between the no-typing options and the form itself. */}
-            <div className="flex items-center gap-3 mt-5 mb-4">
-              <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground shrink-0">
-                Or enter manually
-              </span>
-              <span className="h-px flex-1 bg-border" />
+            <div
+              role="tablist"
+              aria-label="Ways to add a contact"
+              className="mb-5 flex gap-1 overflow-x-auto rounded-xl bg-muted/70 p-1 [scrollbar-width:none]"
+            >
+              {tabs.map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === id}
+                  onClick={() => setTab(id)}
+                  className={cn(
+                    // Each tab is as wide as its label, so "Business card" fits
+                    // beside the others; on a very narrow phone the row scrolls.
+                    "flex-auto whitespace-nowrap rounded-lg px-2 py-2 text-[12.5px] font-medium transition-colors",
+                    tab === id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
+            {/* The importers stay mounted when hidden, so a scan in progress
+                or a finished import keeps its state across tab switches. */}
+            <div className={tab === "contacts" ? "" : "hidden"}>
+              <NativeContactImport onExtracted={handleContactImported} />
+            </div>
+            <div className={tab === "card" ? "" : "hidden"}>
+              <BusinessCardScanner onExtracted={handleCardScanned} />
+            </div>
+            <div className={tab === "linkedin" ? "" : "hidden"}>
+              <LinkedInScreenshotImport onExtracted={handleLinkedInExtracted} />
+            </div>
+            <div className={tab === "qr" ? "" : "hidden"}>
+              <QRScanner onExtracted={handleQRScanned} />
+            </div>
+
+            <div className={tab === "manual" ? "" : "hidden"}>
+            {importedPhoto && (
+              <div className="mb-4 flex items-center gap-3 rounded-xl border border-border/60 bg-card p-3">
+                <ContactAvatar firstName="" photo={importedPhoto} size={44} />
+                <p className="flex-1 text-sm text-muted-foreground">Photo from your contacts</p>
+                <button
+                  type="button"
+                  onClick={() => setImportedPhoto(null)}
+                  className="text-sm font-medium text-primary"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+            {duplicate && (
+              <div className="mb-4 rounded-xl border border-cooling/25 bg-cooling-soft p-3">
+                <p className="text-xs font-semibold text-cooling">You may already have {duplicate.name}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-cooling/85">
+                  Saving will create a second contact. Open the existing one instead?
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setLocation(`/contacts/${duplicate.id}`)}
+                  className="mt-2 text-xs font-semibold text-cooling underline"
+                >
+                  Open {duplicate.name}
+                </button>
+              </div>
+            )}
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
 
-            {/* ── QUICK ADD ─────────────────────────────────── */}
+            <FormSection title="Basic information">
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="firstName" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>First Name</FormLabel>
+                  <FormLabel>First name</FormLabel>
                   <FormControl><Input placeholder="Sarah" {...field} data-testid="input-firstname" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="lastName" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Last Name</FormLabel>
+                  <FormLabel>Last name</FormLabel>
                   <FormControl><Input placeholder="Jones" {...field} data-testid="input-lastname" /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -334,7 +446,9 @@ export default function AddContact() {
                 <FormMessage />
               </FormItem>
             )} />
+            </FormSection>
 
+            <FormSection title="Relationship details">
             <FormField control={form.control} name="metAt" render={({ field }) => (
               <FormItem>
                 <FormLabel>Where did you meet? <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
@@ -360,11 +474,29 @@ export default function AddContact() {
               )} />
             </div>
             <p className="text-xs text-muted-foreground">Leave "Last spoke" blank if you haven't been in touch since you met.</p>
+            </FormSection>
+
+            <FormSection title="Personal details">
+            <div className="space-y-2">
+              <p className="text-sm font-medium leading-none">Birthday <span className="text-muted-foreground font-normal">(optional)</span></p>
+              <BirthdayInput value={birthday} onChange={setBirthday} />
+              <p className="text-xs text-muted-foreground">Novara reminds you on the day.</p>
+            </div>
+
+            <FormField control={form.control} name="notes" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Notes <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                <FormControl><Textarea placeholder="Add any additional details…" className="resize-none h-20" {...field} data-testid="input-notes" /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            </FormSection>
 
             {/* ── PRIMARY SAVE ──────────────────────────────── */}
             <Button
               type="submit"
-              className="w-full h-12 rounded-xl text-base font-semibold shadow-md"
+              variant="cta"
+              className="w-full h-12 rounded-xl text-base font-semibold"
               disabled={addContact.isPending}
               data-testid="button-submit"
             >
@@ -375,7 +507,7 @@ export default function AddContact() {
             <button
               type="button"
               onClick={() => setShowDetails(v => !v)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-border/70 text-sm font-medium text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-border/70 text-sm font-medium text-muted-foreground hover:border-cta/40 hover:text-cta transition-colors"
             >
               {showDetails ? (
                 <><ChevronUp className="w-4 h-4" />Hide details</>
@@ -643,19 +775,11 @@ export default function AddContact() {
                   );
                 }} />
 
-                {/* Notes */}
-                <FormField control={form.control} name="notes" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notes <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
-                    <FormControl><Textarea placeholder="Discussed their recent launch…" className="resize-none h-24" {...field} data-testid="input-notes" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
                 {/* Save button repeated at bottom of details for convenience */}
                 <Button
                   type="submit"
-                  className="w-full h-12 rounded-xl text-base font-semibold shadow-md"
+                  variant="cta"
+                  className="w-full h-12 rounded-xl text-base font-semibold"
                   disabled={addContact.isPending}
                 >
                   {addContact.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Saving…</> : "Save Contact"}
@@ -666,6 +790,7 @@ export default function AddContact() {
 
           </form>
             </Form>
+            </div>
           </>
         )}
       </main>

@@ -10,6 +10,7 @@ export interface NotificationSettings {
   notifyDueToday: boolean;
   notifyOverdue: boolean;
   notifyStatusChange: boolean;
+  notifyBirthdays: boolean;
   notifyWeeklyDigest: boolean;
   reminderTime: string;
 }
@@ -19,6 +20,7 @@ const DEFAULT_SETTINGS: NotificationSettings = {
   notifyDueToday: true,
   notifyOverdue: true,
   notifyStatusChange: true,
+  notifyBirthdays: true,
   notifyWeeklyDigest: false,
   reminderTime: "09:00",
 };

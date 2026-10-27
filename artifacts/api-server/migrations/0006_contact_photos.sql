@@ -1,0 +1,12 @@
+-- Optional photo per contact, shown in place of the initials.
+--
+-- Stored inline as a small JPEG data URL. The app crops and shrinks every
+-- photo to a 192 x 192 square before upload (typically 10-20 KB) and the API
+-- rejects anything over 200 KB, so a contact list stays light enough to send
+-- whole. If photos ever need to be larger, move them to object storage and
+-- keep only a URL here.
+--
+-- Additive and safe to apply while the app is running: contacts without a
+-- photo keep NULL, and the photo endpoints answer "not available" until this
+-- column exists.
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS photo text;

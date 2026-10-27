@@ -13,6 +13,7 @@ import {
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { startScheduler } from "./lib/scheduler";
+import { startHealthSnapshotScheduler } from "./lib/networkHealth";
 
 const app: Express = express();
 
@@ -65,17 +66,23 @@ app.use(
   }),
   );
 
-app.use(express.json());
+// 300 KB: room for a contact photo (the app sends at most ~200 KB as base64).
+app.use(express.json({ limit: "300kb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // General rate limit for the whole API surface. This is a first line of
 // defense while the unauthenticated proxy endpoints (news, LinkedIn import)
 // remain the most exposed to abuse.
+//
+// The RevenueCat webhook is exempt: RevenueCat delivers subscription events in
+// bursts, and a 429 would only make it retry. It authenticates itself with a
+// shared secret instead (routes/revenuecat.ts).
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.path === "/webhooks/revenuecat",
 });
 app.use("/api", apiLimiter);
 
@@ -98,5 +105,6 @@ app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
 });
 
 startScheduler();
+startHealthSnapshotScheduler();
 
 export default app;

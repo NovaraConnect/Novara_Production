@@ -41,7 +41,14 @@ const USER_TABLES = [
   "apns_tokens",
   "feedback",
   "user_settings",
+  "entitlements",
+  "revenuecat_events",
 ] as const;
+
+/** Tables whose per-user column is not `user_id`. */
+const USER_COLUMN: Record<string, string> = {
+  revenuecat_events: "app_user_id",
+};
 
 /**
  * Narrows the list to the tables this deployment actually has.
@@ -78,7 +85,8 @@ router.delete("/account", requireAuth, async (req: Request, res: Response) => {
   try {
     await client.query("BEGIN");
     for (const table of tables) {
-      await client.query(`DELETE FROM ${table} WHERE user_id = $1`, [userId]);
+      const column = USER_COLUMN[table] ?? "user_id";
+      await client.query(`DELETE FROM ${table} WHERE ${column} = $1`, [userId]);
     }
     await client.query("COMMIT");
   } catch (err) {

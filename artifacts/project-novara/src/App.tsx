@@ -13,6 +13,10 @@ import AddContact from "@/pages/AddContact";
 import ContactDetail from "@/pages/ContactDetail";
 import EditContact from "@/pages/EditContact";
 import Settings from "@/pages/Settings";
+import Paywall from "@/pages/Paywall";
+import { SUBSCRIPTION_ROUTE } from "@/lib/purchases";
+import { SubscriptionGate } from "@/components/SubscriptionGate";
+import { useNativePurchaseIdentity } from "@/hooks/useNativePurchaseIdentity";
 import InstallGuide from "@/pages/InstallGuide";
 import InstallLanding from "@/pages/InstallLanding";
 import Notifications from "@/pages/Notifications";
@@ -226,7 +230,9 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   return (
     <>
       <Show when="signed-in">
-        <Component />
+        <SubscriptionGate>
+          <Component />
+        </SubscriptionGate>
       </Show>
       <Show when="signed-out">
         <Redirect to="/" />
@@ -251,6 +257,7 @@ function Router() {
       <Route path="/contacts/:id/edit" component={() => <ProtectedRoute component={EditContact} />} />
       <Route path="/contacts/:id" component={() => <ProtectedRoute component={ContactDetail} />} />
       <Route path="/settings" component={() => <ProtectedRoute component={Settings} />} />
+      <Route path={SUBSCRIPTION_ROUTE} component={() => <ProtectedRoute component={Paywall} />} />
       <Route path="/install" component={InstallGuide} />
       {/* Public and unauthenticated on purpose: this is the URL given to
           Apple in App Store Connect, and a reviewer has to be able to read
@@ -273,6 +280,13 @@ function Router() {
  *  browser. Mounted inside the router so it can navigate. */
 function NativeDeepLinks() {
   useNativeDeepLink();
+  return null;
+}
+
+/** Keeps the native purchase identity linked to the signed-in Clerk user.
+ *  Renders nothing; a no-op in a browser. */
+function NativePurchaseIdentity() {
+  useNativePurchaseIdentity();
   return null;
 }
 
@@ -305,6 +319,7 @@ function ClerkProviderWithRoutes() {
           <ClerkQueryClientCacheInvalidator />
       <PostHogIdentifier />
           <NativeDeepLinks />
+          <NativePurchaseIdentity />
           <Router />
           <InstallPrompt />
           <Toaster />

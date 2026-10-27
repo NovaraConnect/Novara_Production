@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ImportOptionCard } from "@/components/ImportOptionCard";
-import { QrCode, X, AlertCircle, CheckCircle2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ImportOptionCard, ImportPrimaryButton, InfoRow } from "@/components/ImportOptionCard";
+import { Camera, Info, ScanLine, X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 export interface ScannedQRContact {
@@ -261,15 +260,25 @@ export function QRScanner({ onExtracted }: QRScannerProps) {
   return (
     <>
       <ImportOptionCard
-        icon={QrCode}
-        title="Scan QR Code"
-        description="Scan your business contact's QR code."
-        {...(status === "idle" ? { onClick: openScanner } : {})}
+        icon={ScanLine}
+        title="Scan a QR code"
+        description="Scan a contact’s QR code to add their details instantly."
+        info={
+          <InfoRow icon={Info} title="Where to find a QR code?">
+            People can share a contact QR code from a business card, an event badge or a networking app.
+          </InfoRow>
+        }
       >
+        {status === "idle" && (
+          <ImportPrimaryButton onClick={openScanner} data-testid="button-open-qr-camera">
+            <Camera />
+            Open Camera
+          </ImportPrimaryButton>
+        )}
 
         {status === "scanning" && !modalOpen && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-            <QrCode className="w-4 h-4 text-primary animate-pulse" />
+            <ScanLine className="w-4 h-4 text-cta animate-pulse" />
             Opening camera…
           </div>
         )}

@@ -23,6 +23,10 @@ export function useFeatures() {
     enabled: isLoaded && isSignedIn,
     staleTime: 5 * 60_000,
     initialData: readCachedFeatures() ?? undefined,
+    // The cached copy shows at once but counts as already stale, so every
+    // launch still asks the server. Without this, a switch turned on or off
+    // on the server (the subscription requirement) went unseen for 5 minutes.
+    initialDataUpdatedAt: 0,
     retry: (count, err: Error) => {
       if (err.message === "Unauthorized") return false;
       return count < 2;
@@ -34,5 +38,8 @@ export function useFeatures() {
     cardAiParse: data?.cardAiParse ?? false,
     linkedinAiParse: data?.linkedinAiParse ?? false,
     linkedinScreenshotImport: data?.linkedinScreenshotImport ?? false,
+    applePaywall: data?.applePaywall ?? false,
+    subscriptionRequired: data?.subscriptionRequired ?? false,
+    localStoreKitTest: data?.localStoreKitTest ?? false,
   };
 }

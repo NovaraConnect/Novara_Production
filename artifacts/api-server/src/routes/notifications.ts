@@ -22,9 +22,8 @@ router.get("/notifications/settings", requireAuth, async (req: Request, res: Res
   const userId = (req as AuthedRequest).userId;
   try {
     const { rows: [row] } = await pool.query(
-      `SELECT push_enabled, notify_due_today, notify_overdue, notify_status_change,
-              notify_weekly_digest, reminder_time
-       FROM user_settings WHERE user_id = $1`,
+      // SELECT * so notify_birthdays (migration 0008) is read when present.
+      `SELECT * FROM user_settings WHERE user_id = $1`,
       [userId],
     );
 
@@ -33,6 +32,7 @@ router.get("/notifications/settings", requireAuth, async (req: Request, res: Res
       notifyDueToday: true,
       notifyOverdue: true,
       notifyStatusChange: true,
+      notifyBirthdays: true,
       notifyWeeklyDigest: false,
       reminderTime: "09:00",
     };
@@ -47,6 +47,7 @@ router.get("/notifications/settings", requireAuth, async (req: Request, res: Res
       notifyDueToday: row.notify_due_today ?? true,
       notifyOverdue: row.notify_overdue ?? true,
       notifyStatusChange: row.notify_status_change ?? true,
+      notifyBirthdays: row.notify_birthdays ?? true,
       notifyWeeklyDigest: row.notify_weekly_digest ?? false,
       reminderTime: row.reminder_time ?? "09:00",
     });
@@ -63,6 +64,7 @@ router.put("/notifications/settings", requireAuth, async (req: Request, res: Res
     notifyDueToday,
     notifyOverdue,
     notifyStatusChange,
+    notifyBirthdays,
     notifyWeeklyDigest,
     reminderTime,
   } = req.body as {
@@ -70,6 +72,7 @@ router.put("/notifications/settings", requireAuth, async (req: Request, res: Res
     notifyDueToday?: boolean;
     notifyOverdue?: boolean;
     notifyStatusChange?: boolean;
+    notifyBirthdays?: boolean;
     notifyWeeklyDigest?: boolean;
     reminderTime?: string;
   };
@@ -105,11 +108,26 @@ router.put("/notifications/settings", requireAuth, async (req: Request, res: Res
       ],
     );
 
+    // Separate statement, and only once migration 0008 has added the column.
+    let birthdaysOn = true;
+    const { rows: birthdayCol } = await pool.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'notify_birthdays'",
+    );
+    if (birthdayCol.length > 0) {
+      const { rows: [b] } = await pool.query(
+        `UPDATE user_settings SET notify_birthdays = COALESCE($2, notify_birthdays)
+         WHERE user_id = $1 RETURNING notify_birthdays`,
+        [userId, notifyBirthdays ?? null],
+      );
+      birthdaysOn = b?.notify_birthdays ?? true;
+    }
+
     res.json({
       pushEnabled: row.push_enabled,
       notifyDueToday: row.notify_due_today,
       notifyOverdue: row.notify_overdue,
       notifyStatusChange: row.notify_status_change,
+      notifyBirthdays: birthdaysOn,
       notifyWeeklyDigest: row.notify_weekly_digest,
       reminderTime: row.reminder_time,
     });

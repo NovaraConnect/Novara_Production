@@ -4,7 +4,7 @@ import ThemeSetting from "@/components/ThemeSetting";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Bell, Save, Check, X, Plus, LogOut, RefreshCw, Smartphone, ChevronRight, BookOpen, Target, Trash2, Bug, Lightbulb } from "lucide-react";
+import { Bell, Save, Check, X, Plus, LogOut, RefreshCw, Smartphone, ChevronRight, BookOpen, Target, Trash2, Bug, Lightbulb, CreditCard, Download, type LucideIcon } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { useSettings } from "@/hooks/useSettings";
@@ -14,6 +14,12 @@ import { NovaraMark } from "@/components/NovaraMark";
 import { isNativeShell } from "@/lib/installPrompt";
 import { APP_VERSION } from "@/lib/appVersion";
 import { deleteAccount } from "@/lib/api";
+import { useContacts } from "@/hooks/useContacts";
+import { canExportContacts, exportContacts } from "@/lib/exportContacts";
+import { cn } from "@/lib/utils";
+import { useSubscriptionState } from "@/hooks/useSubscriptionState";
+import { usePaywallAvailable } from "@/hooks/usePaywallAvailable";
+import { SUBSCRIPTION_ROUTE } from "@/lib/purchases";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +38,57 @@ function labelMonths(m: number) {
 }
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2 px-1">{children}</p>;
+}
+
+/** One row of a grouped settings card: icon, label (and an optional line under
+ *  it), an optional value on the right, and a chevron when it opens something. */
+function SettingsRow({
+  icon: Icon,
+  label,
+  detail,
+  value,
+  onClick,
+  destructive,
+  disabled,
+  testId,
+}: {
+  icon: LucideIcon;
+  label: string;
+  detail?: string;
+  value?: string;
+  onClick?: () => void;
+  destructive?: boolean;
+  disabled?: boolean;
+  testId?: string;
+}) {
+  const body = (
+    <>
+      <Icon className={cn("h-5 w-5 shrink-0", destructive ? "text-destructive" : "text-foreground/80")} aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <p className={cn("text-[15px] font-medium", destructive ? "text-destructive" : "text-foreground")}>{label}</p>
+        {detail && <p className="mt-0.5 text-xs text-muted-foreground">{detail}</p>}
+      </div>
+      {value && <span className="max-w-[45%] text-right text-sm leading-snug text-muted-foreground">{value}</span>}
+      {onClick && <ChevronRight className={cn("h-4 w-4 shrink-0", destructive ? "text-destructive" : "text-muted-foreground")} aria-hidden="true" />}
+    </>
+  );
+  const row = "flex w-full items-center gap-4 px-4 py-3.5 text-left";
+  if (!onClick) return <div className={row}>{body}</div>;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      data-testid={testId}
+      className={cn(row, "transition-colors disabled:opacity-60", destructive ? "hover:bg-destructive/10" : "hover:bg-elevated")}
+    >
+      {body}
+    </button>
+  );
+}
 
 export default function Settings() {
   // Arriving from the Dashboard prompt via /settings#career-profile should
@@ -56,6 +113,38 @@ export default function Settings() {
 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const { contacts } = useContacts();
+  const subscription = useSubscriptionState();
+  // Opens the subscription screen only where it can sell (the iPhone app with
+  // the paywall on); elsewhere the row just shows the plan.
+  const canManageSubscription = usePaywallAvailable();
+  const [exporting, setExporting] = useState(false);
+  const handleExport = async () => {
+    if (contacts.length === 0) {
+      toast.error("You have no contacts to export yet.");
+      return;
+    }
+    setExporting(true);
+    try {
+      await exportContacts(contacts);
+    } catch {
+      toast.error("Couldn't export your contacts. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const replayTutorial = async () => {
+    try {
+      await updateSettings.mutateAsync({ hasSeenTutorial: false });
+      // Straight to the introduction rather than via the Dashboard,
+      // which would only redirect here anyway.
+      setLocation("/welcome");
+    } catch {
+      toast.error("Failed to reset tutorial");
+    }
+  };
 
   // Account deletion, required by App Store Review Guideline 5.1.1(v) for any
   // app that lets people create an account. Irreversible, so it is behind a
@@ -144,76 +233,59 @@ export default function Settings() {
         <h1 className="font-serif text-2xl font-bold tracking-tight text-foreground">Settings</h1>
       </header>
 
-      <main className="flex-1 px-4 py-8 flex flex-col gap-8">
+      <main className="flex-1 px-4 py-6 flex flex-col gap-7">
 
-        {/* App identity */}
-        <section className="brand-glow text-center space-y-3">
-          <NovaraMark size={80} className="mx-auto mb-4" />
-          <h2 className="font-serif text-2xl font-bold text-foreground">Novara</h2>
-          {user && (
-            <p className="text-sm text-muted-foreground">
-              Signed in as <span className="font-medium text-foreground">{user.primaryEmailAddress?.emailAddress}</span>
-            </p>
-          )}
+        {/* Who is signed in */}
+        <section className="surface-card flex items-center gap-4 p-4">
+          <NovaraMark size={56} className="shrink-0" />
+          <div className="min-w-0">
+            <p className="truncate text-[17px] font-semibold text-foreground">{user?.fullName || "Novara"}</p>
+            {user && (
+              <p className="truncate text-sm text-muted-foreground">{user.primaryEmailAddress?.emailAddress}</p>
+            )}
+          </div>
         </section>
 
-        {/* Account — same row pattern as Notifications, Support and Mobile App
-            below, so the whole screen is one list rather than buttons in one
-            card and rows in the next. */}
         <section>
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Account</p>
+          <SectionLabel>Account</SectionLabel>
           <div className="surface-card overflow-hidden divide-y divide-border/60">
-            <button
-              onClick={async () => {
-                try {
-                  await updateSettings.mutateAsync({ hasSeenTutorial: false });
-                  // Straight to the introduction rather than via the Dashboard,
-                  // which would only redirect here anyway.
-                  setLocation("/welcome");
-                } catch {
-                  toast.error("Failed to reset tutorial");
-                }
-              }}
-              disabled={updateSettings.isPending}
-              className="w-full p-4 flex items-center gap-4 hover:bg-elevated transition-colors text-left disabled:opacity-60"
-            >
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <BookOpen className="w-5 h-5 text-primary" />
-              </div>
-              <p className="flex-1 text-sm font-semibold text-foreground">Replay Tutorial</p>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
-            </button>
-            {/* Signing out is reversible; deleting the account is not. They used
-                to look identical, which left the only irreversible action in
-                the app with no more weight than ending a session. Sign out is
-                now a neutral row like Replay Tutorial, so red in this card
-                means exactly one thing. */}
-            <button
-              onClick={() => signOut({ redirectUrl: `${basePath}/` })}
-              className="w-full p-4 flex items-center gap-4 hover:bg-elevated transition-colors text-left"
-            >
-              <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
-                <LogOut className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <p className="flex-1 text-sm font-semibold text-foreground">Sign out</p>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
-            </button>
-            <button
+            <SettingsRow icon={BookOpen} label="Replay Tutorial" onClick={replayTutorial} disabled={updateSettings.isPending} />
+            <SettingsRow
+              icon={CreditCard}
+              label="Manage Subscription"
+              value={subscription.isKnown ? subscription.label : undefined}
+              onClick={canManageSubscription ? () => setLocation(SUBSCRIPTION_ROUTE) : undefined}
+              testId="button-manage-subscription"
+            />
+            <SettingsRow icon={Bell} label="Notifications" onClick={() => setLocation("/notifications")} />
+            {/* Signing out is reversible; deleting the account is not, so the
+                two live in different groups and only the delete is red. */}
+            <SettingsRow icon={LogOut} label="Sign out" onClick={() => signOut({ redirectUrl: `${basePath}/` })} />
+          </div>
+        </section>
+
+        <section>
+          <SectionLabel>Data &amp; Privacy</SectionLabel>
+          <div className="surface-card overflow-hidden divide-y divide-border/60">
+            {/* Hidden in iPhone app versions that cannot save files yet. */}
+            {canExportContacts() && (
+              <SettingsRow
+                icon={Download}
+                label="Export Data"
+                detail={exporting ? "Preparing your file…" : "Download a copy of your contacts"}
+                onClick={handleExport}
+                disabled={exporting}
+                testId="button-export-data"
+              />
+            )}
+            <SettingsRow
+              icon={Trash2}
+              label="Delete Account"
+              detail="Permanently removes your contacts and your Novara login"
               onClick={() => setConfirmingDelete(true)}
-              className="w-full p-4 flex items-center gap-4 hover:bg-destructive/10 transition-colors text-left"
-              data-testid="button-delete-account"
-            >
-              <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
-                <Trash2 className="w-5 h-5 text-destructive" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-destructive">Delete account</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Permanently removes your contacts and your Novara login
-                </p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-destructive" aria-hidden="true" />
-            </button>
+              destructive
+              testId="button-delete-account"
+            />
           </div>
         </section>
 
@@ -224,7 +296,9 @@ export default function Settings() {
               <AlertDialogDescription>
                 This permanently deletes your contacts, your career profile, your notification
                 settings and your Novara login. It cannot be undone, and there is no way to
-                recover the data afterwards.
+                recover the data afterwards. If you subscribe to Novara Pro, cancel it first in
+                your iPhone's Settings → your name → Subscriptions: deleting your account
+                doesn't stop Apple from billing you.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -246,40 +320,41 @@ export default function Settings() {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Auto-downgrade cadence setting */}
-        <section className="surface-card p-5 space-y-4">
-          <div className="flex items-start gap-3">
-            <RefreshCw className="w-5 h-5 text-primary mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-foreground">Auto-downgrade cadence</p>
-              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                After this many months, contacts move to a maintenance cadence (twice per year) automatically.
-              </p>
+        <section>
+          <SectionLabel>Preferences</SectionLabel>
+          <div className="surface-card p-4 space-y-4">
+            <div className="flex items-start gap-4">
+              <RefreshCw className="h-5 w-5 shrink-0 text-foreground/80 mt-0.5" aria-hidden="true" />
+              <div>
+                <p className="text-[15px] font-medium text-foreground">Auto-downgrade cadence</p>
+                <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                  After this many months, contacts move to a maintenance cadence (twice per year) automatically.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {DOWNGRADE_OPTIONS.map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => handleDowngradeChange(opt)}
+                  className={`rounded-xl border px-1 py-2 text-[13px] font-semibold transition-colors ${
+                    settings.autoDowngradeAfterMonths === opt
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border text-muted-foreground hover:border-primary/30"
+                  }`}
+                >
+                  {labelMonths(opt)}
+                </button>
+              ))}
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {DOWNGRADE_OPTIONS.map((opt) => (
-              <button
-                key={opt}
-                onClick={() => handleDowngradeChange(opt)}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${
-                  settings.autoDowngradeAfterMonths === opt
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "border-border text-muted-foreground hover:border-primary/30"
-                }`}
-              >
-                {labelMonths(opt)}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Currently: contacts older than <span className="font-semibold text-foreground">{labelMonths(settings.autoDowngradeAfterMonths)}</span> follow up every 6 months.
-          </p>
         </section>
+
+        <ThemeSetting />
 
         {/* Career Profile */}
         <section id="career-profile" className="scroll-mt-24">
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Career Profile</p>
+          <SectionLabel>Career Profile</SectionLabel>
           <div className="surface-card p-5 space-y-6">
 
             {/* Career statement */}
@@ -351,79 +426,22 @@ export default function Settings() {
           </div>
         </section>
 
-        <ThemeSetting />
-
-        {/* Notifications */}
         <section>
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Notifications</p>
-          <button
-            onClick={() => setLocation("/notifications")}
-            className="surface-card w-full p-4 flex items-center gap-4 hover:bg-elevated transition-colors text-left"
-          >
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <Bell className="w-5 h-5 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground">Notification settings</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Follow-up reminders, status alerts, weekly digest</p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </button>
-        </section>
-
-        {/* Support */}
-        <section>
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Support</p>
-          <div className="space-y-3">
-            <button
-              onClick={() => setLocation("/feedback?type=bug")}
-              className="surface-card w-full p-4 flex items-center gap-4 hover:bg-elevated transition-colors text-left"
-              data-testid="nav-report-bug"
-            >
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <Bug className="w-5 h-5 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground">Report a bug</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Let us know when something isn't working</p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-            </button>
-            <button
-              onClick={() => setLocation("/feedback?type=feature")}
-              className="surface-card w-full p-4 flex items-center gap-4 hover:bg-elevated transition-colors text-left"
-              data-testid="nav-suggest-feature"
-            >
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <Lightbulb className="w-5 h-5 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground">Suggest a feature</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Tell us what would make Novara better</p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-            </button>
+          <SectionLabel>Support</SectionLabel>
+          <div className="surface-card overflow-hidden divide-y divide-border/60">
+            <SettingsRow icon={Bug} label="Report a bug" detail="Let us know when something isn't working" onClick={() => setLocation("/feedback?type=bug")} testId="nav-report-bug" />
+            <SettingsRow icon={Lightbulb} label="Suggest a feature" detail="Tell us what would make Novara better" onClick={() => setLocation("/feedback?type=feature")} testId="nav-suggest-feature" />
           </div>
         </section>
 
         {/* Install app — browsers and installed PWAs only. */}
         {!nativeApp && (
-        <section>
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Mobile App</p>
-          <button
-            onClick={() => setLocation("/install")}
-            className="surface-card w-full p-4 flex items-center gap-4 hover:bg-elevated transition-colors text-left"
-          >
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <Smartphone className="w-5 h-5 text-primary" />
+          <section>
+            <SectionLabel>Mobile App</SectionLabel>
+            <div className="surface-card overflow-hidden">
+              <SettingsRow icon={Smartphone} label="Install on your phone" detail="Add Novara to your home screen for the full app experience" onClick={() => setLocation("/install")} />
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground">Install on your phone</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Add Novara to your home screen for the full app experience</p>
-            </div>
-            <div className="text-muted-foreground">›</div>
-          </button>
-        </section>
+          </section>
         )}
 
         <div className="text-center mt-auto pt-4">

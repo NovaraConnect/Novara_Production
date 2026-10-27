@@ -1,8 +1,6 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
-import { ContactRound } from "lucide-react";
-import { ImportOptionCard } from "@/components/ImportOptionCard";
-import { Button } from "@/components/ui/button";
+import { ContactRound, Loader2, Lock, ShieldCheck, UserRound } from "lucide-react";
+import { ImportOptionCard, ImportPrimaryButton, InfoRow } from "@/components/ImportOptionCard";
 import { toast } from "sonner";
 import { useContacts } from "@/hooks/useContacts";
 import { findDuplicateContact } from "@/lib/contactDuplicates";
@@ -32,15 +30,17 @@ import type { ScannedContact } from "@/lib/businessCardParse";
  * Renders nothing outside the app, and nothing in an older app build that has
  * the web view but not the picker.
  */
+export type PossibleDuplicate = { id: string; name: string };
+
 export function NativeContactImport({
   onExtracted,
 }: {
-  onExtracted: (data: ScannedContact & { linkedinUrl?: string }) => void;
+  /** `duplicate` is an existing contact this one may repeat; the page shows
+   *  the warning next to the form the details land in. */
+  onExtracted: (data: ScannedContact & { linkedinUrl?: string; photo?: string }, duplicate: PossibleDuplicate | null) => void;
 }) {
-  const [, setLocation] = useLocation();
   const { contacts } = useContacts();
   const [busy, setBusy] = useState(false);
-  const [duplicate, setDuplicate] = useState<{ id: string; name: string } | null>(null);
 
   if (!canPickNativeContact()) return null;
 
@@ -55,15 +55,12 @@ export function NativeContactImport({
     }
 
     const existing = findDuplicateContact(contacts, fields);
-    setDuplicate(
-      existing
-        ? { id: existing.id, name: `${existing.firstName} ${existing.lastName}`.trim() }
-        : null,
+    onExtracted(
+      fields,
+      existing ? { id: existing.id, name: `${existing.firstName} ${existing.lastName}`.trim() } : null,
     );
-
-    onExtracted(fields);
     haptic("success");
-    toast.success("Contact imported — review the fields below before saving");
+    toast.success("Contact imported — review the details before saving");
   };
 
   const handlePick = async () => {
@@ -88,37 +85,23 @@ export function NativeContactImport({
   return (
     <ImportOptionCard
       icon={ContactRound}
-      title="Import from Contacts"
-      description="Pick someone from your iPhone contacts. Novara only sees the one you choose."
+      title="Import from your contacts"
+      description="Choose someone from your iPhone contacts. Novara only sees the one you select."
+      info={
+        <>
+          <InfoRow icon={Lock} title="Your contacts stay private">
+            Apple's own picker opens. Novara only receives the contact you choose.
+          </InfoRow>
+          <InfoRow icon={ShieldCheck} title="Nothing else is read">
+            Novara doesn't read, store or sync the rest of your address book.
+          </InfoRow>
+        </>
+      }
     >
-      <Button
-        type="button"
-        variant="outline"
-        disabled={busy}
-        onClick={handlePick}
-        className="w-full h-11 gap-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-sm font-semibold shadow-sm"
-        data-testid="button-import-contact"
-      >
-        {busy ? "Opening Contacts…" : "Choose a Contact"}
-      </Button>
-
-      {duplicate && (
-        <div className="mt-3 rounded-xl border border-cooling/25 bg-cooling-soft p-3">
-          <p className="text-xs font-semibold text-cooling">
-            You may already have {duplicate.name}
-          </p>
-          <p className="mt-0.5 text-xs leading-relaxed text-cooling/85">
-            Saving will create a second contact. Open the existing one instead?
-          </p>
-          <button
-            type="button"
-            onClick={() => setLocation(`/contacts/${duplicate.id}`)}
-            className="mt-2 text-xs font-semibold text-cooling underline"
-          >
-            Open {duplicate.name}
-          </button>
-        </div>
-      )}
+      <ImportPrimaryButton onClick={handlePick} disabled={busy} data-testid="button-import-contact">
+        {busy ? <Loader2 className="animate-spin" /> : <UserRound />}
+        Choose a Contact
+      </ImportPrimaryButton>
     </ImportOptionCard>
   );
 }

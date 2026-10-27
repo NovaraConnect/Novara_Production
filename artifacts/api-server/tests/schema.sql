@@ -34,6 +34,8 @@ notes text,
 email text,
 phone text,
 preferred_contact_method text,
+photo text,
+birthday text,
 created_at timestamptz NOT NULL DEFAULT now(),
 updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -49,6 +51,7 @@ push_enabled boolean NOT NULL DEFAULT false,
 notify_due_today boolean NOT NULL DEFAULT true,
 notify_overdue boolean NOT NULL DEFAULT true,
 notify_status_change boolean NOT NULL DEFAULT true,
+notify_birthdays boolean NOT NULL DEFAULT true,
 notify_weekly_digest boolean NOT NULL DEFAULT false,
 reminder_time text NOT NULL DEFAULT '09:00',
 created_at timestamptz NOT NULL DEFAULT now(),
@@ -90,4 +93,41 @@ app_version text,
 status text NOT NULL DEFAULT 'new',
 created_at timestamptz NOT NULL DEFAULT now(),
 updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS network_health_snapshots (
+user_id text NOT NULL,
+snapshot_date date NOT NULL,
+score integer NOT NULL CHECK (score BETWEEN 0 AND 100),
+PRIMARY KEY (user_id, snapshot_date)
+);
+
+-- Mirrors migrations/0004_apple_iap_entitlements.sql.
+CREATE TABLE IF NOT EXISTS entitlements (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+user_id text NOT NULL,
+source text NOT NULL CHECK (source IN ('apple_iap', 'university', 'stripe')),
+provider_ref text NULL,
+product_id text NULL,
+status text NOT NULL CHECK (status IN ('active', 'inactive')),
+expires_at timestamptz NULL,
+-- From migrations/0007_entitlements_period_type.sql.
+period_type text NULL,
+-- From migrations/0009_entitlements_will_renew.sql.
+will_renew boolean NULL,
+last_event_at timestamptz NULL,
+created_at timestamptz NOT NULL DEFAULT now(),
+updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS entitlements_apple_one_row
+ON entitlements (user_id) WHERE source = 'apple_iap';
+CREATE INDEX IF NOT EXISTS entitlements_user_idx ON entitlements (user_id);
+
+CREATE TABLE IF NOT EXISTS revenuecat_events (
+event_id text PRIMARY KEY,
+event_type text NOT NULL,
+app_user_id text NOT NULL,
+environment text NULL,
+event_timestamp timestamptz NOT NULL,
+received_at timestamptz NOT NULL DEFAULT now()
 );

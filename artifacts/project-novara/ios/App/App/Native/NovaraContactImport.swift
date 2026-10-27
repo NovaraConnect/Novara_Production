@@ -55,6 +55,17 @@ final class NovaraContactImport: NSObject {
         CNContactUrlAddressesKey as CNKeyDescriptor
     ]
 
+    /// Also read on a re-fetch, but never a reason to re-fetch: a missing photo
+    /// must not be what triggers a Contacts permission prompt.
+    private static let photoKeys: [CNKeyDescriptor] = [
+        CNContactThumbnailImageDataKey as CNKeyDescriptor,
+        CNContactImageDataAvailableKey as CNKeyDescriptor
+    ]
+
+    /// Edge of the square photo handed to the web app; matches the size the
+    /// app stores (src/lib/contactPhoto.ts).
+    private static let photoSize: CGFloat = 192
+
     func present(from presenter: UIViewController, completion: @escaping (Result<Any, Error>) -> Void) {
         self.presenter = presenter
         self.completion = completion
@@ -111,8 +122,33 @@ final class NovaraContactImport: NSObject {
             .first(where: { $0.lowercased().contains("linkedin.com") }) {
             payload["linkedinUrl"] = linkedIn
         }
+        if contact.isKeyAvailable(CNContactThumbnailImageDataKey),
+           let data = contact.thumbnailImageData,
+           let photo = squarePhotoDataURL(from: data) {
+            payload["photo"] = photo
+        }
 
         return payload
+    }
+
+    /// The contact's address-book photo as the small square JPEG data URL
+    /// Novara stores: centre-cropped, 192 x 192, typically 10-20 KB.
+    private static func squarePhotoDataURL(from data: Data) -> String? {
+        guard let image = UIImage(data: data), image.size.width > 0, image.size.height > 0 else { return nil }
+        let side = min(image.size.width, image.size.height)
+        let scale = photoSize / side
+        let drawSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: photoSize, height: photoSize), format: format)
+        let square = renderer.image { _ in
+            image.draw(in: CGRect(x: (photoSize - drawSize.width) / 2,
+                                  y: (photoSize - drawSize.height) / 2,
+                                  width: drawSize.width,
+                                  height: drawSize.height))
+        }
+        guard let jpeg = square.jpegData(compressionQuality: 0.82) else { return nil }
+        return "data:image/jpeg;base64," + jpeg.base64EncodedString()
     }
 
     /// Picks the value whose label appears earliest in `labels`, falling back
@@ -135,7 +171,7 @@ final class NovaraContactImport: NSObject {
         let proceed = {
             do {
                 let full = try store.unifiedContact(withIdentifier: contact.identifier,
-                                                    keysToFetch: Self.requiredKeys)
+                                                    keysToFetch: Self.requiredKeys + Self.photoKeys)
                 handle(.success(full))
             } catch {
                 handle(.failure(ImportError.unreadable))
