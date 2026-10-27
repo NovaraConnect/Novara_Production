@@ -1,6 +1,6 @@
-import { useState, useRef } from "react";
-import { ImportOptionCard, LinkedInGlyph } from "@/components/ImportOptionCard";
-import { Image as ImageIcon, Loader2, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { useState, useRef, useId } from "react";
+import { ImportOptionCard } from "@/components/ImportOptionCard";
+import { Camera, Image as ImageIcon, Loader2, X, CheckCircle2, AlertCircle, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { MAX_FILE_BYTES, recognizeImageText } from "@/lib/imageOcr";
@@ -22,7 +22,9 @@ type Status = "idle" | "processing" | "done" | "error";
 // logged; nothing is saved until the user reviews and taps Save.
 export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImportProps) {
   const [status, setStatus] = useState<Status>("idle");
+  const cameraRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
+  const noteId = useId();
   const { linkedinAiParse } = useFeatures();
   const { getToken } = useAuth();
 
@@ -101,9 +103,9 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
 
   return (
     <ImportOptionCard
-      iconNode={<LinkedInGlyph />}
-      title="Import from LinkedIn Screenshot"
-      description="Upload a screenshot of a LinkedIn profile. Novara reads the visible text to prefill a draft you can review."
+      icon={UserRound}
+      title="Import from LinkedIn"
+      description="Photograph a LinkedIn profile on another screen, or select a screenshot from Photos."
     >
 
       {/* ── Processing ── */}
@@ -166,22 +168,56 @@ export function LinkedInScreenshotImport({ onExtracted }: LinkedInScreenshotImpo
       {status === "idle" && (
         <>
 
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full h-11 gap-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-sm font-semibold shadow-sm"
-            onClick={() => libraryRef.current?.click()}
-          >
-            <ImageIcon className="w-4 h-4" />
-            Choose Screenshot
-          </Button>
-          <p className="text-[11px] text-muted-foreground mt-2">
-            Novara doesn't connect to LinkedIn or access private data.
+          <div className="flex gap-2">
+            <div className="flex-1 min-w-0">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-11 gap-1.5 px-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-[13px] font-semibold shadow-sm"
+                onClick={() => cameraRef.current?.click()}
+                aria-describedby={`${noteId}-camera`}
+              >
+                <Camera className="w-4 h-4 shrink-0" />
+                Take a Photo
+              </Button>
+              <p id={`${noteId}-camera`} className="mt-1.5 text-center text-[11px] leading-snug text-muted-foreground">
+                Capture a profile instantly
+              </p>
+            </div>
+            <div className="flex-1 min-w-0">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-11 gap-1.5 px-2 bg-background border-primary/25 text-primary hover:bg-primary/5 rounded-xl text-[13px] font-semibold shadow-sm"
+                onClick={() => libraryRef.current?.click()}
+                aria-describedby={`${noteId}-library`}
+              >
+                <ImageIcon className="w-4 h-4 shrink-0" />
+                Choose Screenshot
+              </Button>
+              <p id={`${noteId}-library`} className="mt-1.5 text-center text-[11px] leading-snug text-muted-foreground">
+                Select from your photo library
+              </p>
+            </div>
+          </div>
+          <p className="text-[10px] italic text-muted-foreground mt-2">
+            Novara does not connect to LinkedIn or access private data.
           </p>
         </>
       )}
 
-      {/* Hidden file input — photo library / file picker (no camera capture). */}
+      {/* Hidden file inputs — both feed the same processFile() path. */}
+      {/* capture="environment" → rear camera on mobile ("Take a Photo"). */}
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleFileChange}
+        aria-hidden
+      />
+      {/* No capture → photo library / file picker ("Choose Screenshot"). */}
       <input
         ref={libraryRef}
         type="file"
