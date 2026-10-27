@@ -344,7 +344,7 @@ export default function InvestorPage() {
                   <div key={k}>
                     <dt className="text-[#7D8BA3]">{k}</dt>
                     <dd className="mt-1 font-semibold text-white">{v}</dd>
-                    {note && <dd className="mt-0.5 text-xs text-[#8FA6FF]">{note}</dd>}
+                    {note && <dd className="mt-1 text-xs leading-snug text-[#7D8BA3]">{note}</dd>}
                   </div>
                 ))}
               </dl>
