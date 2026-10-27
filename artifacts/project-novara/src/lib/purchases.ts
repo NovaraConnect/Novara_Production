@@ -170,13 +170,19 @@ export function subscriptionPlanFor(status: ProStatus | undefined): Subscription
   return status.state === "expired" ? "expired" : "none";
 }
 
-/** Whole days until `expiresAt`, rounded up (so "ends tomorrow" is 1), never
- *  negative. Null without a date. */
+/** Calendar days from today until the day `expiresAt` falls on, in the
+ *  user's own time zone: a trial ending tomorrow is 1, ending later today is
+ *  0. Counted by date rather than by 24-hour blocks, so a clock change during
+ *  the trial (a 7-day trial is 7 days and 1 hour across the end of daylight
+ *  saving) can't make it read 8. Never negative; null without a date. */
 export function daysLeft(expiresAt: string | null, now: number = Date.now()): number | null {
   if (!expiresAt) return null;
-  const ms = new Date(expiresAt).getTime() - now;
-  if (Number.isNaN(ms)) return null;
-  return Math.max(0, Math.ceil(ms / 86_400_000));
+  const end = new Date(expiresAt);
+  if (Number.isNaN(end.getTime())) return null;
+  const today = new Date(now);
+  const endDay = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
+  const startDay = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.max(0, Math.round((endDay - startDay) / 86_400_000));
 }
 
 /** "5 days left", "1 day left" or "ends today". */
