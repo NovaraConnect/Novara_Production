@@ -67,6 +67,23 @@ function parseDateOnly(dateStr: string): Date {
   return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(dateStr);
 }
 
+/** When the next follow-up falls, in words: "Overdue by 5 days", "Due today",
+ *  "Due in 3 days", "Due in 2 weeks", "Due in 1 month". Counted in calendar
+ *  days from local midnight, matching formatDate's dates. */
+export function describeFollowUp(contact: { nextFollowUpDate?: string | null }): { label: string; overdue: boolean } {
+  if (!contact.nextFollowUpDate) return { label: "No follow-up set", overdue: false };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((parseDateOnly(contact.nextFollowUpDate).getTime() - today.getTime()) / 86_400_000);
+  const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? "" : "s"}`;
+  if (days < 0) return { label: `Overdue by ${plural(-days, "day")}`, overdue: true };
+  if (days === 0) return { label: "Due today", overdue: false };
+  if (days === 1) return { label: "Due tomorrow", overdue: false };
+  if (days < 14) return { label: `Due in ${plural(days, "day")}`, overdue: false };
+  if (days < 60) return { label: `Due in ${plural(Math.round(days / 7), "week")}`, overdue: false };
+  return { label: `Due in ${plural(Math.round(days / 30), "month")}`, overdue: false };
+}
+
 export function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "Never";
   try {

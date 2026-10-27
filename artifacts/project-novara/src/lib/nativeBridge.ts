@@ -31,6 +31,8 @@ export interface NativeContactPayload {
   email?: string;
   phone?: string;
   linkedinUrl?: string;
+  /** The contact's address-book photo, as a small square JPEG data URL. */
+  photo?: string;
   /** True when the user backed out of the system picker. Not an error. */
   cancelled?: boolean;
 }
@@ -57,6 +59,7 @@ interface NovaraNativeBridge {
   back(): void;
   haptic(style: HapticStyle): void;
   pickContact?(): Promise<NativeContactPayload>;
+  shareFile?(name: string, text: string): Promise<boolean>;
   scanCard?(): Promise<NativeCardScan>;
   openSettings?(): void;
   setTheme?(choice: NativeThemeChoice): void;
@@ -81,6 +84,19 @@ export function canPickNativeContact(): boolean {
 /** True when this build of the app can open the native document scanner. */
 export function canScanNativeCard(): boolean {
   return hasNativeBridge() && typeof bridge()?.scanCard === "function";
+}
+
+/** True when this build of the app can hand a file to the iOS share sheet.
+ *  A web view cannot download files itself, so Export Data depends on it. */
+export function canShareNativeFile(): boolean {
+  return hasNativeBridge() && typeof bridge()?.shareFile === "function";
+}
+
+/** Opens the share sheet for a text file. Resolves false if dismissed. */
+export async function shareNativeFile(name: string, text: string): Promise<boolean> {
+  const share = bridge()?.shareFile;
+  if (!share) throw new Error("Sharing files isn't available in this version of the app.");
+  return share(name, text);
 }
 
 /**

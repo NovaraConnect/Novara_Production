@@ -25,8 +25,21 @@ import {
   type FormSnapshot,
 } from "@/lib/linkedinImportDraft";
 import { QRScanner, type ScannedQRContact } from "@/components/QRScanner";
-import { NativeContactImport } from "@/components/NativeContactImport";
-import { localDateString } from "@/lib/utils";
+import { NativeContactImport, type PossibleDuplicate } from "@/components/NativeContactImport";
+import { ContactAvatar } from "@/components/ContactAvatar";
+import { setContactPhoto } from "@/lib/api";
+import { CONTACTS_KEY } from "@/hooks/useContacts";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/react";
+import { localDateString, cn } from "@/lib/utils";
+
+type AddTab = "import" | "scan" | "linkedin" | "manual";
+const ADD_TABS: { id: AddTab; label: string }[] = [
+  { id: "import", label: "Import" },
+  { id: "scan", label: "Scan" },
+  { id: "linkedin", label: "LinkedIn" },
+  { id: "manual", label: "Manual" },
+];
 
 const INITIAL_OPTIONS: Contact["initialFollowUpDays"][] = [1, 2, 3];
 const CADENCE_OPTIONS: Contact["followUpCadenceDays"][] = [...MANUAL_CADENCE_OPTIONS];
@@ -75,6 +88,17 @@ const FREE_TIER_LIMIT = 6;
 
 export default function AddContact() {
   const [, setLocation] = useLocation();
+
+  // The tabs at the top: Import lists every way in, Scan and LinkedIn narrow
+  // it to those, Manual is the form. Anything an importer reads lands in the
+  // form, so a successful import switches to Manual to review it.
+  const [tab, setTab] = useState<AddTab>("import");
+  const [duplicate, setDuplicate] = useState<PossibleDuplicate | null>(null);
+  // The address-book photo from an iPhone Contacts import, saved onto the
+  // contact as soon as it has been created.
+  const [importedPhoto, setImportedPhoto] = useState<string | null>(null);
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
   const { addContact, contacts } = useContacts();
   const { settings } = useSettings();
   const [showDetails, setShowDetails] = useState(false);
@@ -146,6 +170,7 @@ export default function AddContact() {
     setImportanceOverridden(false);
     setInitialOverridden(false);
     setCadenceOverridden(false);
+    setTab("manual");
   }, [form]);
 
   const handleCardScanned = useCallback((data: ScannedContact & { linkedinUrl?: string }) => {
@@ -170,9 +195,19 @@ export default function AddContact() {
     setImportanceOverridden(false);
     setInitialOverridden(false);
     setCadenceOverridden(false);
+    setTab("manual");
   }, [form]);
 
 
+
+  const handleContactImported = useCallback(
+    (data: ScannedContact & { linkedinUrl?: string; photo?: string }, possibleDuplicate: PossibleDuplicate | null) => {
+      handleCardScanned(data);
+      setDuplicate(possibleDuplicate);
+      setImportedPhoto(data.photo ?? null);
+    },
+    [handleCardScanned],
+  );
 
   // Tracks what the last LinkedIn import wrote, so a second import can withdraw
   // it instead of leaving the previous profile's values behind.
@@ -199,6 +234,7 @@ export default function AddContact() {
     setImportanceOverridden(false);
     setInitialOverridden(false);
     setCadenceOverridden(false);
+    setTab("manual");
   }, [form]);
 
   const addInterest = () => {
@@ -215,7 +251,7 @@ export default function AddContact() {
   const onSubmit = async (values: FormValues) => {
     if (atLimit) return;
     try {
-      await addContact.mutateAsync({
+      const created = await addContact.mutateAsync({
         ...values,
         interests,
         // Persist manual overrides so recalculation never overwrites them.
@@ -226,6 +262,16 @@ export default function AddContact() {
         initialFollowUpDays: values.initialFollowUpDays as Contact["initialFollowUpDays"],
         followUpCadenceDays: values.followUpCadenceDays as Contact["followUpCadenceDays"],
       } as any);
+      if (importedPhoto && created?.id) {
+        // The contact is already saved, so a failed photo upload only costs
+        // the photo, never the contact.
+        try {
+          await setContactPhoto(getToken, created.id, importedPhoto);
+          await queryClient.invalidateQueries({ queryKey: CONTACTS_KEY });
+        } catch {
+          toast.error("Contact saved, but its photo couldn't be added.");
+        }
+      }
       setLocation("/contacts");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
@@ -269,32 +315,68 @@ export default function AddContact() {
 
         {!atLimit && (
           <>
-            {/* Section label for the options below. */}
-            <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-              Add from
-            </p>
-
-            {/* LinkedIn Profile import — always shown. */}
-            <LinkedInScreenshotImport onExtracted={handleLinkedInExtracted} />
-
-            {/* Business Card Scanner */}
-            <BusinessCardScanner onExtracted={handleCardScanned} />
-
-            {/* QR Code Scanner */}
-            <QRScanner onExtracted={handleQRScanned} />
-
-            {/* Import from the iPhone's own Contacts. Renders nothing in a
-                browser, and nothing in an app build without the native picker. */}
-            <NativeContactImport onExtracted={handleCardScanned} />
-
-            {/* Divider between the no-typing options and the form itself. */}
-            <div className="flex items-center gap-3 mt-3 mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground shrink-0">
-                Or enter manually
-              </span>
-              <span className="h-px flex-1 bg-border" />
+            <div role="tablist" aria-label="Ways to add a contact" className="mb-4 grid grid-cols-4 gap-1 rounded-full bg-muted/70 p-1">
+              {ADD_TABS.map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === id}
+                  onClick={() => setTab(id)}
+                  className={cn(
+                    "rounded-full py-2 text-sm font-medium transition-colors",
+                    tab === id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
+            {/* The importers stay mounted when hidden, so a scan in progress
+                or a finished import keeps its state across tab switches. */}
+            <div className={tab === "import" || tab === "linkedin" ? "" : "hidden"}>
+              <LinkedInScreenshotImport onExtracted={handleLinkedInExtracted} />
+            </div>
+            <div className={tab === "import" || tab === "scan" ? "" : "hidden"}>
+              <BusinessCardScanner onExtracted={handleCardScanned} />
+              <QRScanner onExtracted={handleQRScanned} />
+            </div>
+            {/* Import from the iPhone's own Contacts. Renders nothing in a
+                browser, and nothing in an app build without the native picker. */}
+            <div className={tab === "import" ? "" : "hidden"}>
+              <NativeContactImport onExtracted={handleContactImported} />
+            </div>
+
+            <div className={tab === "manual" ? "" : "hidden"}>
+            {importedPhoto && (
+              <div className="mb-4 flex items-center gap-3 rounded-xl border border-border/60 bg-card p-3">
+                <ContactAvatar firstName="" photo={importedPhoto} size={44} />
+                <p className="flex-1 text-sm text-muted-foreground">Photo from your contacts</p>
+                <button
+                  type="button"
+                  onClick={() => setImportedPhoto(null)}
+                  className="text-sm font-medium text-primary"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+            {duplicate && (
+              <div className="mb-4 rounded-xl border border-cooling/25 bg-cooling-soft p-3">
+                <p className="text-xs font-semibold text-cooling">You may already have {duplicate.name}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-cooling/85">
+                  Saving will create a second contact. Open the existing one instead?
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setLocation(`/contacts/${duplicate.id}`)}
+                  className="mt-2 text-xs font-semibold text-cooling underline"
+                >
+                  Open {duplicate.name}
+                </button>
+              </div>
+            )}
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
 
@@ -663,6 +745,7 @@ export default function AddContact() {
 
           </form>
             </Form>
+            </div>
           </>
         )}
       </main>

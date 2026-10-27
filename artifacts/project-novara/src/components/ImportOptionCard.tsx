@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import { ChevronRight, type LucideIcon } from "lucide-react";
 
 /** The "in" letters alone, in the app's primary blue, sized to sit in the
  *  same icon slot as the other import icons. Drawn inline and only used to
@@ -6,10 +6,10 @@ import type { LucideIcon } from "lucide-react";
 export function LinkedInGlyph() {
   return (
     <span
-      className="w-9 h-9 flex items-center justify-center shrink-0 text-primary"
+      className="w-6 h-6 flex items-center justify-center shrink-0 text-primary"
       aria-hidden="true"
     >
-      <span className="text-[20px] font-bold leading-none tracking-tight">in</span>
+      <span className="text-[19px] font-bold leading-none tracking-tight">in</span>
     </span>
   );
 }
@@ -18,9 +18,10 @@ export function LinkedInGlyph() {
  * The shell around each "get a contact in without typing" option on Add
  * Contact — business card, LinkedIn profile, QR code, phone contacts.
  *
- * One set, matching the Add Contact design: a tinted rounded card, an icon tile
- * on the left, the title and a line of explanation to its right. Cards with
- * buttons put them below the header; compact cards are the whole tap target.
+ * One set, matching the Add Contact design: a tinted rounded card with the
+ * icon beside the title and a line of explanation under both. Cards with
+ * buttons put them below; compact cards are the whole tap target and show a
+ * chevron, which only appears where tapping the card does something.
  *
  * Presentation only. Each importer keeps its own behaviour and passes its
  * status UI and buttons as children. Pass `onClick` for an option that has no
@@ -46,22 +47,17 @@ export function ImportOptionCard({
   testId?: string;
   children?: React.ReactNode;
 }) {
-  const tile =
-    iconNode ??
-    (Icon ? (
-      <span className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0" aria-hidden="true">
-        <Icon className="w-[18px] h-[18px] text-primary" />
-      </span>
-    ) : null);
+  const icon = iconNode ?? (Icon ? <Icon className="w-6 h-6 shrink-0 text-primary" aria-hidden="true" /> : null);
 
   const header = (
-    <div className="flex items-center gap-3">
-      {tile}
-      <div className="min-w-0 flex-1">
-        <p className="text-[14px] font-bold text-primary leading-snug">{title}</p>
-        <p className="text-xs text-muted-foreground leading-snug">{description}</p>
+    <>
+      <div className="flex items-center gap-3">
+        {icon}
+        <p className="min-w-0 flex-1 text-[15px] font-bold text-primary leading-snug">{title}</p>
+        {onClick && <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
       </div>
-    </div>
+      <p className="mt-1 text-xs text-muted-foreground leading-snug">{description}</p>
+    </>
   );
 
   // Kept compact so every option, through Enter Manually, fits on one phone

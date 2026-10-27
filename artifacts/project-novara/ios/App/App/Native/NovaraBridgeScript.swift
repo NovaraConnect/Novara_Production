@@ -119,6 +119,7 @@ enum NovaraBridgeScript {
         haptic: function (style) { post({ name: 'haptic', style: style || 'selection' }); },
         pickContact: function () { return request('pickContact'); },
         scanCard: function () { return request('scanCard'); },
+        shareFile: function (name, text) { return request('shareFile', { name: name, text: text }); },
         openSettings: function () { post({ name: 'openAppSettings' }); },
         setTheme: function (choice) {
           // The CHOICE, not the resolved theme: 'system' maps to iOS's own

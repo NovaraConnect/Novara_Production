@@ -13,6 +13,7 @@ import {
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { startScheduler } from "./lib/scheduler";
+import { startHealthSnapshotScheduler } from "./lib/networkHealth";
 
 const app: Express = express();
 
@@ -65,7 +66,8 @@ app.use(
   }),
   );
 
-app.use(express.json());
+// 300 KB: room for a contact photo (the app sends at most ~200 KB as base64).
+app.use(express.json({ limit: "300kb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // General rate limit for the whole API surface. This is a first line of
@@ -98,5 +100,6 @@ app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
 });
 
 startScheduler();
+startHealthSnapshotScheduler();
 
 export default app;

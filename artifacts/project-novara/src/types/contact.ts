@@ -26,6 +26,8 @@ export interface Contact {
   lastInteractionDate: string;
   nextFollowUpDate: string;
   notes?: string;
+  /** Small square JPEG data URL, shown instead of the initials. */
+  photo?: string;
   createdAt: string;
 }
 

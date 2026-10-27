@@ -34,6 +34,7 @@ notes text,
 email text,
 phone text,
 preferred_contact_method text,
+photo text,
 created_at timestamptz NOT NULL DEFAULT now(),
 updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -90,4 +91,11 @@ app_version text,
 status text NOT NULL DEFAULT 'new',
 created_at timestamptz NOT NULL DEFAULT now(),
 updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS network_health_snapshots (
+user_id text NOT NULL,
+snapshot_date date NOT NULL,
+score integer NOT NULL CHECK (score BETWEEN 0 AND 100),
+PRIMARY KEY (user_id, snapshot_date)
 );

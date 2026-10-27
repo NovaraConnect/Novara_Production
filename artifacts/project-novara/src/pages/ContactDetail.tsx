@@ -2,6 +2,7 @@ import { useRoute, useLocation, Link } from "wouter";
 import { useState, useEffect } from "react";
 import { formatDate, computeStatus } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
+import { ContactPhotoEditor } from "@/components/ContactPhotoEditor";
 import { ImportanceBadge } from "@/components/ImportanceBadge";
 import {
   ArrowLeft, Edit2, Trash2, Linkedin, MapPin, AlignLeft, CalendarDays,
@@ -230,6 +231,9 @@ export default function ContactDetail() {
       <main className="flex-1 px-4 py-4">
         {/* Header */}
         <div className="mb-8">
+          <div className="mb-4">
+            <ContactPhotoEditor contact={contact} />
+          </div>
           <h1 className="font-serif text-3xl font-bold tracking-tight text-foreground mb-1 leading-tight">
             {contact.firstName} {contact.lastName}
           </h1>

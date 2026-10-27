@@ -293,3 +293,36 @@ export async function enrichContact(
   }
   return res.json();
 }
+
+// ── Contact photos ───────────────────────────────────────────────────────────
+
+async function contactFromResponse(res: Response, fallback: string): Promise<Contact> {
+  if (res.status === 401) throw new Error("Unauthorized");
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? fallback);
+  }
+  return res.json();
+}
+
+/** Saves a photo (a small JPEG data URL, see lib/contactPhoto) for a contact. */
+export async function setContactPhoto(getToken: GetAuthToken, id: string, photo: string): Promise<Contact> {
+  const res = await apiFetch(getToken, `/api/contacts/${id}/photo`, { method: "PUT", json: { photo } });
+  return contactFromResponse(res, "Couldn't save the photo. Please try again.");
+}
+
+/** Removes a contact's photo, back to initials. */
+export async function removeContactPhoto(getToken: GetAuthToken, id: string): Promise<Contact> {
+  const res = await apiFetch(getToken, `/api/contacts/${id}/photo`, { method: "DELETE" });
+  return contactFromResponse(res, "Couldn't remove the photo. Please try again.");
+}
+
+// ── Network Health trend ─────────────────────────────────────────────────────
+
+/** The score from about a month ago, or null until a month of history exists. */
+export async function fetchHealthTrend(getToken: GetAuthToken): Promise<{ score: number; date: string } | null> {
+  const res = await apiFetch(getToken, "/api/network-health/trend");
+  if (!res.ok) return null;
+  const body = (await res.json().catch(() => ({}))) as { lastMonth?: { score: number; date: string } | null };
+  return body.lastMonth ?? null;
+}

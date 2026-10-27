@@ -45,6 +45,69 @@ router.get("/contacts", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// PUT /api/contacts/:id/photo  { photo: "data:image/jpeg;base64,..." }
+// The app crops and shrinks photos before upload; this only checks shape and
+// size, so a contact list carrying every photo stays small.
+const MAX_PHOTO_CHARS = 200_000;
+const PHOTO_PREFIX = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/;
+
+async function hasPhotoColumn(): Promise<boolean> {
+  const { rows } = await pool.query(
+    "SELECT 1 FROM information_schema.columns WHERE table_name = 'contacts' AND column_name = 'photo'",
+  );
+  return rows.length > 0;
+}
+
+router.put("/contacts/:id/photo", requireAuth, async (req: Request, res: Response) => {
+  const userId = (req as AuthedRequest).userId;
+  const photo = (req.body as { photo?: unknown })?.photo;
+  if (typeof photo !== "string" || photo.length > MAX_PHOTO_CHARS || !PHOTO_PREFIX.test(photo)) {
+    res.status(400).json({ error: "Photo must be a JPEG, PNG or WebP image under 150 KB" });
+    return;
+  }
+  try {
+    if (!(await hasPhotoColumn())) {
+      res.status(503).json({ error: "Contact photos aren't available yet" });
+      return;
+    }
+    const { rows } = await pool.query(
+      "UPDATE contacts SET photo = $1, updated_at = now() WHERE id = $2 AND user_id = $3 RETURNING *",
+      [photo, req.params.id, userId],
+    );
+    if (!rows[0]) {
+      res.status(404).json({ error: "Contact not found" });
+      return;
+    }
+    res.json(dbToContact(rows[0]));
+  } catch (err) {
+    logger.error({ err }, "Saving contact photo failed");
+    res.status(500).json({ error: "Failed to save photo" });
+  }
+});
+
+// DELETE /api/contacts/:id/photo — back to initials.
+router.delete("/contacts/:id/photo", requireAuth, async (req: Request, res: Response) => {
+  const userId = (req as AuthedRequest).userId;
+  try {
+    if (!(await hasPhotoColumn())) {
+      res.status(503).json({ error: "Contact photos aren't available yet" });
+      return;
+    }
+    const { rows } = await pool.query(
+      "UPDATE contacts SET photo = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 RETURNING *",
+      [req.params.id, userId],
+    );
+    if (!rows[0]) {
+      res.status(404).json({ error: "Contact not found" });
+      return;
+    }
+    res.json(dbToContact(rows[0]));
+  } catch (err) {
+    logger.error({ err }, "Removing contact photo failed");
+    res.status(500).json({ error: "Failed to remove photo" });
+  }
+});
+
 // POST /api/contacts/recalculate  — authenticated, idempotent maintenance.
 // Recomputes AI Suggested Priority + automatic cadence for the caller's
 // non-overridden contacts and returns a report. Safe to run repeatedly.

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
 import { ContactRound } from "lucide-react";
 import { ImportOptionCard } from "@/components/ImportOptionCard";
 import { toast } from "sonner";
@@ -31,15 +30,17 @@ import type { ScannedContact } from "@/lib/businessCardParse";
  * Renders nothing outside the app, and nothing in an older app build that has
  * the web view but not the picker.
  */
+export type PossibleDuplicate = { id: string; name: string };
+
 export function NativeContactImport({
   onExtracted,
 }: {
-  onExtracted: (data: ScannedContact & { linkedinUrl?: string }) => void;
+  /** `duplicate` is an existing contact this one may repeat; the page shows
+   *  the warning next to the form the details land in. */
+  onExtracted: (data: ScannedContact & { linkedinUrl?: string; photo?: string }, duplicate: PossibleDuplicate | null) => void;
 }) {
-  const [, setLocation] = useLocation();
   const { contacts } = useContacts();
   const [busy, setBusy] = useState(false);
-  const [duplicate, setDuplicate] = useState<{ id: string; name: string } | null>(null);
 
   if (!canPickNativeContact()) return null;
 
@@ -54,15 +55,12 @@ export function NativeContactImport({
     }
 
     const existing = findDuplicateContact(contacts, fields);
-    setDuplicate(
-      existing
-        ? { id: existing.id, name: `${existing.firstName} ${existing.lastName}`.trim() }
-        : null,
+    onExtracted(
+      fields,
+      existing ? { id: existing.id, name: `${existing.firstName} ${existing.lastName}`.trim() } : null,
     );
-
-    onExtracted(fields);
     haptic("success");
-    toast.success("Contact imported — review the fields below before saving");
+    toast.success("Contact imported — review the details before saving");
   };
 
   const handlePick = async () => {
@@ -86,8 +84,7 @@ export function NativeContactImport({
 
   return (
     <>
-      {/* The whole card opens the picker, like the QR option. The duplicate
-          notice sits beside it rather than inside, since it has a button. */}
+      {/* The whole card opens the picker, like the QR option. */}
       <ImportOptionCard
         icon={ContactRound}
         title="Import from Contacts"
@@ -97,23 +94,6 @@ export function NativeContactImport({
         testId="button-import-contact"
       />
 
-      {duplicate && (
-        <div className="-mt-1 mb-3 rounded-xl border border-cooling/25 bg-cooling-soft p-3">
-          <p className="text-xs font-semibold text-cooling">
-            You may already have {duplicate.name}
-          </p>
-          <p className="mt-0.5 text-xs leading-relaxed text-cooling/85">
-            Saving will create a second contact. Open the existing one instead?
-          </p>
-          <button
-            type="button"
-            onClick={() => setLocation(`/contacts/${duplicate.id}`)}
-            className="mt-2 text-xs font-semibold text-cooling underline"
-          >
-            Open {duplicate.name}
-          </button>
-        </div>
-      )}
     </>
   );
 }

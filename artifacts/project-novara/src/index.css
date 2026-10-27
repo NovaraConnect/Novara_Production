@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
 @layer theme, base, clerk, components, utilities;
 @import "tailwindcss";
 @import '@clerk/themes/shadcn.css';
@@ -83,7 +83,9 @@
   --color-overdue: var(--overdue);
   --color-overdue-soft: var(--overdue-soft);
 
-  --font-sans: 'Plus Jakarta Sans', sans-serif;
+  /* Apple's system font (SF Pro) on iPhone and Mac, as in the design; Inter,
+     its closest match, everywhere else. */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
   --font-serif: 'Playfair Display', serif;
   --radius: .5rem;
 }
