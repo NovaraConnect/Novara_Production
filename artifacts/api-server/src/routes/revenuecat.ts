@@ -16,6 +16,11 @@
 // entitlement if its event_timestamp is not older than the last one applied.
 //
 // NO GRACE. Access is granted until Apple's expiration_at_ms and no longer.
+//
+// TRANSFER. When an Apple Account that already paid restores purchases while
+// signed in to a different Novara account, RevenueCat moves the subscription
+// and sends TRANSFER (which has no app_user_id). We move the Apple row to the
+// new owner and switch the old owner's row off.
 // ============================================================================
 import { Router, type Request, type Response } from "express";
 import { createHash, timingSafeEqual } from "node:crypto";
@@ -29,7 +34,11 @@ export const REVENUECAT_WEBHOOK_PATH = "/webhooks/revenuecat";
 export interface RevenueCatEvent {
   id: string;
   type: string;
+  /** Absent on TRANSFER events, which use transferred_from / transferred_to. */
   app_user_id: string;
+  cancel_reason?: string | null;
+  transferred_from?: string[] | null;
+  transferred_to?: string[] | null;
   product_id?: string | null;
   entitlement_ids?: string[] | null;
   expiration_at_ms?: number | null;
@@ -48,9 +57,15 @@ const GRANTING = new Set([
   "RENEWAL",
   "PRODUCT_CHANGE",
   "UNCANCELLATION",
-  "CANCELLATION", // still active until the period ends
+  "CANCELLATION", // still active until the period ends (refunds excepted, below)
   "BILLING_ISSUE", // Apple's own retry window; access ends at expiration
+  "SUBSCRIPTION_EXTENDED", // Apple pushed the expiry back
+  "REFUND_REVERSED",
+  "TEMPORARY_ENTITLEMENT_GRANT", // short grant during an App Store outage
 ]);
+
+/** cancel_reason RevenueCat sends with CANCELLATION when Apple refunded the period. */
+const REFUND_REASON = "CUSTOMER_SUPPORT";
 
 /** Events after which Novara Pro is no longer granted. */
 const ENDING = new Set(["EXPIRATION"]);
@@ -77,7 +92,7 @@ export function entitlementChangeFor(event: RevenueCatEvent):
   const productId = event.product_id ?? null;
   const providerRef = event.original_transaction_id ?? null;
 
-  if (ENDING.has(event.type)) {
+  if (ENDING.has(event.type) || (event.type === "CANCELLATION" && event.cancel_reason === REFUND_REASON)) {
     return { active: false, expiresAt, productId, providerRef };
   }
   if (GRANTING.has(event.type)) {
@@ -85,8 +100,73 @@ export function entitlementChangeFor(event: RevenueCatEvent):
     if (!expiresAt) return null;
     return { active: true, expiresAt, productId, providerRef };
   }
-  // TEST, TRANSFER, SUBSCRIPTION_PAUSED and anything new: recorded, not acted on.
+  // TEST, PRODUCT_CHANGE without expiry, and anything new: recorded, not acted on.
+  // TRANSFER is handled separately (applyTransfer).
   return null;
+}
+
+const clerkIds = (ids: unknown): string[] =>
+  Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string" && CLERK_USER_ID.test(id)) : [];
+
+/** The Clerk user a TRANSFER moves the subscription to, if any. */
+function transferTarget(event: RevenueCatEvent): string | null {
+  return clerkIds(event.transferred_to)[0] ?? null;
+}
+
+/**
+ * Moves the Apple entitlement from the transferred_from users to the
+ * transferred_to user, inside the caller's transaction. The new owner gets the
+ * old owner's expiry; the old owner's row is switched off. Ordering is
+ * respected on both sides through last_event_at.
+ */
+async function applyTransfer(client: PoolClient, event: RevenueCatEvent): Promise<Outcome> {
+  const to = transferTarget(event);
+  const from = clerkIds(event.transferred_from).filter((id) => id !== to);
+  if (!to || from.length === 0) return "ignored";
+  const eventAt = new Date(event.event_timestamp_ms).toISOString();
+
+  const { rows } = await client.query<{
+    provider_ref: string | null;
+    product_id: string | null;
+    status: string;
+    expires_at: Date | null;
+  }>(
+    `SELECT provider_ref, product_id, status, expires_at
+       FROM entitlements
+      WHERE source = 'apple_iap' AND user_id = ANY($1)
+        AND (last_event_at IS NULL OR last_event_at <= $2)
+      ORDER BY (status = 'active') DESC, expires_at DESC NULLS LAST
+      LIMIT 1
+      FOR UPDATE`,
+    [from, eventAt],
+  );
+  const moved = rows[0];
+  if (!moved) return "ignored";
+
+  await client.query(
+    `UPDATE entitlements
+        SET status = 'inactive', last_event_at = $2, updated_at = now()
+      WHERE source = 'apple_iap' AND user_id = ANY($1)
+        AND (last_event_at IS NULL OR last_event_at <= $2)`,
+    [from, eventAt],
+  );
+  await client.query(
+    `INSERT INTO entitlements
+       (user_id, source, provider_ref, product_id, status, expires_at, last_event_at, updated_at)
+     VALUES ($1, 'apple_iap', $2, $3, $4, $5, $6, now())
+     ON CONFLICT (user_id) WHERE source = 'apple_iap'
+     DO UPDATE SET
+       provider_ref  = EXCLUDED.provider_ref,
+       product_id    = EXCLUDED.product_id,
+       status        = EXCLUDED.status,
+       expires_at    = EXCLUDED.expires_at,
+       last_event_at = EXCLUDED.last_event_at,
+       updated_at    = now()
+     WHERE entitlements.last_event_at IS NULL
+        OR entitlements.last_event_at <= EXCLUDED.last_event_at`,
+    [to, moved.provider_ref, moved.product_id, moved.status, moved.expires_at, eventAt],
+  );
+  return "applied";
 }
 
 async function applyEvent(event: RevenueCatEvent): Promise<Outcome> {
@@ -100,7 +180,7 @@ async function applyEvent(event: RevenueCatEvent): Promise<Outcome> {
       [
         event.id,
         event.type,
-        event.app_user_id,
+        event.app_user_id ?? transferTarget(event) ?? "",
         event.environment ?? null,
         new Date(event.event_timestamp_ms).toISOString(),
       ],
@@ -108,6 +188,12 @@ async function applyEvent(event: RevenueCatEvent): Promise<Outcome> {
     if (inserted.rowCount === 0) {
       await client.query("COMMIT");
       return "duplicate";
+    }
+
+    if (event.type === "TRANSFER") {
+      const outcome = await applyTransfer(client, event);
+      await client.query("COMMIT");
+      return outcome;
     }
 
     const change = entitlementChangeFor(event);
@@ -171,7 +257,7 @@ router.post(REVENUECAT_WEBHOOK_PATH, async (req: Request, res: Response) => {
     !event ||
     typeof event.id !== "string" ||
     typeof event.type !== "string" ||
-    typeof event.app_user_id !== "string" ||
+    (typeof event.app_user_id !== "string" && event.type !== "TRANSFER") ||
     typeof event.event_timestamp_ms !== "number"
   ) {
     res.status(400).json({ error: "Malformed event" });

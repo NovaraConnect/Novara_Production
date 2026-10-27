@@ -1,6 +1,6 @@
 // RevenueCat webhook + Apple-sourced Pro entitlement, end to end against the
 // real Express app and the test Postgres.
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import request from "supertest";
 import { app, authHeaders } from "./testApp";
 import { isAuthorised, entitlementChangeFor } from "../src/routes/revenuecat";
@@ -167,6 +167,92 @@ describe("RevenueCat webhook", () => {
     const evt = await pool.query("SELECT COUNT(*)::int AS n FROM revenuecat_events WHERE app_user_id = $1", [USER]);
     expect(ent.rows[0].n).toBe(0);
     expect(evt.rows[0].n).toBe(0);
+  });
+
+  it("a refund (CANCELLATION with CUSTOMER_SUPPORT) removes Pro at once", async () => {
+    await deliver(makeEvent());
+    const refund = await deliver(makeEvent({
+      type: "CANCELLATION",
+      cancel_reason: "CUSTOMER_SUPPORT",
+      event_timestamp_ms: Date.now() + 1000,
+    }));
+    expect(refund.body.outcome).toBe("applied");
+    const me = await request(app).get("/api/entitlements/me").set(authHeaders(USER));
+    expect(me.body.pro).toBe(false);
+  });
+
+  it("an ordinary CANCELLATION keeps Pro until the period ends", async () => {
+    await deliver(makeEvent());
+    await deliver(makeEvent({
+      type: "CANCELLATION",
+      cancel_reason: "UNSUBSCRIBE",
+      event_timestamp_ms: Date.now() + 1000,
+    }));
+    const me = await request(app).get("/api/entitlements/me").set(authHeaders(USER));
+    expect(me.body.pro).toBe(true);
+  });
+
+  it("SUBSCRIPTION_EXTENDED moves the expiry later", async () => {
+    await deliver(makeEvent());
+    const later = Date.now() + 60 * DAY;
+    await deliver(makeEvent({
+      type: "SUBSCRIPTION_EXTENDED",
+      expiration_at_ms: later,
+      event_timestamp_ms: Date.now() + 1000,
+    }));
+    const me = await request(app).get("/api/entitlements/me").set(authHeaders(USER));
+    expect(me.body.expiresAt).toBe(new Date(later).toISOString());
+  });
+
+  it("TRANSFER (no app_user_id) moves Pro to the new Novara account", async () => {
+    const OTHER = "user_rc_other";
+    await deliver(makeEvent());
+    const { id, event_timestamp_ms } = makeEvent({ event_timestamp_ms: Date.now() + 1000 });
+    const res = await deliver({
+      id,
+      type: "TRANSFER",
+      event_timestamp_ms,
+      transferred_from: [USER],
+      transferred_to: ["$RCAnonymousID:xyz", OTHER],
+      environment: "SANDBOX",
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.outcome).toBe("applied");
+
+    const oldOwner = await request(app).get("/api/entitlements/me").set(authHeaders(USER));
+    const newOwner = await request(app).get("/api/entitlements/me").set(authHeaders(OTHER));
+    expect(oldOwner.body.pro).toBe(false);
+    expect(newOwner.body.pro).toBe(true);
+  });
+
+  it("TRANSFER with nothing to move is recorded and ignored", async () => {
+    const res = await deliver({
+      id: `evt_transfer_${Date.now()}`,
+      type: "TRANSFER",
+      event_timestamp_ms: Date.now(),
+      transferred_from: ["user_nobody"],
+      transferred_to: ["user_somebody"],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.outcome).toBe("ignored");
+  });
+
+  it("contact creation still works as Free if migration 0004 was not applied", async () => {
+    const original = pool.query.bind(pool);
+    const spy = vi.spyOn(pool, "query").mockImplementation(((text: unknown, ...rest: unknown[]) => {
+      if (typeof text === "string" && text.includes("FROM entitlements")) {
+        return Promise.reject(Object.assign(new Error('relation "entitlements" does not exist'), { code: "42P01" }));
+      }
+      return (original as (...a: unknown[]) => unknown)(text, ...rest);
+    }) as never);
+    try {
+      const res = await request(app).post("/api/contacts").set(authHeaders(USER)).send(person(1));
+      expect(res.status).toBe(201);
+      const me = await request(app).get("/api/entitlements/me").set(authHeaders(USER));
+      expect(me.body.pro).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("the status endpoint requires sign-in", async () => {

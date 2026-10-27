@@ -11,6 +11,7 @@
 // leave someone with access.
 // ============================================================================
 import { pool } from "../db";
+import { logger } from "./logger";
 
 /** Novara Free ceiling. Pro removes it. */
 export const FREE_TIER_LIMIT = 6;
@@ -30,16 +31,26 @@ const NOT_PRO: ProStatus = { pro: false, source: null, expiresAt: null };
 
 /** Whether the user holds an active Novara Pro entitlement right now. */
 export async function proStatusFor(userId: string): Promise<ProStatus> {
-  const { rows } = await pool.query<{ expires_at: Date }>(
-    `SELECT expires_at
-       FROM entitlements
-      WHERE user_id = $1
-        AND source = 'apple_iap'
-        AND status = 'active'
-        AND expires_at > now()
-      LIMIT 1`,
-    [userId],
-  );
+  let rows: { expires_at: Date }[];
+  try {
+    ({ rows } = await pool.query<{ expires_at: Date }>(
+      `SELECT expires_at
+         FROM entitlements
+        WHERE user_id = $1
+          AND source = 'apple_iap'
+          AND status = 'active'
+          AND expires_at > now()
+        LIMIT 1`,
+      [userId],
+    ));
+  } catch (err) {
+    // 42P01 = undefined_table: this API was deployed before migration 0004.
+    // Nobody can have bought Pro yet, so answer Free instead of failing every
+    // contact creation. Any other error still propagates.
+    if ((err as { code?: string }).code !== "42P01") throw err;
+    logger.error("entitlements table missing; apply migration 0004_apple_iap_entitlements.sql");
+    return NOT_PRO;
+  }
   const row = rows[0];
   if (!row) return NOT_PRO;
   return { pro: true, source: "apple_iap", expiresAt: new Date(row.expires_at).toISOString() };
