@@ -65,6 +65,16 @@ export interface NativeProProduct {
 
 export type NativePurchaseOutcome = "purchased" | "pending" | "cancelled";
 
+/** The simulator's current StoreKit subscription, reported only by DEBUG builds
+ *  run with the "StoreKit Test" scheme. productId is null when StoreKit has
+ *  never seen a purchase. */
+export interface LocalStoreKitEntitlement {
+  active: boolean;
+  productId: string | null;
+  expiresAt: string | null;
+  isTrial: boolean;
+}
+
 export interface NativeRestoreResult {
   /** "restored" when Apple reported an active Novara Pro subscription. */
   outcome: "restored" | "nothing";
@@ -87,6 +97,8 @@ interface NovaraNativeBridge {
   purchase?(productId: string): Promise<{ outcome: NativePurchaseOutcome }>;
   restorePurchases?(): Promise<NativeRestoreResult>;
   manageSubscriptions?(): Promise<void>;
+  // Local testing only (DEBUG build, "StoreKit Test" scheme). Absent otherwise.
+  localStoreKitEntitlement?(): Promise<LocalStoreKitEntitlement>;
 }
 
 /** First bridge version with purchase methods. Bridge versions 1 and 2 have no
@@ -255,4 +267,15 @@ export async function restoreNativePurchases(): Promise<NativeRestoreResult> {
 export async function manageNativeSubscriptions(): Promise<void> {
   const b = purchaseBridge();
   await b.manageSubscriptions!();
+}
+
+/**
+ * Local testing only: the simulator's StoreKit subscription, or null when this
+ * build is not a StoreKit Test build (always null in a browser and in any
+ * build from TestFlight or the App Store).
+ */
+export async function getLocalStoreKitEntitlement(): Promise<LocalStoreKitEntitlement | null> {
+  const b = bridge();
+  if (!b || !hasNativeBridge() || typeof b.localStoreKitEntitlement !== "function") return null;
+  return b.localStoreKitEntitlement();
 }

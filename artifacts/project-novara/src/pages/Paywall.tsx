@@ -1,29 +1,38 @@
 // ============================================================================
-// Novara Pro paywall. NATIVE iOS SHELL ONLY.
+// Novara Pro subscription screen (SUBSCRIPTION_ROUTE). Payment controls appear
+// in the NATIVE iOS SHELL ONLY.
 //
-// Shown only when every gate in isPaywallVisible() passes. In a browser, or on
-// an older build, or with the server flag off, the route redirects to Settings
-// and no payment control is rendered.
+// Two jobs:
+//  - Subscribe to start. While the API requires a subscription, SubscriptionGate
+//    sends every signed-in user without a trial or Pro here. There is no back
+//    button then, only Account settings (sign out, delete account).
+//  - Manage. Subscribers see their plan, Manage Subscription and Restore.
+//
+// Payment controls render only when every gate in isPaywallVisible() passes.
+// In a browser or on an older app build: if a subscription is required, the
+// page explains where to subscribe; otherwise it redirects to Settings.
 //
 // The page never decides Pro itself. After Apple reports a purchase, it polls
 // the server (GET /api/entitlements/me) until the RevenueCat webhook has
 // written the entitlement.
 //
-// One plan, monthly or annual, each with a 7-day free trial that Apple runs.
+// One plan, monthly or yearly, each with a 7-day free trial that Apple runs.
 // The trial is offered only when Apple says this Apple Account can still have
 // it (NativeProProduct.trialDays > 0); otherwise the page shows plain prices.
 // ============================================================================
 import { useEffect, useState } from "react";
-import { Redirect, useLocation } from "wouter";
+import { Link, Redirect, useLocation } from "wouter";
 import { useAuth } from "@clerk/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useFeatures } from "@/hooks/useFeatures";
 import { usePaywallAvailable } from "@/hooks/usePaywallAvailable";
-import { useProStatus, PRO_STATUS_KEY } from "@/hooks/useProStatus";
+import { useProStatus, readProStatus, PRO_STATUS_KEY } from "@/hooks/useProStatus";
 import { useSubscriptionState } from "@/hooks/useSubscriptionState";
 import {
   getNativeProProducts,
+  hasNativeBridge,
   identifyNativePurchases,
   manageNativeSubscriptions,
   purchaseNativePro,
@@ -33,25 +42,42 @@ import {
 } from "@/lib/nativeBridge";
 import {
   ANNUAL_SAVING_LABEL,
-  AUTO_RENEW_NOTICE,
   KEEP_YOUR_CONTACTS_NOTE,
   PRO_PERIOD_LABEL,
+  subscriptionTerms,
   TERMS_OF_USE_URL,
-  trialNotice,
   trialTimeLeft,
   waitForPro,
 } from "@/lib/purchases";
-import { fetchProStatus } from "@/lib/api";
 
 type Busy = null | "purchase" | "restore" | "manage";
+
+function LegalLinks({ showAccount }: { showAccount: boolean }) {
+  return (
+    <p className="text-xs text-muted-foreground text-center space-x-1">
+      <a className="underline" href={TERMS_OF_USE_URL} target="_blank" rel="noopener noreferrer">Terms of Use (EULA)</a>
+      <span>·</span>
+      <a className="underline" href="/privacy">Privacy Policy</a>
+      {showAccount && (
+        <>
+          <span>·</span>
+          <Link className="underline" href="/settings">Account settings</Link>
+        </>
+      )}
+    </p>
+  );
+}
 
 export default function Paywall() {
   const [, setLocation] = useLocation();
   const { getToken, userId } = useAuth();
   const queryClient = useQueryClient();
   const { isPro } = useProStatus();
+  const { subscriptionRequired, localStoreKitTest } = useFeatures();
   const subscription = useSubscriptionState();
   const visible = usePaywallAvailable();
+  // Subscribe to start: this screen stands in for the whole app.
+  const required = subscriptionRequired && !isPro;
 
   const [products, setProducts] = useState<NativeProProduct[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -78,7 +104,29 @@ export default function Paywall() {
     };
   }, [visible, userId]);
 
-  if (!visible) return <Redirect to="/settings" />;
+  if (!visible) {
+    if (!required) return <Redirect to="/settings" />;
+    // A subscription is required but this device cannot sell one.
+    return (
+      <div className="mobile-container pb-10 flex flex-col min-h-[100dvh]">
+        <header className="pt-safe pb-4 px-6">
+          <h1 className="font-serif text-xl font-bold tracking-tight text-foreground pt-4">Novara Pro</h1>
+        </header>
+        <main className="flex-1 px-4 py-6 space-y-6">
+          <p className="text-base font-semibold text-foreground">
+            {subscription.plan === "expired" ? "Your subscription has ended." : "Novara starts with a 7-day free trial."}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {hasNativeBridge()
+              ? "Update Novara from the App Store to choose a plan."
+              : "Choose a plan in the Novara app on iPhone, then sign in here with the same account."}
+          </p>
+          <p className="text-xs text-muted-foreground">{KEEP_YOUR_CONTACTS_NOTE}</p>
+          <LegalLinks showAccount />
+        </main>
+      </div>
+    );
+  }
 
   const monthly = products?.find((p) => p.period === "monthly");
   const annual = products?.find((p) => p.period === "annual");
@@ -86,7 +134,7 @@ export default function Paywall() {
   const trialDays = chosen?.trialDays && chosen.trialDays > 0 ? chosen.trialDays : 0;
 
   const refreshStatus = async (): Promise<boolean> => {
-    const confirmed = await waitForPro(() => fetchProStatus(getToken));
+    const confirmed = await waitForPro(() => readProStatus(getToken, localStoreKitTest));
     await queryClient.invalidateQueries({ queryKey: PRO_STATUS_KEY });
     return confirmed;
   };
@@ -105,6 +153,11 @@ export default function Paywall() {
       }
       setMessage("Confirming your subscription…");
       const confirmed = await refreshStatus();
+      if (confirmed && required) {
+        // Subscribe to start: the app opens as soon as the server agrees.
+        setLocation("/");
+        return;
+      }
       setMessage(
         confirmed
           ? trialDays > 0
@@ -134,6 +187,10 @@ export default function Paywall() {
       const result = await restoreNativePurchases();
       if (result.outcome === "restored") {
         const confirmed = await refreshStatus();
+        if (confirmed && required) {
+          setLocation("/");
+          return;
+        }
         setMessage(confirmed ? "Novara Pro is restored." : "Your subscription was found. It can take a minute to appear.");
       } else {
         setMessage("No active Novara Pro subscription was found for this Apple Account.");
@@ -156,18 +213,30 @@ export default function Paywall() {
     }
   };
 
+  const headline = isPro
+    ? "Novara Pro"
+    : subscription.plan === "expired"
+      ? "Your subscription has ended. Choose a plan to keep using Novara."
+      : required
+        ? trialDays > 0
+          ? `Start your ${trialDays}-day free trial`
+          : "Choose your plan to start using Novara"
+        : "Add everyone you meet, without a limit.";
+
   return (
     <div className="mobile-container pb-10 flex flex-col min-h-[100dvh]">
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border/50 pt-safe pb-4 px-6 flex items-center">
-        <Button variant="ghost" size="icon" className="-ml-2 mr-2" onClick={() => setLocation("/settings")}>
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
+        {!required && (
+          <Button variant="ghost" size="icon" className="-ml-2 mr-2" onClick={() => setLocation("/settings")}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+        )}
         <h1 className="font-serif text-xl font-bold tracking-tight text-foreground">Novara Pro</h1>
       </header>
 
       <main className="flex-1 px-4 py-6 space-y-6">
         <section className="space-y-3">
-          <p className="text-base font-semibold text-foreground">Add everyone you meet, without a limit.</p>
+          <p className="text-base font-semibold text-foreground">{headline}</p>
           <ul className="space-y-2 text-sm text-foreground">
             <li className="flex gap-2"><Check className="w-4 h-4 mt-0.5 text-cooling" /> Unlimited contacts</li>
             <li className="flex gap-2"><Check className="w-4 h-4 mt-0.5 text-cooling" /> Import as many as you like from LinkedIn, business cards, QR codes and your iPhone contacts</li>
@@ -197,7 +266,7 @@ export default function Paywall() {
             {products && (
               <>
                 {[
-                  { period: "annual" as const, product: annual, title: "Annual", saving: ANNUAL_SAVING_LABEL },
+                  { period: "annual" as const, product: annual, title: "Yearly", saving: ANNUAL_SAVING_LABEL },
                   { period: "monthly" as const, product: monthly, title: "Monthly", saving: null },
                 ].map(({ period, product, title, saving }) =>
                   product ? (
@@ -237,13 +306,11 @@ export default function Paywall() {
                     "Subscribe"
                   )}
                 </Button>
-                {chosen && trialDays > 0 && (
-                  <p className="text-xs text-foreground leading-relaxed">
-                    Free for {trialDays} days, then {chosen.priceString} {PRO_PERIOD_LABEL[selected]}.{" "}
-                    {trialNotice(trialDays)}
+                {chosen && (
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {subscriptionTerms({ priceString: chosen.priceString, period: selected, trialDays })}
                   </p>
                 )}
-                <p className="text-xs text-muted-foreground leading-relaxed">{AUTO_RENEW_NOTICE}</p>
               </>
             )}
           </section>
@@ -262,11 +329,7 @@ export default function Paywall() {
           )}
         </section>
 
-        <p className="text-xs text-muted-foreground text-center">
-          <a className="underline" href={TERMS_OF_USE_URL} target="_blank" rel="noopener noreferrer">Terms of Use</a>
-          {" · "}
-          <a className="underline" href="/privacy">Privacy Policy</a>
-        </p>
+        <LegalLinks showAccount={required} />
       </main>
     </div>
   );

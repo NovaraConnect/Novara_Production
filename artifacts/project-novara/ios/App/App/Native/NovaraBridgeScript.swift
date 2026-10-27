@@ -44,6 +44,15 @@ enum NovaraBridgeScript {
     ///     Apple reported. Pro access is decided by the server.
     static let version = 3
 
+    /// Local testing only: present in DEBUG builds run with the StoreKit Test
+    /// scheme, absent (an empty line) everywhere else. The web app looks for it
+    /// before reporting simulator purchases to a local API.
+    private static var localStoreKitTestMethod: String {
+        NovaraPurchases.isLocalStoreKitTest
+            ? "localStoreKitEntitlement: function () { return request('localStoreKitEntitlement'); },"
+            : ""
+    }
+
     static let source: String = """
     (function () {
       'use strict';
@@ -130,6 +139,7 @@ enum NovaraBridgeScript {
         purchase: function (productId) { return request('purchase', { productId: productId }); },
         restorePurchases: function () { return request('restorePurchases'); },
         manageSubscriptions: function () { return request('manageSubscriptions'); },
+        \(localStoreKitTestMethod)
         openSettings: function () { post({ name: 'openAppSettings' }); },
         setTheme: function (choice) {
           // The CHOICE, not the resolved theme: 'system' maps to iOS's own

@@ -51,6 +51,28 @@ final class NovaraWebViewController: CAPBridgeViewController {
 
     // MARK: - Capacitor hooks
 
+    #if DEBUG
+    /// Local testing only. The "Novara Connect (StoreKit Test)" scheme sets
+    /// NOVARA_WEB_URL so the simulator loads a local web build (with the
+    /// subscription screens and a local API) instead of the live site.
+    /// NOVARA_ALLOW_NAVIGATION adds hosts, comma-separated, that may load inside
+    /// the app, e.g. a development Clerk instance. Release builds never read either.
+    override func instanceDescriptor() -> InstanceDescriptor {
+        let descriptor = super.instanceDescriptor()
+        let env = ProcessInfo.processInfo.environment
+        if let url = env["NOVARA_WEB_URL"]?.trimmingCharacters(in: .whitespaces), !url.isEmpty {
+            descriptor.serverURL = url
+        }
+        if let hosts = env["NOVARA_ALLOW_NAVIGATION"], !hosts.isEmpty {
+            descriptor.allowedNavigationHostnames += hosts
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+        }
+        return descriptor
+    }
+    #endif
+
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
 

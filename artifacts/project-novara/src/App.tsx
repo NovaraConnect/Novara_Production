@@ -15,6 +15,7 @@ import EditContact from "@/pages/EditContact";
 import Settings from "@/pages/Settings";
 import Paywall from "@/pages/Paywall";
 import { SUBSCRIPTION_ROUTE } from "@/lib/purchases";
+import { SubscriptionGate } from "@/components/SubscriptionGate";
 import { useNativePurchaseIdentity } from "@/hooks/useNativePurchaseIdentity";
 import InstallGuide from "@/pages/InstallGuide";
 import InstallLanding from "@/pages/InstallLanding";
@@ -229,7 +230,9 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   return (
     <>
       <Show when="signed-in">
-        <Component />
+        <SubscriptionGate>
+          <Component />
+        </SubscriptionGate>
       </Show>
       <Show when="signed-out">
         <Redirect to="/" />

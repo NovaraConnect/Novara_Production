@@ -220,6 +220,9 @@ export interface Features {
   /** Whether adding contacts needs Novara Pro or its free trial. Only ever on
    *  together with applePaywall. Off: Free keeps the 6-contact limit. */
   subscriptionRequired: boolean;
+  /** Local development API only: simulator StoreKit test purchases may be
+   *  reported to it. Always false on Render. */
+  localStoreKitTest: boolean;
 }
 
 const FEATURES_CACHE_KEY = "novara.features.lastKnown";
@@ -243,6 +246,7 @@ export function readCachedFeatures(): Features | null {
       linkedinScreenshotImport: !!data?.linkedinScreenshotImport,
       applePaywall: !!data?.applePaywall,
       subscriptionRequired: !!data?.subscriptionRequired,
+      localStoreKitTest: !!data?.localStoreKitTest,
     };
   } catch {
     return null;
@@ -267,6 +271,7 @@ export async function fetchFeatures(getToken: GetAuthToken): Promise<Features> {
     linkedinScreenshotImport: !!data?.linkedinScreenshotImport,
     applePaywall: !!data?.applePaywall,
     subscriptionRequired: !!data?.subscriptionRequired,
+    localStoreKitTest: !!data?.localStoreKitTest,
   };
 
   try {
@@ -340,4 +345,18 @@ export async function fetchProStatus(getToken: GetAuthToken): Promise<ProStatus>
       ?? (data?.pro === true ? "active" : "none"),
     billingPeriod: data?.billingPeriod === "monthly" || data?.billingPeriod === "annual" ? data.billingPeriod : null,
   };
+}
+
+/** Local testing only: tells a local API what the simulator's StoreKit test
+ *  environment holds, in place of the RevenueCat webhook. The API refuses this
+ *  everywhere except a developer's own machine. */
+export async function reportLocalStoreKitEntitlement(
+  getToken: GetAuthToken,
+  entitlement: { active: boolean; productId: string | null; expiresAt: string | null; isTrial: boolean },
+): Promise<void> {
+  const res = await apiFetch(getToken, "/api/dev/storekit-test/entitlement", {
+    method: "POST",
+    json: entitlement,
+  });
+  if (!res.ok) throw new Error(`Local StoreKit test report failed: ${res.status}`);
 }

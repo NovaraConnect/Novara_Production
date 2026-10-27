@@ -1,5 +1,6 @@
 import Foundation
 import RevenueCat
+import StoreKit
 import UIKit
 
 /// Apple In-App Purchase for Novara Pro, through RevenueCat.
@@ -57,6 +58,9 @@ enum NovaraPurchases {
     /// it is checked per account: someone who already had the trial must not be
     /// promised it again. Anything short of a confirmed "eligible" reports 0.
     static func products(completion: @escaping (Result<Any, Error>) -> Void) {
+        #if DEBUG
+        if isLocalStoreKitTest { NovaraLocalStoreKit.products(completion: completion); return }
+        #endif
         guard configureIfNeeded() else {
             completion(.failure(unavailable(notConfigured)))
             return
@@ -104,6 +108,9 @@ enum NovaraPurchases {
 
     /// Links the RevenueCat identity to the signed-in Clerk user ID.
     static func identify(userId: String, completion: @escaping (Result<Any, Error>) -> Void) {
+        #if DEBUG
+        if isLocalStoreKitTest { completion(.success(["ok": true])); return }
+        #endif
         guard configureIfNeeded() else {
             completion(.failure(unavailable(notConfigured)))
             return
@@ -126,6 +133,9 @@ enum NovaraPurchases {
     /// Starts a purchase of one plan. Reports "purchased", "pending" or "cancelled".
     /// "purchased" means Apple accepted the payment; it does not mean Pro is active.
     static func purchase(productId: String, completion: @escaping (Result<Any, Error>) -> Void) {
+        #if DEBUG
+        if isLocalStoreKitTest { NovaraLocalStoreKit.purchase(productId: productId, completion: completion); return }
+        #endif
         guard configureIfNeeded() else {
             completion(.failure(unavailable(notConfigured)))
             return
@@ -163,6 +173,9 @@ enum NovaraPurchases {
     /// Restores purchases from the Apple Account. "restored" means Apple reports an
     /// active Novara Pro subscription on this device; the server still confirms it.
     static func restore(completion: @escaping (Result<Any, Error>) -> Void) {
+        #if DEBUG
+        if isLocalStoreKitTest { NovaraLocalStoreKit.restore(completion: completion); return }
+        #endif
         guard configureIfNeeded() else {
             completion(.failure(unavailable(notConfigured)))
             return
@@ -179,6 +192,9 @@ enum NovaraPurchases {
 
     /// Opens Apple's subscription settings. Works even when the SDK is not configured.
     static func openSubscriptionSettings(completion: @escaping (Result<Any, Error>) -> Void) {
+        #if DEBUG
+        if isLocalStoreKitTest { NovaraLocalStoreKit.manage(completion: completion); return }
+        #endif
         DispatchQueue.main.async {
             UIApplication.shared.open(manageSubscriptionsURL, options: [:]) { opened in
                 if opened {
@@ -190,3 +206,169 @@ enum NovaraPurchases {
         }
     }
 }
+
+// MARK: - Local StoreKit testing (DEBUG builds only)
+
+extension NovaraPurchases {
+    /// True only in a DEBUG build launched by the "Novara Connect (StoreKit Test)"
+    /// scheme, which sets NOVARA_STOREKIT_TEST=1 and attaches NovaraPro.storekit.
+    /// Purchases then go to Xcode's local StoreKit test store instead of
+    /// RevenueCat and Apple: no App Store Connect, no RevenueCat, no money.
+    /// Always false in Release builds (TestFlight and the App Store).
+    static var isLocalStoreKitTest: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.environment["NOVARA_STOREKIT_TEST"] == "1"
+        #else
+        return false
+        #endif
+    }
+}
+
+#if DEBUG
+/// StoreKit 2 directly, for the simulator. Mirrors NovaraPurchases' answers so
+/// the web paywall cannot tell the difference, and adds `entitlement`, which
+/// the web app reports to a local API in place of the RevenueCat webhook.
+enum NovaraLocalStoreKit {
+
+    /// Must match NovaraPro.storekit and the App Store Connect product IDs.
+    static let productIds = ["group.novaraconnect.app.pro.monthly", "group.novaraconnect.app.pro.annual"]
+
+    private static var listener: Task<Void, Never>?
+
+    /// Finishes renewals and other transactions StoreKit delivers in the
+    /// background, so the test store does not keep redelivering them.
+    private static func listenOnce() {
+        guard listener == nil else { return }
+        listener = Task.detached {
+            for await update in StoreKit.Transaction.updates {
+                if case .verified(let transaction) = update { await transaction.finish() }
+            }
+        }
+    }
+
+    private static func run(_ completion: @escaping (Result<Any, Error>) -> Void,
+                            _ work: @escaping @MainActor () async throws -> Any) {
+        listenOnce()
+        Task { @MainActor in
+            do { completion(.success(try await work())) } catch { completion(.failure(error)) }
+        }
+    }
+
+    private static func failure(_ message: String) -> Error {
+        NSError(domain: "Novara.LocalStoreKit", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+    }
+
+    @MainActor private static var activeScene: UIWindowScene? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+    }
+
+    private static func days(_ period: StoreKit.Product.SubscriptionPeriod) -> Int {
+        switch period.unit {
+        case .day: return period.value
+        case .week: return period.value * 7
+        case .month: return period.value * 30
+        case .year: return period.value * 365
+        @unknown default: return 0
+        }
+    }
+
+    static func products(completion: @escaping (Result<Any, Error>) -> Void) {
+        run(completion) {
+            var list: [[String: Any]] = []
+            for product in try await StoreKit.Product.products(for: productIds) {
+                guard let subscription = product.subscription else { continue }
+                var trialDays = 0
+                if let intro = subscription.introductoryOffer, intro.paymentMode == .freeTrial,
+                   await subscription.isEligibleForIntroOffer {
+                    trialDays = days(intro.period) * max(intro.periodCount, 1)
+                }
+                list.append([
+                    "productId": product.id,
+                    "period": subscription.subscriptionPeriod.unit == .year ? "annual" : "monthly",
+                    "priceString": product.displayPrice,
+                    "trialDays": trialDays,
+                ])
+            }
+            if list.isEmpty {
+                throw failure("No test products. Run the \"Novara Connect (StoreKit Test)\" scheme from Xcode.")
+            }
+            return ["products": list]
+        }
+    }
+
+    static func purchase(productId: String, completion: @escaping (Result<Any, Error>) -> Void) {
+        run(completion) {
+            guard let product = try await StoreKit.Product.products(for: [productId]).first else {
+                throw failure("That plan isn't available right now.")
+            }
+            let result: StoreKit.Product.PurchaseResult
+            if #available(iOS 17.0, *), let scene = activeScene {
+                result = try await product.purchase(confirmIn: scene)
+            } else {
+                result = try await product.purchase()
+            }
+            switch result {
+            case .success(let verification):
+                if case .verified(let transaction) = verification { await transaction.finish() }
+                return ["outcome": "purchased"]
+            case .pending:
+                return ["outcome": "pending"]
+            case .userCancelled:
+                return ["outcome": "cancelled"]
+            @unknown default:
+                return ["outcome": "cancelled"]
+            }
+        }
+    }
+
+    static func restore(completion: @escaping (Result<Any, Error>) -> Void) {
+        run(completion) {
+            try await StoreKit.AppStore.sync()
+            let current = try await currentEntitlement()
+            return ["outcome": (current["active"] as? Bool) == true ? "restored" : "nothing"]
+        }
+    }
+
+    static func manage(completion: @escaping (Result<Any, Error>) -> Void) {
+        run(completion) {
+            guard let scene = activeScene else { throw failure("Couldn't open subscription settings.") }
+            try await StoreKit.AppStore.showManageSubscriptions(in: scene)
+            return ["ok": true]
+        }
+    }
+
+    /// The newest Novara Pro transaction in the test store: active or not, its
+    /// product, its expiry, and whether it is the free trial.
+    static func entitlement(completion: @escaping (Result<Any, Error>) -> Void) {
+        run(completion) { try await currentEntitlement() }
+    }
+
+    private static func currentEntitlement() async throws -> [String: Any] {
+        var latest: StoreKit.Transaction?
+        for id in productIds {
+            if let result = await StoreKit.Transaction.latest(for: id), case .verified(let transaction) = result,
+               latest.map({ transaction.purchaseDate > $0.purchaseDate }) ?? true {
+                latest = transaction
+            }
+        }
+        guard let transaction = latest else {
+            return ["active": false, "productId": NSNull(), "expiresAt": NSNull(), "isTrial": false]
+        }
+        let expires = transaction.expirationDate
+        let isTrial: Bool
+        if #available(iOS 17.2, *) {
+            isTrial = transaction.offer?.type == .introductory
+        } else {
+            isTrial = transaction.offerType == .introductory
+        }
+        return [
+            "active": transaction.revocationDate == nil && (expires.map { $0 > Date() } ?? false),
+            "productId": transaction.productID,
+            "expiresAt": expires.map { ISO8601DateFormatter().string(from: $0) } ?? NSNull(),
+            "isTrial": isTrial,
+        ]
+    }
+}
+#endif

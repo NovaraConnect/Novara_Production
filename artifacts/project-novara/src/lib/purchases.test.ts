@@ -4,8 +4,10 @@ import {
   daysLeft,
   FREE_TIER_LIMIT,
   isPaywallVisible,
+  subscriptionGate,
   subscriptionLabel,
   subscriptionPlanFor,
+  subscriptionTerms,
   SUBSCRIPTION_ROUTE,
   waitForPro,
 } from "./purchases";
@@ -94,14 +96,58 @@ describe("subscription plan and label", () => {
   });
 
   it("labels each plan", () => {
-    expect(subscriptionLabel("trial", 5, true)).toBe("Free trial · 5 days left");
-    expect(subscriptionLabel("trial", 1, true)).toBe("Free trial · 1 day left");
-    expect(subscriptionLabel("trial", 0, true)).toBe("Free trial · ends today");
-    expect(subscriptionLabel("monthly", null, true)).toBe("Novara Pro · Monthly");
-    expect(subscriptionLabel("annual", null, true)).toBe("Novara Pro · Annual");
+    expect(subscriptionLabel("trial", 5, true)).toBe("Free Trial · 5 days left");
+    expect(subscriptionLabel("trial", 1, true)).toBe("Free Trial · 1 day left");
+    expect(subscriptionLabel("trial", 0, true)).toBe("Free Trial · ends today");
+    expect(subscriptionLabel("monthly", null, true)).toBe("Pro · Monthly");
+    expect(subscriptionLabel("annual", null, true)).toBe("Pro · Yearly");
     expect(subscriptionLabel("expired", null, true)).toBe("Subscription ended");
     expect(subscriptionLabel("none", null, true)).toBe("Not subscribed");
     expect(subscriptionLabel("none", null, false)).toBe("Free Plan");
+  });
+});
+
+describe("subscriptionGate (subscribe to start)", () => {
+  const base = { subscriptionRequired: true, isKnown: true, isPro: false, path: "/dashboard" };
+
+  it("is open for everyone while a subscription is not required", () => {
+    expect(subscriptionGate({ ...base, subscriptionRequired: false })).toBe("open");
+  });
+
+  it("sends anyone without a trial or Pro to the subscription screen", () => {
+    expect(subscriptionGate(base)).toBe("subscribe");
+    expect(subscriptionGate({ ...base, path: "/contacts/42" })).toBe("subscribe");
+    expect(subscriptionGate({ ...base, path: "/welcome" })).toBe("subscribe");
+  });
+
+  it("lets trial and Pro users in", () => {
+    expect(subscriptionGate({ ...base, isPro: true })).toBe("open");
+  });
+
+  it("keeps the subscription screen and Settings (sign out, delete account) open", () => {
+    expect(subscriptionGate({ ...base, path: SUBSCRIPTION_ROUTE })).toBe("open");
+    expect(subscriptionGate({ ...base, path: "/settings" })).toBe("open");
+    expect(subscriptionGate({ ...base, path: "/settingsx" })).toBe("subscribe");
+  });
+
+  it("waits, rather than flashing either screen, while the status loads", () => {
+    expect(subscriptionGate({ ...base, isKnown: false })).toBe("wait");
+  });
+});
+
+describe("subscriptionTerms", () => {
+  it("states the trial, the price after it, renewal and how to cancel", () => {
+    const text = subscriptionTerms({ priceString: "$4.99", period: "monthly", trialDays: 7 });
+    expect(text).toContain("Free for 7 days, then $4.99 per month");
+    expect(text).toContain("charged when the trial ends");
+    expect(text).toContain("renews automatically every month");
+    expect(text).toContain("Subscriptions");
+  });
+
+  it("drops the trial wording when Apple offers no trial", () => {
+    const text = subscriptionTerms({ priceString: "$49.99", period: "annual", trialDays: 0 });
+    expect(text).not.toContain("Free for");
+    expect(text).toContain("$49.99 per year, charged to your Apple Account when you confirm");
   });
 });
 

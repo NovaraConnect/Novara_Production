@@ -3,10 +3,14 @@
 // rule here can be tested directly.
 // ============================================================================
 import type { ProStatus } from "./api";
+import type { ProPeriod } from "./nativeBridge";
 
 /** The Novara Pro subscription screen (pages/Paywall.tsx). Settings and Add
  *  Contact link here. Keep this path stable: other screens depend on it. */
 export const SUBSCRIPTION_ROUTE = "/pro";
+
+/** Signed-in screens that stay open without a subscription. */
+const GATE_EXEMPT_PATHS = [SUBSCRIPTION_ROUTE, "/settings"];
 
 /** Apple's standard licensed application end user agreement. Linked from the
  *  paywall as the Terms of Use, which Apple requires for subscriptions. Replace
@@ -22,21 +26,49 @@ export const PRO_PERIOD_LABEL = { monthly: "per month", annual: "per year" } as 
  *  this too (see docs/APPLE_IAP_SETUP.md). */
 export const ANNUAL_SAVING_LABEL = "Save 16%";
 
-/** Free trial terms, shown with the plans whenever Apple offers this account a
- *  trial. `days` comes from Apple (NativeProProduct.trialDays), never a constant. */
-export function trialNotice(days: number): string {
-  return `The ${days}-day free trial starts when you confirm. Cancel at least 24 hours before it ends and you won't be charged. Otherwise your subscription starts automatically when the trial ends.`;
+/** How to cancel, in the words Apple's own Settings app uses. */
+export const HOW_TO_CANCEL =
+  "To cancel, open Settings on your iPhone, tap your name, then Subscriptions. Or tap Manage Subscription on this screen.";
+
+/**
+ * The full terms shown under the plans before purchase: price per period,
+ * trial length and what happens after it, auto-renewal, and how to cancel.
+ * Price and trial length always come from Apple (NativeProProduct), never a
+ * constant. Confirm against current App Review guidance before submission
+ * (see the setup doc).
+ */
+export function subscriptionTerms(input: { priceString: string; period: ProPeriod; trialDays: number }): string {
+  const unit = input.period === "annual" ? "year" : "month";
+  const price = `${input.priceString} per ${unit}`;
+  const charge =
+    input.trialDays > 0
+      ? `Free for ${input.trialDays} days, then ${price}. Your Apple Account is charged when the trial ends unless you cancel at least 24 hours before it ends.`
+      : `${price}, charged to your Apple Account when you confirm.`;
+  return `${charge} The subscription renews automatically every ${unit} at the same price unless auto-renew is turned off at least 24 hours before the end of the current period. ${HOW_TO_CANCEL}`;
 }
 
-/** What happens to someone's contacts if they don't subscribe or stop. Matches
- *  what the server enforces: only adding and importing need Pro. */
+/** What happens to someone's contacts when a subscription ends. */
 export const KEEP_YOUR_CONTACTS_NOTE =
-  "Your contacts stay yours. If you don't subscribe, or your subscription ends, you can still view, edit and follow up with every contact you've added.";
+  "If your subscription ends, your contacts are kept and come back as soon as you subscribe again.";
 
-/** Apple's standard subscription terms, shown before purchase. Confirm against
- *  current App Review guidance before submission (see the setup doc). */
-export const AUTO_RENEW_NOTICE =
-  "Payment is charged to your Apple Account at confirmation of purchase. The subscription renews automatically unless auto-renew is turned off at least 24 hours before the end of the current period. Your account is charged for renewal within 24 hours before the end of the current period. You can manage or cancel the subscription in your Apple Account settings.";
+/**
+ * What the app shows a signed-in user while a subscription is required.
+ *  - "open": the requested screen.
+ *  - "wait": nothing yet; the subscription status is still loading.
+ *  - "subscribe": the subscription screen instead (SUBSCRIPTION_ROUTE).
+ * Settings stays open so anyone can still sign out or delete their account
+ * (Apple guideline 5.1.1(v)) without paying.
+ */
+export function subscriptionGate(input: {
+  subscriptionRequired: boolean;
+  isKnown: boolean;
+  isPro: boolean;
+  path: string;
+}): "open" | "wait" | "subscribe" {
+  if (!input.subscriptionRequired || input.isPro) return "open";
+  if (GATE_EXEMPT_PATHS.some((p) => input.path === p || input.path.startsWith(`${p}/`))) return "open";
+  return input.isKnown ? "subscribe" : "wait";
+}
 
 /**
  * Whether the native paywall may be shown at all.
@@ -143,7 +175,7 @@ export function trialTimeLeft(days: number): string {
   return `${days} ${days === 1 ? "day" : "days"} left`;
 }
 
-/** Short label for the plan, e.g. "Free trial · 5 days left" or "Novara Pro · Annual". */
+/** Short label for the plan, e.g. "Free Trial · 5 days left" or "Pro · Yearly". */
 export function subscriptionLabel(
   plan: SubscriptionPlan,
   days: number | null,
@@ -151,11 +183,11 @@ export function subscriptionLabel(
 ): string {
   switch (plan) {
     case "trial":
-      return days === null ? "Free trial" : `Free trial · ${trialTimeLeft(days)}`;
+      return days === null ? "Free Trial" : `Free Trial · ${trialTimeLeft(days)}`;
     case "monthly":
-      return "Novara Pro · Monthly";
+      return "Pro · Monthly";
     case "annual":
-      return "Novara Pro · Annual";
+      return "Pro · Yearly";
     case "expired":
       return "Subscription ended";
     case "none":
