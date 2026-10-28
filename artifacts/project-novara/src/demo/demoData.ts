@@ -1,7 +1,30 @@
+import { addDays, startOfDay } from "date-fns";
 import { Contact, UserSettings } from "@/types/contact";
 
-// Demo is "frozen" at June 14, 2026
-// All dates are relative to that reference point
+// ============================================================================
+// Sample data for the public demo at /try.
+//
+// EVERY DATE IS RELATIVE TO TODAY. The demo used to be frozen at a fixed date;
+// once that date passed, every contact drifted to Cold or Dormant and the demo
+// showed a Network Health of 0/100. Relative dates keep the same picture on
+// any day, which demoData.test.ts checks:
+//
+//   Sarah   due today        Warm     (the tour's example)
+//   Alex    due in 4 days    Warm
+//   James   due in 9 days    Warm
+//   Marc    3 days overdue   Cooling
+//   Priya   12 days overdue  Cooling
+//   Emma    40 days overdue  Cold
+//   Léa     pipeline, not yet counted in Network Health
+//
+// The people are fictional. Email addresses use example.com, which is
+// reserved for documentation, so nobody real can be emailed from the demo.
+// ============================================================================
+
+const TODAY = startOfDay(new Date());
+
+/** An ISO timestamp `n` days from today (negative for the past). */
+const day = (n: number) => addDays(TODAY, n).toISOString();
 
 export const DEMO_CONTACTS: Contact[] = [
   {
@@ -11,7 +34,7 @@ export const DEMO_CONTACTS: Contact[] = [
     company: "Tesla",
     role: "Senior Recruiter",
     linkedinUrl: "https://linkedin.com/in/sarah-jones",
-    email: "sarah.jones@tesla.com",
+    email: "sarah.jones@example.com",
     phone: "+1 415 555 0192",
     metAt: "TechCrunch Disrupt 2025",
     importance: "High",
@@ -24,11 +47,11 @@ export const DEMO_CONTACTS: Contact[] = [
     initialFollowUpDays: 3,
     followUpCadenceDays: 30,
     cadenceOverride: false,
-    firstContactDate: "2025-12-01T00:00:00.000Z",
-    lastInteractionDate: "2026-05-20T00:00:00.000Z",
-    nextFollowUpDate: "2026-06-14T00:00:00.000Z",
+    firstContactDate: day(-320),
+    lastInteractionDate: day(-30),
+    nextFollowUpDate: day(0),
     notes: "Discussed engineering leadership roles opening in Q3. She mentioned they're expanding the ML team. Follow up about positions — she prefers a quick LinkedIn message first.",
-    createdAt: "2025-12-01T00:00:00.000Z",
+    createdAt: day(-320),
   },
   {
     id: "demo-marc",
@@ -47,11 +70,11 @@ export const DEMO_CONTACTS: Contact[] = [
     initialFollowUpDays: 3,
     followUpCadenceDays: 60,
     cadenceOverride: false,
-    firstContactDate: "2025-09-15T00:00:00.000Z",
-    lastInteractionDate: "2026-03-30T00:00:00.000Z",
-    nextFollowUpDate: "2026-06-11T00:00:00.000Z",
+    firstContactDate: day(-300),
+    lastInteractionDate: day(-63),
+    nextFollowUpDate: day(-3),
     notes: "Building a professional network in beauty-tech. Potential collaboration on consumer insights data. Reach out about the new L'Oréal Tech Incubator program.",
-    createdAt: "2025-09-15T00:00:00.000Z",
+    createdAt: day(-300),
   },
   {
     id: "demo-priya",
@@ -67,15 +90,15 @@ export const DEMO_CONTACTS: Contact[] = [
     priorityOverride: false,
     industry: "Venture Capital",
     interests: ["climate tech", "AI governance"],
-    connectionStatus: "pipeline",
+    connectionStatus: "connected",
     initialFollowUpDays: 3,
     followUpCadenceDays: 60,
     cadenceOverride: false,
-    firstContactDate: "2025-11-20T00:00:00.000Z",
-    lastInteractionDate: "2026-04-01T00:00:00.000Z",
-    nextFollowUpDate: "2026-06-12T00:00:00.000Z",
+    firstContactDate: day(-340),
+    lastInteractionDate: day(-72),
+    nextFollowUpDate: day(-12),
     notes: "Focuses on climate tech and AI governance investments. She mentioned interest in my work on sustainable infrastructure. Strong YC ecosystem connection.",
-    createdAt: "2025-11-20T00:00:00.000Z",
+    createdAt: day(-340),
   },
   {
     id: "demo-james",
@@ -96,11 +119,11 @@ export const DEMO_CONTACTS: Contact[] = [
     initialFollowUpDays: 3,
     followUpCadenceDays: 30,
     cadenceOverride: false,
-    firstContactDate: "2026-01-10T00:00:00.000Z",
-    lastInteractionDate: "2026-06-01T00:00:00.000Z",
-    nextFollowUpDate: "2026-07-01T00:00:00.000Z",
+    firstContactDate: day(-290),
+    lastInteractionDate: day(-21),
+    nextFollowUpDate: day(9),
     notes: "",
-    createdAt: "2026-01-10T00:00:00.000Z",
+    createdAt: day(-290),
   },
   {
     id: "demo-alex",
@@ -121,11 +144,11 @@ export const DEMO_CONTACTS: Contact[] = [
     initialFollowUpDays: 3,
     followUpCadenceDays: 30,
     cadenceOverride: false,
-    firstContactDate: "2026-02-14T00:00:00.000Z",
-    lastInteractionDate: "2026-05-25T00:00:00.000Z",
-    nextFollowUpDate: "2026-06-24T00:00:00.000Z",
+    firstContactDate: day(-255),
+    lastInteractionDate: day(-26),
+    nextFollowUpDate: day(4),
     notes: "",
-    createdAt: "2026-02-14T00:00:00.000Z",
+    createdAt: day(-255),
   },
   {
     id: "demo-emma",
@@ -146,11 +169,11 @@ export const DEMO_CONTACTS: Contact[] = [
     initialFollowUpDays: 2,
     followUpCadenceDays: 90,
     cadenceOverride: false,
-    firstContactDate: "2024-06-01T00:00:00.000Z",
-    lastInteractionDate: "2026-01-20T00:00:00.000Z",
-    nextFollowUpDate: "2026-07-15T00:00:00.000Z",
+    firstContactDate: day(-880),
+    lastInteractionDate: day(-130),
+    nextFollowUpDate: day(-40),
     notes: "Strategy consultant focused on digital transformation in financial services. Could be valuable for consulting referrals. Last talked at the alumni mixer in January.",
-    createdAt: "2024-06-01T00:00:00.000Z",
+    createdAt: day(-880),
   },
   {
     id: "demo-lea",
@@ -171,11 +194,11 @@ export const DEMO_CONTACTS: Contact[] = [
     initialFollowUpDays: 3,
     followUpCadenceDays: 90,
     cadenceOverride: false,
-    firstContactDate: "2024-09-01T00:00:00.000Z",
-    lastInteractionDate: "2026-01-10T00:00:00.000Z",
-    nextFollowUpDate: "2026-07-20T00:00:00.000Z",
+    firstContactDate: day(-790),
+    lastInteractionDate: day(-70),
+    nextFollowUpDate: day(20),
     notes: "Leading digital transformation at LVMH. Interested in luxury brand innovation and AI personalisation. Met briefly at the summit keynote.",
-    createdAt: "2024-09-01T00:00:00.000Z",
+    createdAt: day(-790),
   },
 ];
 
@@ -194,23 +217,20 @@ export interface DemoHeadline {
   url: string;
 }
 
+/** Sample conversation starters for Sarah (Tesla). In the app these are real,
+ *  daily headlines; here they are illustrative, so they are labelled as
+ *  samples and not credited to any real publication. */
 export const TESLA_NEWS: DemoHeadline[] = [
   {
-    title: "Tesla Reports Record Q2 2026 Deliveries, Beating Analyst Expectations by 8%",
-    source: "Reuters",
-    publishedAt: "2026-06-12T10:00:00Z",
-    url: "https://www.reuters.com/",
+    title: "Tesla expands its AI and robotics hiring ahead of next year’s product cycle",
+    source: "Sample headline",
+    publishedAt: day(-2),
+    url: "",
   },
   {
-    title: "Tesla's Autonomous Robotaxi Service Expands to 12 New Cities Across North America",
-    source: "TechCrunch",
-    publishedAt: "2026-06-09T14:30:00Z",
-    url: "https://techcrunch.com/",
-  },
-  {
-    title: "Tesla Accelerates Hiring Push for AI and Robotics Engineers Ahead of 2027 Product Cycle",
-    source: "Bloomberg",
-    publishedAt: "2026-06-07T08:00:00Z",
-    url: "https://www.bloomberg.com/",
+    title: "Tesla’s engineering teams open new roles in machine learning",
+    source: "Sample headline",
+    publishedAt: day(-5),
+    url: "",
   },
 ];
