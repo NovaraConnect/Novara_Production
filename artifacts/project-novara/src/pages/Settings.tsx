@@ -4,7 +4,7 @@ import ThemeSetting from "@/components/ThemeSetting";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Bell, Save, Check, X, Plus, LogOut, RefreshCw, Smartphone, ChevronRight, BookOpen, Target, Trash2, Bug, Lightbulb, CreditCard, Download, type LucideIcon } from "lucide-react";
+import { Bell, Save, Check, X, Plus, LogOut, RefreshCw, Smartphone, ChevronRight, BookOpen, Target, Trash2, Bug, Lightbulb, CreditCard, Download, Star, type LucideIcon } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { useSettings } from "@/hooks/useSettings";
@@ -12,6 +12,7 @@ import { useAuth, useClerk, useUser } from "@clerk/react";
 import { UserSettings } from "@/types/contact";
 import { NovaraMark } from "@/components/NovaraMark";
 import { isNativeShell } from "@/lib/installPrompt";
+import { openAppStoreReview } from "@/lib/reviewPrompt";
 import { APP_VERSION } from "@/lib/appVersion";
 import { deleteAccount } from "@/lib/api";
 import { useContacts } from "@/hooks/useContacts";
@@ -431,6 +432,10 @@ export default function Settings() {
           <div className="surface-card overflow-hidden divide-y divide-border/60">
             <SettingsRow icon={Bug} label="Report a bug" detail="Let us know when something isn't working" onClick={() => setLocation("/feedback?type=bug")} testId="nav-report-bug" />
             <SettingsRow icon={Lightbulb} label="Suggest a feature" detail="Tell us what would make Novara better" onClick={() => setLocation("/feedback?type=feature")} testId="nav-suggest-feature" />
+            {/* In the iPhone app only: it opens Novara's App Store page. */}
+            {nativeApp && (
+              <SettingsRow icon={Star} label="Rate Novara" detail="Leave a review on the App Store" onClick={openAppStoreReview} testId="button-rate-novara" />
+            )}
           </div>
         </section>
 

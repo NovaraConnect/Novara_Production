@@ -42,7 +42,11 @@ enum NovaraBridgeScript {
     ///     `manageSubscriptions`. The web paywall requires version 3, so a
     ///     version 1 or 2 binary never shows one. Purchase results are what
     ///     Apple reported. Pro access is decided by the server.
-    static let version = 3
+    ///
+    /// 4 — added `requestReview`, which asks iOS for its App Store rating
+    ///     prompt. The web side only calls it after a good moment, and never on
+    ///     a version 3 or older binary, which does not have it.
+    static let version = 4
 
     /// Local testing only: present in DEBUG builds run with the StoreKit Test
     /// scheme, absent (an empty line) everywhere else. The web app looks for it
@@ -140,6 +144,7 @@ enum NovaraBridgeScript {
         purchase: function (productId) { return request('purchase', { productId: productId }); },
         restorePurchases: function () { return request('restorePurchases'); },
         manageSubscriptions: function () { return request('manageSubscriptions'); },
+        requestReview: function () { return request('requestReview'); },
         \(localStoreKitTestMethod)
         openSettings: function () { post({ name: 'openAppSettings' }); },
         setTheme: function (choice) {

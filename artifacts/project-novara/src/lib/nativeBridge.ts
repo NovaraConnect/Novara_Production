@@ -105,6 +105,8 @@ interface NovaraNativeBridge {
   purchase?(productId: string): Promise<{ outcome: NativePurchaseOutcome }>;
   restorePurchases?(): Promise<NativeRestoreResult>;
   manageSubscriptions?(): Promise<void>;
+  // Bridge version 4: Apple's App Store rating prompt.
+  requestReview?(): Promise<{ requested: boolean }>;
   // Local testing only (DEBUG build, "StoreKit Test" scheme). Absent otherwise.
   localStoreKitEntitlement?(): Promise<LocalStoreKitEntitlement>;
 }
@@ -157,6 +159,19 @@ export function canScanNativeCard(): boolean {
  *  A web view cannot download files itself, so Export Data depends on it. */
 export function canShareNativeFile(): boolean {
   return hasNativeBridge() && typeof bridge()?.shareFile === "function";
+}
+
+/** True when this build of the app can ask iOS for its App Store rating
+ *  prompt (bridge version 4 and later). */
+export function canRequestNativeReview(): boolean {
+  return hasNativeBridge() && typeof bridge()?.requestReview === "function";
+}
+
+/** Asks iOS for its rating prompt. iOS decides whether it actually appears. */
+export async function requestNativeReview(): Promise<void> {
+  const request = bridge()?.requestReview;
+  if (!request) return;
+  await request();
 }
 
 /** Opens the share sheet for a text file. Resolves false if dismissed. */
