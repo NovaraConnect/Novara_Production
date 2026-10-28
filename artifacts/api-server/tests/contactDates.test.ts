@@ -59,11 +59,30 @@ describe("contact dates — create", () => {
     expect(res.body.nextFollowUpDate).toBe(addDays(spoke, 30));
   });
 
-  it("long relationship: switches to the maintenance interval", async () => {
+  it("long relationship with auto-downgrade on: switches to the maintenance interval", async () => {
+    await request(app).put("/api/settings").set(authHeaders(USER)).send({ autoDowngradeAfterMonths: 12 });
     const spoke = addDays(TODAY, -10);
     const res = await create({ firstContactDate: addDays(TODAY, -730), lastInteractionDate: spoke });
     expect(res.status).toBe(201);
     expect(res.body.nextFollowUpDate).toBe(addDays(spoke, MAINTENANCE_DAYS));
+  });
+
+  it("long relationship with auto-downgrade Never (the default): keeps the contact's cadence", async () => {
+    const spoke = addDays(TODAY, -10);
+    const res = await create({ firstContactDate: addDays(TODAY, -730), lastInteractionDate: spoke });
+    expect(res.status).toBe(201);
+    expect(res.body.nextFollowUpDate).toBe(addDays(spoke, 30));
+  });
+
+  it("mark contacted with Never keeps the cadence; with 12 months it uses maintenance", async () => {
+    const res = await create({ firstContactDate: addDays(TODAY, -730), lastInteractionDate: addDays(TODAY, -10) });
+    const never = await request(app).post(`/api/contacts/${res.body.id}/mark-contacted`).set(authHeaders(USER));
+    expect(never.status).toBe(200);
+    expect(never.body.nextFollowUpDate).toBe(addDays(TODAY, 30));
+
+    await request(app).put("/api/settings").set(authHeaders(USER)).send({ autoDowngradeAfterMonths: 12 });
+    const downgraded = await request(app).post(`/api/contacts/${res.body.id}/mark-contacted`).set(authHeaders(USER));
+    expect(downgraded.body.nextFollowUpDate).toBe(addDays(TODAY, MAINTENANCE_DAYS));
   });
 
   it("rejects last-spoke before the met date, and stores nothing", async () => {

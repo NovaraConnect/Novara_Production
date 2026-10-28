@@ -26,6 +26,17 @@ const EARLIEST_DATE = "1900-01-01";
 /** Mirrors the 180-day interval mark-contacted uses in maintenance mode. */
 export const MAINTENANCE_DAYS = 180;
 
+/**
+ * The user's auto-downgrade setting from a user_settings row: months, or null
+ * for Never. A user with no settings row gets the default, which is Never.
+ */
+export function downgradeMonthsFrom(row: { auto_downgrade_after_months?: unknown } | undefined | null): number | null {
+  const value = row?.auto_downgrade_after_months;
+  if (value == null) return null;
+  const months = Number(value);
+  return Number.isFinite(months) && months > 0 ? months : null;
+}
+
 /** "YYYY-MM-DD" for a UTC instant. */
 export function utcDateString(d: Date = new Date()): string {
   return d.toISOString().slice(0, 10);
@@ -121,13 +132,16 @@ export function computeNextFollowUp(input: {
   lastInteractionDate: string;
   initialFollowUpDays: number;
   cadenceDays: number;
-  downgradeMonths: number;
+  /** null means Never: always the contact's own cadence. */
+  downgradeMonths: number | null;
   today?: string;
 }): string {
   const today = input.today ?? utcDateString();
   if (input.lastInteractionDate === input.firstContactDate) {
     return addDays(input.firstContactDate, input.initialFollowUpDays);
   }
-  const maintenance = daysBetween(input.firstContactDate, today) >= input.downgradeMonths * 30;
+  const maintenance =
+    input.downgradeMonths != null &&
+    daysBetween(input.firstContactDate, today) >= input.downgradeMonths * 30;
   return addDays(input.lastInteractionDate, maintenance ? MAINTENANCE_DAYS : input.cadenceDays);
 }

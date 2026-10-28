@@ -6,7 +6,7 @@ import { UserSettings } from "@/types/contact";
 export const SETTINGS_KEY = ["settings"] as const;
 
 const DEFAULT_SETTINGS: UserSettings = {
-  autoDowngradeAfterMonths: 6,
+  autoDowngradeAfterMonths: null,
   careerStatement: "",
   careerGoals: [],
   goalTags: [],

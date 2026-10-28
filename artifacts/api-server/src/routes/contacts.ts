@@ -12,7 +12,7 @@ import {
 import { recalculateContactsForUser } from "../lib/recalculate";
 import { analyzeContactWithAI } from "../lib/enrich";
 import { logger } from "../lib/logger";
-import { computeNextFollowUp, resolveContactDates, utcDateString } from "../lib/followUpDates";
+import { computeNextFollowUp, downgradeMonthsFrom, resolveContactDates, utcDateString } from "../lib/followUpDates";
 import { contactLimitFor, limitReachedBody } from "../lib/entitlements";
 
 // Who may add contacts (Free ceiling, or Pro / trial once a subscription is
@@ -272,7 +272,7 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
       lastInteractionDate: dates.lastInteractionDate,
       initialFollowUpDays: Number(initialFollowUpDays) || 7,
       cadenceDays: effectiveCadence,
-      downgradeMonths: Number(settingsRow?.auto_downgrade_after_months) || 6,
+      downgradeMonths: downgradeMonthsFrom(settingsRow),
     });
 
     const { rows: [contact] } = await pool.query(
@@ -468,7 +468,7 @@ router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
           initialFollowUpDays:
             Number(initialFollowUpDays) || Number(existing.initial_follow_up_days) || 7,
           cadenceDays: effectiveCadence,
-          downgradeMonths: Number(settingsResult.rows[0]?.auto_downgrade_after_months) || 6,
+          downgradeMonths: downgradeMonthsFrom(settingsResult.rows[0]),
           today,
         })
       : nextFollowUpDate ? String(nextFollowUpDate).split("T")[0] : null;
@@ -557,13 +557,13 @@ router.post("/contacts/:id/mark-contacted", requireAuth, async (req: Request, re
       "SELECT auto_downgrade_after_months FROM user_settings WHERE user_id = $1",
       [userId],
     );
-    const downgradeMonths = settings?.auto_downgrade_after_months ?? 6;
+    const downgradeMonths = downgradeMonthsFrom(settings);
 
     const { rows: [contact] } = await pool.query(
       `UPDATE contacts SET
         last_interaction_date = CURRENT_DATE,
         next_follow_up_date = CASE
-          WHEN (CURRENT_DATE - first_contact_date) >= ($3 * 30)
+          WHEN $3::int IS NOT NULL AND (CURRENT_DATE - first_contact_date) >= ($3::int * 30)
             THEN CURRENT_DATE + INTERVAL '180 days'
           ELSE CURRENT_DATE + (follow_up_cadence_days || ' days')::INTERVAL
         END,

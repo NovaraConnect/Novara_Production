@@ -34,7 +34,9 @@ export interface Contact {
 }
 
 export interface UserSettings {
-  autoDowngradeAfterMonths: 3 | 6 | 9 | 12;
+  /** Months before contacts move to the twice-a-year maintenance cadence,
+   *  or null for Never (the default): contacts always keep their own cadence. */
+  autoDowngradeAfterMonths: 9 | 12 | 18 | null;
   careerStatement: string;
   careerGoals: string[];
   goalTags: string[];

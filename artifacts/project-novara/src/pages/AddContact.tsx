@@ -687,7 +687,7 @@ export default function AddContact() {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground mb-3">How often to reconnect once you're in touch. After {settings.autoDowngradeAfterMonths} months, moves to twice-per-year maintenance.</p>
+                    <p className="text-xs text-muted-foreground mb-3">How often to reconnect once you're in touch.{settings.autoDowngradeAfterMonths != null && ` After ${settings.autoDowngradeAfterMonths} months, moves to twice-per-year maintenance.`}</p>
                     <FormField control={form.control} name="followUpCadenceDays" render={({ field }) => (
                       <FormItem>
                         <FormControl>
