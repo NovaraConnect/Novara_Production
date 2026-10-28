@@ -1,5 +1,6 @@
 import UIKit
 import Network
+import StoreKit
 
 /// The app's native shell.
 ///
@@ -399,6 +400,23 @@ final class NovaraRootViewController: UIViewController {
         present(sheet, animated: true)
     }
 
+    /// Asks iOS for its App Store rating prompt. iOS alone decides whether the
+    /// prompt appears (at most three times a year per user, never in TestFlight),
+    /// so the web side learns only that the request was made, not its outcome.
+    private func requestAppReview(respond: @escaping (Result<Any, Error>) -> Void) {
+        guard let scene = view.window?.windowScene else {
+            respond(.failure(NSError(domain: "Novara", code: -1,
+                                     userInfo: [NSLocalizedDescriptionKey: "No window to show the prompt in"])))
+            return
+        }
+        if #available(iOS 16.0, *) {
+            AppStore.requestReview(in: scene)
+        } else {
+            SKStoreReviewController.requestReview(in: scene)
+        }
+        respond(.success(["requested": true]))
+    }
+
     private func presentCardScanner(respond: @escaping (Result<Any, Error>) -> Void) {
         let scanner = NovaraCardScanner()
         cardScanner = scanner
@@ -484,6 +502,8 @@ extension NovaraRootViewController: NovaraWebViewControllerDelegate {
             NovaraPurchases.restore(completion: respond)
         case "manageSubscriptions":
             NovaraPurchases.openSubscriptionSettings(completion: respond)
+        case "requestReview":
+            requestAppReview(respond: respond)
         #if DEBUG
         case "localStoreKitEntitlement" where NovaraPurchases.isLocalStoreKitTest:
             NovaraLocalStoreKit.entitlement(completion: respond)

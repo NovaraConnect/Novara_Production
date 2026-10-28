@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Link } from "wouter";
+import { useUser } from "@clerk/react";
 import { computeHealthScore, computeStatus, getDaysPastDue, formatDate, describeFollowUp, cn } from "@/lib/utils";
 import { BottomNav } from "@/components/BottomNav";
 import { ContactAvatar } from "@/components/ContactAvatar";
@@ -12,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { useContacts } from "@/hooks/useContacts";
 import { Redirect } from "wouter";
 import { useSettings } from "@/hooks/useSettings";
+import { recordPositiveMoment } from "@/lib/reviewPrompt";
 
 export default function Dashboard() {
   const { contacts, isLoading } = useContacts();
@@ -21,6 +24,13 @@ export default function Dashboard() {
   const healthScore = computeHealthScore(connectedContacts);
   const lastMonth = useHealthTrend();
   const healthChange = lastMonth ? healthScore - lastMonth.score : null;
+  const { user } = useUser();
+  // A score that has gone up since last month is a good moment to ask for a
+  // rating (counted at most once a day; see lib/reviewPrompt.ts).
+  const scoreRose = !isLoading && healthChange !== null && healthChange > 0;
+  useEffect(() => {
+    if (scoreRose) recordPositiveMoment("scoreUp", user?.createdAt);
+  }, [scoreRose, user?.createdAt]);
   const stats = connectedContacts.reduce(
     (acc, contact) => {
       const status = computeStatus(contact);

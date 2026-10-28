@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@clerk/react";
+import { useAuth, useUser } from "@clerk/react";
 import {
   fetchContacts,
   createContact,
@@ -9,12 +9,14 @@ import {
   importContactsFromLocalStorage,
 } from "@/lib/api";
 import { Contact } from "@/types/contact";
+import { recordPositiveMoment } from "@/lib/reviewPrompt";
 
 export const CONTACTS_KEY = ["contacts"] as const;
 
 export function useContacts() {
   const queryClient = useQueryClient();
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
 
   const { data: contacts = [], isLoading, error } = useQuery({
     queryKey: CONTACTS_KEY,
@@ -30,7 +32,10 @@ export function useContacts() {
   const addContact = useMutation({
     mutationFn: (data: Parameters<typeof createContact>[1]) =>
       createContact(getToken, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: CONTACTS_KEY }),
+    onSuccess: () => {
+      recordPositiveMoment("added", user?.createdAt);
+      return queryClient.invalidateQueries({ queryKey: CONTACTS_KEY });
+    },
   });
 
   const updateContact = useMutation({
@@ -46,7 +51,10 @@ export function useContacts() {
 
   const markContacted = useMutation({
     mutationFn: (id: string) => apiMarkContacted(getToken, id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: CONTACTS_KEY }),
+    onSuccess: () => {
+      recordPositiveMoment("contacted", user?.createdAt);
+      return queryClient.invalidateQueries({ queryKey: CONTACTS_KEY });
+    },
   });
 
   const importFromStorage = useMutation({
