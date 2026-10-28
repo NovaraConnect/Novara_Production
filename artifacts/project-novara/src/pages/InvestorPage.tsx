@@ -509,7 +509,7 @@ export default function InvestorPage() {
                   <div className="rounded-2xl border border-[#E4E2DA] p-5">
                     <p className="text-sm text-[#5B6272]">Monthly</p>
                     <p className="mt-1 text-3xl font-bold">
-                      $4.99<span className="text-base font-medium text-[#5B6272]"> / month</span>
+                      $5.99<span className="text-base font-medium text-[#5B6272]"> / month</span>
                     </p>
                   </div>
                   <div className="rounded-2xl border-2 p-5" style={{ borderColor: BRAND }}>
@@ -520,9 +520,9 @@ export default function InvestorPage() {
                       </span>
                     </p>
                     <p className="mt-1 text-3xl font-bold">
-                      $49.99<span className="text-base font-medium text-[#5B6272]"> / year</span>
+                      $59.99<span className="text-base font-medium text-[#5B6272]"> / year</span>
                     </p>
-                    <p className="mt-1 text-xs text-[#5B6272]">$4.17 a month</p>
+                    <p className="mt-1 text-xs text-[#5B6272]">$4.99 a month</p>
                   </div>
                 </div>
                 <ul className="mt-8 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
