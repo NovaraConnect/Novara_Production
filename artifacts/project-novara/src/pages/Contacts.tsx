@@ -23,7 +23,7 @@ type SortOrder = "followUp" | "priority" | "name" | "recent";
 const SORT_LABELS: Record<SortOrder, string> = {
   followUp: "Next follow-up",
   priority: "Priority",
-  name: "Name (A–Z)",
+  name: "Last name (A–Z)",
   recent: "Recently added",
 };
 
@@ -37,7 +37,9 @@ function sortContacts(list: Contact[], order: SortOrder): Contact[] {
   if (order === "priority") {
     sorted.sort((a, b) => (PRIORITY_RANK[a.currentPriority ?? a.importance] ?? 1) - (PRIORITY_RANK[b.currentPriority ?? b.importance] ?? 1));
   } else if (order === "name") {
-    sorted.sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
+    // Surname first, then first name; contacts without a surname sort by first name.
+    const key = (c: Contact) => `${c.lastName?.trim() || c.firstName} ${c.firstName}`;
+    sorted.sort((a, b) => key(a).localeCompare(key(b), undefined, { sensitivity: "base" }));
   } else {
     sorted.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
   }
