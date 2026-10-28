@@ -5,6 +5,8 @@ import { isInstalledExperience } from "@/lib/installPrompt";
 
 type Platform = "ios" | "android" | "other";
 
+const MARKETING_PAGES = new Set(["/investors", "/start"]);
+
 function detectPlatform(): Platform {
   const ua = navigator.userAgent;
   if (/iPad|iPhone|iPod/.test(ua) && !(window as unknown as { MSStream?: unknown }).MSStream) return "ios";
@@ -33,8 +35,9 @@ export default function InstallPrompt() {
     if (localStorage.getItem(key) === "1") setDismissed(true);
   }, []);
 
-  // The investor page is read by people who aren't going to install the app.
-  if (dismissed || isInstalledExperience() || location === "/investors") return null;
+  // Marketing pages: investors aren't going to install, and /start has its own
+  // App Store button that this banner would compete with.
+  if (dismissed || isInstalledExperience() || MARKETING_PAGES.has(location)) return null;
 
   const platform = detectPlatform();
 
