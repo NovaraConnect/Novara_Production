@@ -4,7 +4,9 @@ import { cn } from "@/lib/utils";
  *  healthy network reads green and a neglected one reads warm. */
 function bandClass(score: number) {
   if (score >= 70) return "stroke-warm";
-  if (score >= 40) return "stroke-cooling";
+  // The ring is decorative (the score is printed inside it), so the middle band
+  // uses the bright Cooling accent, the yellow on Cooling contact cards.
+  if (score >= 40) return "stroke-cooling-accent";
   return "stroke-cold";
 }
 
