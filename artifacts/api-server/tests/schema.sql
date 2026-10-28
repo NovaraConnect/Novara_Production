@@ -42,7 +42,7 @@ updated_at timestamptz NOT NULL DEFAULT now()
 
 CREATE TABLE IF NOT EXISTS user_settings (
 user_id text PRIMARY KEY,
-auto_downgrade_after_months integer NOT NULL DEFAULT 6,
+auto_downgrade_after_months integer NULL DEFAULT NULL,
 career_statement text NOT NULL DEFAULT '',
 goal_tags text[] NOT NULL DEFAULT '{}',
 career_goals text[] NOT NULL DEFAULT '{}',

@@ -31,9 +31,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-const DOWNGRADE_OPTIONS: UserSettings["autoDowngradeAfterMonths"][] = [3, 6, 9, 12];
+const DOWNGRADE_OPTIONS: UserSettings["autoDowngradeAfterMonths"][] = [9, 12, 18, null];
 
-function labelMonths(m: number) {
+function labelMonths(m: number | null) {
+  if (m == null) return "Never";
   return m === 1 ? "1 month" : `${m} months`;
 }
 
@@ -328,14 +329,14 @@ export default function Settings() {
               <div>
                 <p className="text-[15px] font-medium text-foreground">Auto-downgrade cadence</p>
                 <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                  After this many months, contacts move to a maintenance cadence (twice per year) automatically.
+                  After this many months, contacts move to a maintenance cadence (twice per year) automatically. With Never, every contact stays on their own cadence.
                 </p>
               </div>
             </div>
             <div className="grid grid-cols-4 gap-2">
               {DOWNGRADE_OPTIONS.map((opt) => (
                 <button
-                  key={opt}
+                  key={opt ?? "never"}
                   onClick={() => handleDowngradeChange(opt)}
                   className={`rounded-xl border px-1 py-2 text-[13px] font-semibold transition-colors ${
                     settings.autoDowngradeAfterMonths === opt

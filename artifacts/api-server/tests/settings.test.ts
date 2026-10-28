@@ -8,7 +8,8 @@ describe("settings CRUD", () => {
   it("returns sensible defaults for a user with no saved settings", async () => {
     const res = await request(app).get("/api/settings").set(authHeaders(USER_A));
     expect(res.status).toBe(200);
-    expect(res.body.autoDowngradeAfterMonths).toBe(6);
+    // Never: contacts stay on their own cadence.
+    expect(res.body.autoDowngradeAfterMonths).toBeNull();
     expect(res.body.careerStatement).toBe("");
   });
 
@@ -23,6 +24,21 @@ describe("settings CRUD", () => {
 
     const refetched = await request(app).get("/api/settings").set(authHeaders(USER_A));
     expect(refetched.body.careerStatement).toBe("Breaking into climate tech");
+  });
+
+  it("auto-downgrade: saves Never (null), keeps it when other fields change, rejects removed choices", async () => {
+    const put = (body: Record<string, unknown>) =>
+      request(app).put("/api/settings").set(authHeaders("user_downgrade")).send(body);
+
+    expect((await put({ autoDowngradeAfterMonths: 18 })).body.autoDowngradeAfterMonths).toBe(18);
+    expect((await put({ autoDowngradeAfterMonths: null })).body.autoDowngradeAfterMonths).toBeNull();
+    expect((await put({ careerStatement: "Anything" })).body.autoDowngradeAfterMonths).toBeNull();
+    expect((await put({ autoDowngradeAfterMonths: 12 })).body.autoDowngradeAfterMonths).toBe(12);
+    expect((await put({ careerStatement: "Again" })).body.autoDowngradeAfterMonths).toBe(12);
+
+    for (const removed of [3, 6, 0]) {
+      expect((await put({ autoDowngradeAfterMonths: removed })).status).toBe(400);
+    }
   });
 
   it("keeps settings scoped per user", async () => {

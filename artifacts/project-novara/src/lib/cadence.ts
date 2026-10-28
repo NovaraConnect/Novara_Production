@@ -6,8 +6,10 @@ export const MAINTENANCE_DAYS = 180;
 
 export function isInMaintenanceMode(
   contact: Contact,
-  autoDowngradeAfterMonths: number = 6,
+  autoDowngradeAfterMonths: number | null = null,
 ): boolean {
+  // Never: contacts always stay on their own cadence.
+  if (autoDowngradeAfterMonths == null) return false;
   const firstContact = new Date(contact.firstContactDate);
   const daysSince = differenceInDays(new Date(), firstContact);
   return daysSince >= autoDowngradeAfterMonths * 30;
@@ -15,7 +17,7 @@ export function isInMaintenanceMode(
 
 export function getEffectiveCadenceDays(
   contact: Contact,
-  autoDowngradeAfterMonths: number = 6,
+  autoDowngradeAfterMonths: number | null = null,
 ): number {
   return isInMaintenanceMode(contact, autoDowngradeAfterMonths)
     ? MAINTENANCE_DAYS
@@ -25,7 +27,7 @@ export function getEffectiveCadenceDays(
 export function computeNextFollowUpDate(
   lastInteractionDate: string,
   contact: Contact,
-  autoDowngradeAfterMonths: number = 6,
+  autoDowngradeAfterMonths: number | null = null,
 ): Date {
   const cadence = getEffectiveCadenceDays(contact, autoDowngradeAfterMonths);
   return addDays(new Date(lastInteractionDate), cadence);

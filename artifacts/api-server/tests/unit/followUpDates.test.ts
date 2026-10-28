@@ -128,6 +128,11 @@ describe("computeNextFollowUp", () => {
       .toBe(addDays("2026-09-01", 21));
   });
 
+  it("Never (null): stays on the contact's own cadence however old the relationship", () => {
+    expect(computeNextFollowUp({ ...base, downgradeMonths: null, firstContactDate: "2020-01-01", lastInteractionDate: "2026-09-14" }))
+      .toBe(addDays("2026-09-14", 21));
+  });
+
   it("agrees with mark-contacted's rule when last spoke is today", () => {
     // mark-contacted: next = today + (age >= months*30 ? 180 : cadence)
     const young = computeNextFollowUp({ ...base, firstContactDate: "2026-08-01", lastInteractionDate: TODAY });
