@@ -1,8 +1,11 @@
 // ============================================================================
 // Novara's landing page for students and young professionals, at /start.
 //
-// ONE JOB: get the visitor to download the iOS app. Everything on the page
-// either says why, removes a reason not to, or repeats the button.
+// ONE JOB, IN THE FIRST FEW SECONDS: get the visitor to download the iOS app.
+// So the page is short on purpose: a hero (promise, button, the app moving in
+// a phone), one strip of three screens, and the button again. It does not tour
+// every feature and does not link the /try demo: using Novara means
+// downloading it.
 //
 // PUBLIC AND UNAUTHENTICATED on purpose: it is the link shared with students
 // (career services, flyers, LinkedIn). Registered in App.tsx outside
@@ -10,36 +13,21 @@
 // screen" banner would compete with the App Store button.
 //
 // The button adapts to the device: iPhone goes straight to the App Store,
-// desktop also gets a QR code to scan, and Android (no Play Store build yet)
-// is told so plainly. Every button reports to PostHog as `start_cta`.
+// desktop also gets a QR code to scan, Android (no Play Store build yet) is
+// told so. Every button reports to PostHog as `start_cta`.
 //
-// Not linked: the /try demo. Its sample data has aged (Network Health shows
-// 0/100) and it still has the old design; link it again once it is refreshed.
-//
-// Claims come from the repository, as on /investors: pricing and trial from
-// docs/APPLE_IAP_SETUP.md, privacy from the LinkedIn import and the privacy
-// policy. No user counts, ratings or testimonials: none exist to quote yet.
+// The phone plays real app screenshots (public/screens/, fictional demo
+// contacts) rather than a screen recording: the existing recordings show a
+// real-looking contact and live headlines that cannot go on a public page.
 // ============================================================================
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import {
-  Briefcase,
-  Check,
-  ChevronDown,
-  Download,
-  GraduationCap,
-  Lock,
-  Newspaper,
-  ScanLine,
-  Target,
-} from "lucide-react";
+import { Download } from "lucide-react";
 import { NovaraMark } from "@/components/NovaraMark";
 import { PhoneFrame } from "@/components/PhoneFrame";
-
-const APP_STORE_URL = "https://apps.apple.com/us/app/novara-connect/id6811249861";
+import { APP_STORE_URL } from "@/lib/appStore";
 
 const NAVY = "#08111F";
-const BRAND = "#2941A3";
 const SANS = "'Plus Jakarta Sans', 'Inter', system-ui, sans-serif";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -76,26 +64,11 @@ function AppleLogo({ className = "" }: { className?: string }) {
   );
 }
 
-/** The main action. On Android there is no Play Store build to send anyone
- *  to yet, so it says that instead of pretending. */
-function PrimaryCta({
-  platform,
-  where,
-  onDark = false,
-}: {
-  platform: Platform;
-  where: string;
-  /** White button on the navy sections, black on the light ones. */
-  onDark?: boolean;
-}) {
-  const pad = "px-6 py-3.5 text-base";
+/** The one action. Android has no Play Store build yet, so it says so. */
+function DownloadButton({ platform, where }: { platform: Platform; where: string }) {
   if (platform === "android") {
     return (
-      <span
-        className={`inline-flex items-center justify-center gap-2 rounded-full border font-semibold ${pad} ${
-          onDark ? "border-white/25 text-white" : "border-[#08111F]/20 text-[#08111F]"
-        }`}
-      >
+      <span className="inline-flex items-center justify-center rounded-full border border-white/25 px-6 py-3.5 text-base font-semibold text-white">
         Coming soon to the Play Store
       </span>
     );
@@ -104,9 +77,7 @@ function PrimaryCta({
     <a
       href={APP_STORE_URL}
       onClick={() => track(`${where}:app_store`, platform)}
-      className={`inline-flex items-center justify-center gap-2.5 rounded-full font-semibold shadow-[0_10px_30px_-10px_rgba(0,0,0,0.6)] transition-transform hover:-translate-y-0.5 ${pad} ${
-        onDark ? "bg-white text-black" : "bg-black text-white"
-      }`}
+      className="inline-flex items-center justify-center gap-2.5 rounded-full bg-white px-7 py-4 text-base font-semibold text-black shadow-[0_12px_32px_-10px_rgba(0,0,0,0.7)] transition-transform hover:-translate-y-0.5"
     >
       <AppleLogo className="h-5 w-5" />
       Download on the App Store
@@ -114,95 +85,80 @@ function PrimaryCta({
   );
 }
 
-function PriceLine({ light = false }: { light?: boolean }) {
+function FinePrint({ platform }: { platform: Platform }) {
   return (
-    <p className={`text-sm ${light ? "text-[#AAB7CA]" : "text-[#5B6272]"}`}>
-      New subscribers get <span className={light ? "text-white" : "text-[#08111F]"}>7 days free</span>, then
-      $4.99/month. Cancel anytime.
+    <p className="text-sm text-[#AAB7CA]">
+      {platform === "android"
+        ? "On iPhone today. Android is on its way."
+        : "7 days free for new subscribers, then $4.99/month. Cancel anytime."}
     </p>
   );
 }
 
-const HERO_POINTS = [
-  "Add someone in seconds from a business card or LinkedIn screenshot",
-  "Reminders for who to follow up with, ranked by your goals",
-  "Fresh news on their company, so you always have something to say",
+/** What the hero phone plays, one screen at a time, each with the line that
+ *  says why it matters. */
+const REEL = [
+  { src: shot("dashboard"), line: "See who needs you today" },
+  { src: shot("contact"), line: "Priorities that follow your goals" },
+  { src: shot("conversation-starters"), line: "Always something to say" },
+  { src: shot("add-card"), line: "Add anyone in seconds" },
 ];
+const REEL_MS = 2800;
 
-const FAMILIAR = [
-  "“I’ll add them on LinkedIn later.”",
-  "“We should grab coffee sometime.”",
-  "“Wait… where did I meet them?”",
-];
+function PhoneReel() {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    // Respect reduced motion: hold on the first screen.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const t = window.setInterval(() => setI((n) => (n + 1) % REEL.length), REEL_MS);
+    return () => window.clearInterval(t);
+  }, []);
 
-const STEPS = [
-  {
-    icon: ScanLine,
-    title: "Capture them before you forget",
-    body: "Snap a business card or a LinkedIn screenshot, scan a QR code, or pick from your iPhone contacts. Novara fills in the details.",
-    src: shot("add-card"),
-  },
-  {
-    icon: Target,
-    title: "Know exactly who to reach out to",
-    body: "Your dashboard shows who’s overdue and who’s next, ranked by what you’re working towards. No more guessing.",
-    src: shot("dashboard"),
-  },
-  {
-    icon: Newspaper,
-    title: "Never send “just checking in”",
-    body: "Novara pulls recent news about their company, so every message has a real reason to exist.",
-    src: shot("conversation-starters"),
-  },
-];
+  return (
+    <div className="relative">
+      <div className="relative">
+        <PhoneFrame src={REEL[0].src} alt="Novara on iPhone" eager />
+        {/* The other screens stack on the first and cross-fade in turn. */}
+        {REEL.slice(1).map((s, n) => (
+          <img
+            key={s.src}
+            src={s.src}
+            alt=""
+            aria-hidden
+            className={`absolute left-[9px] top-[9px] w-[calc(100%-18px)] rounded-[2.05rem] transition-opacity duration-700 ${
+              i === n + 1 ? "opacity-100" : "opacity-0"
+            }`}
+          />
+        ))}
+        {/* Keep the Dynamic Island above the fading screens. */}
+        <div className="pointer-events-none absolute left-1/2 top-[calc(9px+1.55%)] h-[3%] w-[28%] -translate-x-1/2 rounded-full bg-[#0B0F17]" />
+      </div>
+      <div className="absolute -bottom-5 left-1/2 w-max max-w-[92%] -translate-x-1/2">
+        <p
+          key={i}
+          className="animate-in fade-in slide-in-from-bottom-1 rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#08111F] shadow-xl duration-500"
+        >
+          {REEL[i].line}
+        </p>
+      </div>
+    </div>
+  );
+}
 
-const AUDIENCES = {
-  student: {
-    label: "I’m a student",
-    icon: GraduationCap,
-    title: "Turn recruiting season into relationships",
-    moments: ["Career fairs", "Info sessions", "Alumni coffee chats", "Professors and TAs", "Club speakers"],
-    goal: "I want a product management internship in fintech",
-    body: "Write your goal once. The recruiters and alumni who can get you there rise to the top of your list, and Novara reminds you to stay in touch before the next application cycle.",
-  },
-  pro: {
-    label: "I’m working",
-    icon: Briefcase,
-    title: "Keep the people who shape your next move",
-    moments: ["Your first manager", "Mentors", "Industry events", "Former classmates", "That founder you met once"],
-    goal: "I want to move into product at a growth-stage startup",
-    body: "Write where you’re headed. Novara keeps the people who can help close, nudges you before they go cold, and remembers the details you’d otherwise lose.",
-  },
-} as const;
-
-const FAQ = [
-  {
-    q: "Is there a free trial?",
-    a: "Yes. New subscribers get 7 days free, then Novara Pro is $4.99 a month or $49.99 a year. Cancel at least 24 hours before the trial ends and you won’t be charged. You manage it in your iPhone’s Settings, under your Apple Account.",
-  },
-  {
-    q: "Do I need an iPhone?",
-    a: "Novara is on the App Store for iPhone today. Android, on the Play Store, is coming soon.",
-  },
-  {
-    q: "Does Novara connect to my LinkedIn?",
-    a: "No. Novara only reads the screenshot you choose to give it. It never logs into or accesses your LinkedIn account.",
-  },
-  {
-    q: "Who can see my contacts?",
-    a: "Only you. Novara is a personal tool, not a team CRM. You can export your data at any time, and deleting your account deletes your contacts.",
-  },
+const PROOF = [
+  { src: shot("dashboard"), title: "Know who to reach out to", body: "Overdue and upcoming, ranked by what matters to you." },
+  { src: shot("conversation-starters"), title: "Never send “just checking in”", body: "Fresh news on their company, every day." },
+  { src: shot("add-card"), title: "Add someone in seconds", body: "Snap a business card or a LinkedIn screenshot." },
 ];
 
 export default function StartPage() {
   const [platform, setPlatform] = useState<Platform>("desktop");
-  const [audience, setAudience] = useState<keyof typeof AUDIENCES>("student");
   const [showSticky, setShowSticky] = useState(false);
   const heroCtaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => setPlatform(detectPlatform()), []);
 
-  // The sticky bar only appears once the hero's own button has scrolled away.
+  // The sticky bar appears once the hero's own button has scrolled away.
   useEffect(() => {
     const el = heroCtaRef.current;
     if (!el) return;
@@ -215,12 +171,12 @@ export default function StartPage() {
 
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = "Novara: never let an important relationship go cold";
+    document.title = "Novara: keep the people you meet";
     const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
     const previousDescription = description?.content;
     if (description) {
       description.content =
-        "Novara remembers everyone you meet, tells you who to follow up with and when, and gives you something to say. For students and young professionals. 7 days free on iPhone.";
+        "Novara reminds you who to follow up with and gives you something to say. For students and young professionals. 7 days free on iPhone.";
     }
     return () => {
       document.title = previousTitle;
@@ -228,93 +184,57 @@ export default function StartPage() {
     };
   }, []);
 
-  const a = AUDIENCES[audience];
-
   return (
     <div
-      className="min-h-[100dvh] overflow-x-clip bg-[#F7F6F2] text-[#08111F] antialiased"
-      style={{ fontFamily: SANS, colorScheme: "light" }}
+      className="min-h-[100dvh] overflow-x-clip text-white antialiased"
+      style={{ fontFamily: SANS, colorScheme: "dark", background: NAVY }}
     >
-      {/* ── Nav ─────────────────────────────────────────────────────────── */}
-      <header className="absolute inset-x-0 top-0 z-30">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-2.5">
-            <NovaraMark size={30} />
-            <span className="font-serif text-lg font-bold text-white">Novara</span>
-          </div>
-          <Link
-            href="/sign-in"
-            className="text-sm font-medium text-[#AAB7CA] transition-colors hover:text-white"
-          >
-            Sign in
-          </Link>
-        </div>
-      </header>
-
       {/* ── Hero ────────────────────────────────────────────────────────── */}
       <section
-        className="relative overflow-hidden pt-16"
+        className="relative"
         style={{
-          background: `radial-gradient(ellipse 70% 60% at 80% 40%, rgba(41,65,163,0.55), transparent 70%), ${NAVY}`,
+          background: `radial-gradient(ellipse 70% 55% at 75% 45%, rgba(41,65,163,0.6), transparent 70%), ${NAVY}`,
         }}
       >
-        <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 pb-16 pt-8 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:pb-24 lg:pt-16">
-          <div>
-            <p className="inline-flex rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold text-[#C4CEDD]">
-              For students &amp; young professionals
-            </p>
-            <h1 className="mt-5 font-serif text-[2.5rem] font-bold leading-[1.05] text-white sm:text-6xl">
-              You met the right people.
-              <span className="block text-[#8FA6FF]">Now keep them.</span>
-            </h1>
-            <ul className="mt-7 space-y-3">
-              {HERO_POINTS.map((p) => (
-                <li key={p} className="flex items-start gap-3 text-[15px] text-[#DCE3EE]">
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#2941A3]">
-                    <Check className="h-3 w-3 text-white" strokeWidth={3} />
-                  </span>
-                  {p}
-                </li>
-              ))}
-            </ul>
+        <header className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-2.5">
+            <NovaraMark size={30} />
+            <span className="font-serif text-lg font-bold">Novara</span>
+          </div>
+          <Link href="/sign-in" className="text-sm font-medium text-[#AAB7CA] hover:text-white">
+            Sign in
+          </Link>
+        </header>
 
-            <div ref={heroCtaRef} className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">
-              <PrimaryCta platform={platform} where="hero" onDark />
-              <a
-                href="#how"
-                onClick={() => track("hero:how_it_works", platform)}
-                className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold text-white/90 hover:text-white"
-              >
-                See how it works <ChevronDown className="h-4 w-4" />
-              </a>
-            </div>
-            <div className="mt-4">
-              {platform === "android" ? (
-                <p className="text-sm text-[#AAB7CA]">On iPhone today. Android is on its way.</p>
-              ) : (
-                <PriceLine light />
-              )}
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 pb-20 pt-6 sm:px-6 lg:min-h-[calc(100dvh-4rem)] lg:grid-cols-[1.1fr_0.9fr] lg:pb-16 lg:pt-0">
+          <div>
+            <p className="text-sm font-semibold text-[#8FA6FF]">For students &amp; young professionals</p>
+            <h1 className="mt-3 font-serif text-[2.6rem] font-bold leading-[1.04] sm:text-6xl lg:text-7xl">
+              You met the right people.{" "}
+              <span className="text-[#8FA6FF]">Now keep them.</span>
+            </h1>
+            <p className="mt-5 max-w-lg text-lg leading-relaxed text-[#C4CEDD]">
+              Novara tells you who to follow up with, and when, so the career fair, the coffee
+              chat and the conference never turn into “we lost touch.”
+            </p>
+            <div ref={heroCtaRef} className="mt-8 flex flex-col items-start gap-3">
+              <DownloadButton platform={platform} where="hero" />
+              <FinePrint platform={platform} />
             </div>
           </div>
 
-          <div className="relative mx-auto w-[min(70vw,290px)] lg:w-[310px]">
-            <div className="absolute -inset-10 rounded-full bg-[#2941A3]/30 blur-3xl" />
-            <PhoneFrame
-              src={shot("dashboard")}
-              alt="The Novara dashboard: a Network Health score and the people to follow up with"
-              className="relative lg:rotate-[2deg]"
-              eager
-            />
-            {/* On desktop, the phone is the one place to send them. */}
+          <div className="relative mx-auto w-[min(72vw,280px)] lg:w-[320px]">
+            <div className="absolute -inset-12 rounded-full bg-[#2941A3]/35 blur-3xl" />
+            <PhoneReel />
             {platform === "desktop" && (
-              <div className="absolute -bottom-6 -left-24 hidden w-44 rounded-2xl bg-white p-3 text-center shadow-2xl lg:block">
+              <div className="absolute -left-40 bottom-16 hidden w-36 rounded-2xl bg-white p-3 text-center shadow-2xl lg:block">
                 <img
                   src={`${basePath}/start/app-store-qr.svg`}
                   alt="QR code for Novara on the App Store"
-                  className="mx-auto h-28 w-28"
+                  className="mx-auto h-24 w-24"
                 />
-                <p className="mt-2 text-xs font-semibold leading-snug text-[#08111F]">
-                  Scan with your iPhone camera to download
+                <p className="mt-2 text-[11px] font-semibold leading-snug text-[#08111F]">
+                  Scan with your iPhone to download
                 </p>
               </div>
             )}
@@ -322,237 +242,43 @@ export default function StartPage() {
         </div>
       </section>
 
-      {/* ── Sound familiar ──────────────────────────────────────────────── */}
-      <section className="py-16 sm:py-24">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <h2 className="text-center font-serif text-3xl font-bold sm:text-4xl">Sound familiar?</h2>
-          <div className="mt-10 grid gap-4 md:grid-cols-3">
-            {FAMILIAR.map((q) => (
+      {/* ── Three screens, one line each ────────────────────────────────── */}
+      <section className="bg-[#F7F6F2] py-16 text-[#08111F] sm:py-20">
+        <div className="mx-auto max-w-6xl">
+          <div className="flex snap-x snap-mandatory gap-5 overflow-x-auto px-4 pb-2 sm:px-6 md:grid md:grid-cols-3 md:gap-8 md:overflow-visible">
+            {PROOF.map((p) => (
               <div
-                key={q}
-                className="rounded-2xl border border-[#E4E2DA] bg-white px-5 py-4 text-center font-serif text-lg italic text-[#2A3146] md:p-6 md:text-xl"
+                key={p.title}
+                className="flex w-[64vw] max-w-[260px] shrink-0 snap-center flex-col items-center text-center md:w-auto md:max-w-none"
               >
-                {q}
+                <PhoneFrame src={p.src} alt={p.title} className="w-[170px] md:w-[200px]" />
+                <p className="mt-6 font-serif text-xl font-bold">{p.title}</p>
+                <p className="mt-1.5 text-[#5B6272]">{p.body}</p>
               </div>
             ))}
           </div>
-          <p className="mx-auto mt-8 max-w-2xl text-center text-lg leading-relaxed text-[#4B5363]">
-            Every one of those is a door that quietly closes. Not because you did anything wrong, just
-            because life got busy. <span className="font-semibold text-[#08111F]">Novara keeps them open.</span>
-          </p>
         </div>
       </section>
 
-      {/* ── How it works ────────────────────────────────────────────────── */}
-      <section id="how" className="scroll-mt-4 bg-white py-16 sm:py-24">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <h2 className="text-center font-serif text-3xl font-bold sm:text-4xl">
-            Thirty seconds after you meet someone
-          </h2>
-          <div className="-mx-4 mt-12 flex snap-x snap-mandatory gap-5 overflow-x-auto px-4 pb-4 md:mx-0 md:grid md:grid-cols-3 md:gap-8 md:overflow-visible md:px-0">
-            {STEPS.map((step, i) => (
-              <div key={step.title} className="flex w-[72vw] max-w-[280px] shrink-0 snap-center flex-col items-center text-center md:w-auto md:max-w-none">
-                <PhoneFrame src={step.src} alt={step.title} className="w-[180px] md:w-[220px]" />
-                <div className="mt-7 flex items-center gap-2 text-sm font-semibold" style={{ color: BRAND }}>
-                  <step.icon className="h-4 w-4" /> Step {i + 1}
-                </div>
-                <p className="mt-2 font-serif text-xl font-bold">{step.title}</p>
-                <p className="mt-2 max-w-xs leading-relaxed text-[#5B6272]">{step.body}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-10 flex flex-col items-center gap-3">
-            <PrimaryCta platform={platform} where="how" />
-            {platform !== "android" && <PriceLine />}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Made for where you are ──────────────────────────────────────── */}
-      <section className="py-16 sm:py-24">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <h2 className="text-center font-serif text-3xl font-bold sm:text-4xl">Made for where you are</h2>
-          <div className="mx-auto mt-8 flex w-fit rounded-full border border-[#E4E2DA] bg-white p-1">
-            {(Object.keys(AUDIENCES) as (keyof typeof AUDIENCES)[]).map((key) => {
-              const Icon = AUDIENCES[key].icon;
-              const active = key === audience;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setAudience(key)}
-                  aria-pressed={active}
-                  className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors sm:px-5 ${
-                    active ? "text-white" : "text-[#5B6272] hover:text-[#08111F]"
-                  }`}
-                  style={active ? { background: BRAND } : undefined}
-                >
-                  <Icon className="h-4 w-4" /> {AUDIENCES[key].label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-12 grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
-            <div>
-              <p className="font-serif text-3xl font-bold leading-tight">{a.title}</p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                {a.moments.map((m) => (
-                  <span key={m} className="rounded-full bg-[#E9ECF7] px-3 py-1 text-sm font-medium text-[#2A3146]">
-                    {m}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-7 rounded-2xl border border-[#E4E2DA] bg-white p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#7A8191]">Your career profile</p>
-                <p className="mt-2 font-medium">“{a.goal}”</p>
-              </div>
-              <p className="mt-6 text-lg leading-relaxed text-[#4B5363]">{a.body}</p>
-            </div>
-            <PhoneFrame
-              src={shot("career-profile")}
-              alt="Novara's career profile, where you describe your goals"
-              className="mx-auto hidden w-[240px] lg:block"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* ── Privacy ─────────────────────────────────────────────────────── */}
-      <section className="py-16 sm:py-20" style={{ background: NAVY }}>
-        <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 md:grid-cols-[auto_1fr] md:items-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10">
-            <Lock className="h-6 w-6 text-[#8FA6FF]" />
-          </span>
-          <div>
-            <h2 className="font-serif text-2xl font-bold text-white sm:text-3xl">Your network stays yours.</h2>
-            <p className="mt-3 max-w-3xl leading-relaxed text-[#AAB7CA]">
-              Novara never connects to your LinkedIn account; it only reads the screenshot you give it.
-              Your list is just for you, with no feed and no team. You can export everything at any time, and a priority you
-              set yourself is never overridden.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Founder ─────────────────────────────────────────────────────── */}
-      <section className="py-16 sm:py-24">
-        <div className="mx-auto flex max-w-3xl flex-col items-center px-4 text-center sm:px-6">
-          <div
-            className="flex h-16 w-16 items-center justify-center rounded-full font-serif text-xl font-bold text-white"
-            style={{ background: "radial-gradient(circle at 30% 30%, #1334A7, #040E41)" }}
-            aria-hidden
-          >
-            CC
-          </div>
-          <p className="mt-6 font-serif text-2xl italic leading-snug sm:text-[1.7rem]">
-            “I moved from France to the US alone at 18 and built my network from scratch. Meeting people
-            was the easy part. Keeping up with them was the hard part, so I built Novara.”
-          </p>
-          <p className="mt-4 text-sm font-medium text-[#5B6272]">Cloé Carmery, founder · UF alum</p>
-        </div>
-      </section>
-
-      {/* ── Pricing ─────────────────────────────────────────────────────── */}
-      <section className="bg-white py-16 sm:py-24">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6">
-          <h2 className="text-center font-serif text-3xl font-bold sm:text-4xl">Less than a coffee a month</h2>
-          <div className="mt-10 rounded-3xl border border-[#E4E2DA] p-6 shadow-[0_24px_48px_-28px_rgba(8,17,31,0.25)] sm:p-10">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <NovaraMark size={36} />
-                <p className="font-serif text-2xl font-bold">Novara Pro</p>
-              </div>
-              <span className="rounded-full bg-[#E9ECF7] px-3 py-1 text-xs font-semibold" style={{ color: BRAND }}>
-                7 days free
-              </span>
-            </div>
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-[#E4E2DA] p-5">
-                <p className="text-sm text-[#5B6272]">Monthly</p>
-                <p className="mt-1 text-3xl font-bold">
-                  $4.99<span className="text-base font-medium text-[#5B6272]"> / month</span>
-                </p>
-              </div>
-              <div className="rounded-2xl border-2 p-5" style={{ borderColor: BRAND }}>
-                <p className="flex items-center justify-between text-sm text-[#5B6272]">
-                  Annual
-                  <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-white" style={{ background: BRAND }}>
-                    Save 16%
-                  </span>
-                </p>
-                <p className="mt-1 text-3xl font-bold">
-                  $49.99<span className="text-base font-medium text-[#5B6272]"> / year</span>
-                </p>
-                <p className="mt-1 text-xs text-[#5B6272]">$4.17 a month</p>
-              </div>
-            </div>
-            <ul className="mt-7 grid gap-x-6 gap-y-2.5 text-sm sm:grid-cols-2">
-              {[
-                "Unlimited contacts",
-                "Follow-up reminders",
-                "Card, QR and LinkedIn import",
-                "Goal-based priorities",
-                "Conversation starters",
-                "Export your data anytime",
-              ].map((f) => (
-                <li key={f} className="flex items-center gap-2.5">
-                  <Check className="h-4 w-4 shrink-0" style={{ color: BRAND }} /> {f}
-                </li>
-              ))}
-            </ul>
-            <div className="mt-8 flex flex-col items-center gap-3">
-              <PrimaryCta platform={platform} where="pricing" />
-              <p className="text-xs text-[#7A8191]">Cancel anytime in your iPhone’s Settings.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── FAQ ─────────────────────────────────────────────────────────── */}
-      <section className="py-16 sm:py-24">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6">
-          <h2 className="text-center font-serif text-3xl font-bold sm:text-4xl">Questions</h2>
-          <div className="mt-10 divide-y divide-[#E4E2DA] rounded-2xl border border-[#E4E2DA] bg-white">
-            {FAQ.map((f) => (
-              <details key={f.q} className="group px-6 py-5">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold">
-                  {f.q}
-                  <ChevronDown className="h-5 w-5 shrink-0 text-[#7A8191] transition-transform group-open:rotate-180" />
-                </summary>
-                <p className="mt-3 leading-relaxed text-[#5B6272]">{f.a}</p>
-              </details>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Final CTA ───────────────────────────────────────────────────── */}
+      {/* ── The button again ────────────────────────────────────────────── */}
       <section
-        className="py-20 sm:py-28"
+        className="py-20 sm:py-24"
         style={{
           background: `radial-gradient(ellipse 60% 80% at 50% 100%, rgba(41,65,163,0.6), transparent 70%), ${NAVY}`,
         }}
       >
-        <div className="mx-auto flex max-w-3xl flex-col items-center px-4 text-center sm:px-6">
-          <NovaraMark size={56} />
-          <h2 className="mt-8 font-serif text-3xl font-bold leading-tight text-white sm:text-5xl">
+        <div className="mx-auto flex max-w-2xl flex-col items-center px-4 text-center sm:px-6">
+          <h2 className="font-serif text-3xl font-bold leading-tight sm:text-5xl">
             Your next opportunity is probably someone you’ve already met.
           </h2>
-          <div className="mt-10">
-            <PrimaryCta platform={platform} where="final" onDark />
-          </div>
-          <div className="mt-4">
-            {platform === "android" ? (
-              <p className="text-sm text-[#AAB7CA]">On iPhone today. Android is on its way.</p>
-            ) : (
-              <PriceLine light />
-            )}
+          <div className="mt-9 flex flex-col items-center gap-3">
+            <DownloadButton platform={platform} where="final" />
+            <FinePrint platform={platform} />
           </div>
         </div>
       </section>
 
-      <footer className="border-t border-white/10 py-8 text-sm text-[#7D8BA3]" style={{ background: NAVY }}>
+      <footer className="border-t border-white/10 py-8 text-sm text-[#7D8BA3]">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 pb-20 sm:flex-row sm:px-6 sm:pb-0">
           <div className="flex items-center gap-2">
             <NovaraMark size={20} />
@@ -566,27 +292,29 @@ export default function StartPage() {
       </footer>
 
       {/* ── Sticky download bar (phones) ────────────────────────────────── */}
-      <div
-        className={`fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md transition-transform duration-300 sm:hidden ${
-          showSticky && platform !== "android" ? "translate-y-0" : "translate-y-full"
-        }`}
-        aria-hidden={!showSticky || platform === "android"}
-      >
-        <div className="flex items-center gap-3">
-          <NovaraMark size={36} />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold leading-tight">Novara</p>
-            <p className="truncate text-xs text-[#5B6272]">7 days free</p>
+      {platform !== "android" && (
+        <div
+          className={`fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 text-[#08111F] backdrop-blur-md transition-transform duration-300 sm:hidden ${
+            showSticky ? "translate-y-0" : "translate-y-full"
+          }`}
+          aria-hidden={!showSticky}
+        >
+          <div className="flex items-center gap-3">
+            <NovaraMark size={36} />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold leading-tight">Novara</p>
+              <p className="truncate text-xs text-[#5B6272]">7 days free</p>
+            </div>
+            <a
+              href={APP_STORE_URL}
+              onClick={() => track("sticky:app_store", platform)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-black px-4 py-2.5 text-sm font-semibold text-white"
+            >
+              <Download className="h-4 w-4" /> Get the app
+            </a>
           </div>
-          <a
-            href={APP_STORE_URL}
-            onClick={() => track("sticky:app_store", platform)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-black px-4 py-2.5 text-sm font-semibold text-white"
-          >
-            <Download className="h-4 w-4" /> Get the app
-          </a>
         </div>
-      </div>
+      )}
     </div>
   );
 }
