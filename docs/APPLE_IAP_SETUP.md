@@ -11,14 +11,14 @@ section 6 is followed.
 $49.99 per year. Each has a **7-day free trial** (an Apple introductory offer).
 There is no contact limit for subscribers.
 
-**Subscribe to start (decided 2026-10-27):** there is no free plan. Once
-`IAP_SUBSCRIPTION_REQUIRED` is on, a signed-in user without a trial or Pro sees
-the subscription screen in place of the app: they choose monthly or yearly and
+**Subscribe to start (decided 2026-10-27):** there is no free plan, and no
+switch brings one back (the `IAP_SUBSCRIPTION_REQUIRED` switch and the
+6-contact Free plan were removed on 2026-10-28). A signed-in user without a
+trial or Pro sees the subscription screen in place of the app: they choose monthly or yearly and
 start Apple's 7-day free trial, which becomes the paid plan unless they cancel.
 When a trial or subscription ends, the subscription screen comes back. Nothing
 is deleted, and Settings (sign out, delete account) stays open. The server also
-refuses to add or import contacts without a trial or Pro. Until that switch is
-on, Free keeps today's 6-contact limit. **Open decision:** how to treat people
+refuses to add or import contacts without a trial or Pro. **Open decision:** how to treat people
 who already have accounts at launch (see section 9).
 
 Pricing, copy rules and the pre-launch checklist are in
@@ -34,12 +34,12 @@ how-to.
 | Entitlement storage | `artifacts/api-server/migrations/0004_apple_iap_entitlements.sql` | `entitlements` (provider-neutral; Apple rows keyed by Clerk user ID) and `revenuecat_events` (idempotency log) |
 | Renewal marker | `migrations/0009_entitlements_will_renew.sql` | Adds `entitlements.will_renew`: false after CANCELLATION (auto-renew off), true after INITIAL_PURCHASE / RENEWAL / PRODUCT_CHANGE / UNCANCELLATION. Status endpoint returns it as `willRenew` |
 | Trial marker | `migrations/0007_entitlements_period_type.sql` | Adds `entitlements.period_type` (RevenueCat's TRIAL / NORMAL …), so a trial can be shown as one. Numbered 0007 because `feat/visual-refresh` uses 0005 and 0006 |
-| Read model | `api-server/src/lib/entitlements.ts` | `proStatusFor()` and `contactLimitFor()`. Access requires `status = active` **and** `expires_at > now()` at read time. A trial is access |
+| Read model | `api-server/src/lib/entitlements.ts` | `proStatusFor()` and `canAddContacts()`. Access requires `status = active` **and** `expires_at > now()` at read time. A trial is access |
 | Status endpoint | `GET /api/entitlements/me` | `pro`, `expiresAt`, `state` (`trial` / `active` / `expired` / `none`) and `billingPeriod` (`monthly` / `annual`) |
-| Who can add contacts | `routes/contacts.ts` (POST and import) | Uses `contactLimitFor()`. Pro or trial = unlimited. Otherwise 0 once a subscription is required (403 `SUBSCRIPTION_REQUIRED`), or 6 before that (403 `CONTACT_LIMIT_REACHED`) |
+| Who can add contacts | `routes/contacts.ts` (POST and import) | Uses `canAddContacts()`. Pro or trial = unlimited. Otherwise none (403 `SUBSCRIPTION_REQUIRED`) |
 | Webhook | `POST /api/webhooks/revenuecat` (`routes/revenuecat.ts`) | The only writer of Apple entitlements. Verified, idempotent, ordered |
 | Gate | `src/components/SubscriptionGate.tsx` around every signed-in screen | Subscribe to start: without a trial or Pro, shows `/pro` instead (Settings stays open) |
-| Flags | `GET /api/features` → `applePaywall`, `subscriptionRequired`, `localStoreKitTest` | `applePaywall` follows `IAP_PAYWALL_ENABLED`. `subscriptionRequired` follows `IAP_SUBSCRIPTION_REQUIRED` and is only ever on together with the paywall |
+| Flags | `GET /api/features` → `applePaywall`, `subscriptionRequired`, `localStoreKitTest` | `applePaywall` follows `IAP_PAYWALL_ENABLED`. `subscriptionRequired` is always `true`, kept for app builds that read it |
 | Native module | `ios/App/App/Native/NovaraPurchases.swift` | RevenueCat SDK calls. Reports what Apple says, including `trialDays` per plan (0 unless Apple confirms this Apple Account can still get the trial); never decides Pro |
 | Bridge | `NovaraBridgeScript.swift` (version **3**), `NovaraRootViewController.swift` | `getProducts`, `identifyPurchases`, `purchase`, `restorePurchases`, `manageSubscriptions` |
 | Web | `src/lib/nativeBridge.ts`, `src/lib/purchases.ts`, `src/pages/Paywall.tsx`, `src/hooks/useProStatus.ts`, `src/hooks/useSubscriptionState.ts`, `src/hooks/useAddContactAccess.ts`, `src/hooks/useNativePurchaseIdentity.ts` | Native-only paywall at `/pro` (`SUBSCRIPTION_ROUTE`); identity link; the wall on Add Contact. `usePaywallAvailable()` says whether `/pro` can open; anything linking to it (Settings, Add Contact) checks it first. `useSubscriptionState()` gives the plan and a label ("Free trial · 5 days left", "Novara Pro · Annual", …) for the Settings row |
@@ -125,7 +125,6 @@ this repository, in Info.plist, or in the app.
 |---|---|---|---|
 | `REVENUECAT_WEBHOOK_AUTH` | API (Render `novara-prod-api` only) | Random, 32+ bytes (`openssl rand -hex 32`) | **Yes** |
 | `IAP_PAYWALL_ENABLED` | API | `true` to show the paywall | Set after the TestFlight test, see section 6 |
-| `IAP_SUBSCRIPTION_REQUIRED` | API | `true` for subscribe-to-start: no app without a trial or Pro | Set once the new app version is **live on the App Store**, see section 6 |
 | `IAP_LOCAL_STOREKIT_TEST` | API on a developer's own machine **only** | `true` to let simulator test purchases unlock Pro (section 11) | Never on Render. Ignored there and whenever `NODE_ENV=production` |
 | `RevenueCatPublicSDKKey` | iOS `Info.plist` (committed) | `appl_…` public key | **Yes** (native builds fail closed without it) |
 | Secret RevenueCat / App Store Connect keys | RevenueCat dashboard only | — | Never in the repo |
@@ -140,15 +139,15 @@ Order matters. The API reads the `entitlements` table on every contact
 creation, so the migration must exist before the API that uses it is deployed.
 
 1. **Apply migrations `0004_apple_iap_entitlements.sql`, `0007_entitlements_period_type.sql` and `0009_entitlements_will_renew.sql` to production** (hand-applied, each in a transaction, in that order). The down files reverse them (0007 first). Verified on an empty database: both apply, re-apply, and reverse cleanly. `feat/visual-refresh`'s 0005 and 0006 touch other tables and can go before or after.
-2. **Deploy the API** with `REVENUECAT_WEBHOOK_AUTH` set and both `IAP_PAYWALL_ENABLED` and `IAP_SUBSCRIPTION_REQUIRED` **unset**. Free users are unchanged (6 contacts).
+2. **Deploy the API** with `REVENUECAT_WEBHOOK_AUTH` set and `IAP_PAYWALL_ENABLED` **unset**. Nobody can add contacts without a trial or Pro from this deploy on.
 3. **Configure the RevenueCat webhook** (section 4, step 7) and send the test event.
 4. **Build the iOS app** with `RevenueCatPublicSDKKey` set, run `pod install` in `ios/App` (`Podfile.lock` already pins RevenueCat 5.97.0), raise the build number above 10, and upload a TestFlight build.
 5. **Sandbox test** on a device with a sandbox tester (section 8).
 6. **Turn on the paywall:** set `IAP_PAYWALL_ENABLED=true` on the API. Safe before Apple approves the new version: only bridge-3 builds can show it, and nothing changes for anyone else.
-7. **Submit for App Review** with both subscriptions attached. The reviewer reaches the paywall from Add Contact on a demo account that already has 6 contacts.
-8. **After the new version is live on the App Store:** set `IAP_SUBSCRIPTION_REQUIRED=true`. From then on everyone needs a trial or Pro to use Novara. People on an older app version are told to update; people in a browser are told to choose a plan in the iPhone app.
+7. **Submit for App Review** with both subscriptions attached. The reviewer reaches the paywall from Add Contact on a demo account without a subscription.
+Everyone needs a trial or Pro to use Novara. People on an older app version are told to update; people in a browser are told to choose a plan in the iPhone app.
 
-To switch everything off at once, unset `IAP_PAYWALL_ENABLED`; that also lifts the subscription requirement, and everyone can use the app again with 6 free contacts. Unsetting only `IAP_SUBSCRIPTION_REQUIRED` keeps the paywall and goes back to the 6-contact Free plan. Existing entitlements remain valid until their expiry either way.
+Unsetting `IAP_PAYWALL_ENABLED` hides the paywall but does **not** bring back a free plan: without it nobody can start a subscription, so new users cannot add contacts until it is back on. Existing entitlements remain valid until their expiry.
 
 Why step 8 waits: if a subscription were required before the new app is on the App Store, nobody could use Novara and nobody could subscribe. Apple does, however, review subscribe-to-start apps as such, so the review note must say plainly that Novara requires a subscription after the free trial. If you would rather Apple review the final experience, turn it on at submission instead, accepting that during review nobody on the current app can use Novara.
 
@@ -165,7 +164,7 @@ create it. Do this when rebasing:
    - Create the partial unique index `(user_id, organization_id) WHERE source = 'university'`.
    - The `source` CHECK here already allows `university`, so it needs no change.
    - Add its organization constraint with `ALTER TABLE entitlements ADD CONSTRAINT … CHECK (source <> 'university' OR organization_id IS NOT NULL)`.
-2. **Merge the contact-limit logic.** `contactLimitFor()` must return `Infinity` when *either* the Apple entitlement *or* the university entitlement is active. The university branch's `universityEntitlementFor()` should be called from `proStatusFor()`'s sibling, not replace it.
+2. **Merge the contact-limit logic.** `canAddContacts()` must return `true` when *either* the Apple entitlement *or* the university entitlement is active. The university branch's `universityEntitlementFor()` should be called from `proStatusFor()`'s sibling, not replace it.
 3. **Paywall visibility.** Replace the `universityEntitled: false` placeholder in `src/pages/Paywall.tsx` and `src/pages/AddContact.tsx` with the university entitlement state from that branch's `/api/entitlements` data. University users must never see the paywall or a price.
 4. **Test schema.** Update `tests/schema.sql` and the truncate list in `tests/setup.ts` to match the renumbered migration, then run both suites.
 
@@ -175,9 +174,9 @@ create it. Do this when rebasing:
 
 On a TestFlight build with a sandbox tester signed in to the device's App Store:
 
-1. Sign in to Novara. Open Add Contact with 6 contacts, then "See Novara Pro". The paywall opens.
+1. Sign in to Novara with an account that has no subscription. The subscription screen opens in place of the app.
 2. Plans load with Apple's localized prices and "7 days free, then …". Annual is preselected. The button says "Start 7-day free trial".
-3. Choose monthly and start the trial. The app shows "Confirming…" then "Your 7-day free trial has started." Add a 7th contact. `GET /api/entitlements/me` reports `state: "trial"`.
+3. Choose monthly and start the trial. The app shows "Confirming…" then "Your 7-day free trial has started." Add a contact. `GET /api/entitlements/me` reports `state: "trial"`.
 4. In RevenueCat, confirm the subscriber and the `novara_pro` entitlement. In the API database, `entitlements` has an `apple_iap` row with `period_type = 'TRIAL'` and a future `expires_at`.
 5. Sandbox time runs fast (a 1-week trial lasts a few minutes). Let it convert: the webhook's RENEWAL turns `state` into `active`. Then cancel (Settings → Apple Account → Subscriptions). When it expires, `state` is `expired` and a new contact is refused; existing contacts can still be opened and edited.
 6. Open the paywall again with the same sandbox account: no trial is offered any more, only prices.
@@ -185,7 +184,7 @@ On a TestFlight build with a sandbox tester signed in to the device's App Store:
 8. Manage Subscription opens Apple's subscription page.
 9. In a browser, `/pro` redirects to Settings and no Apple control appears.
 10. With `IAP_PAYWALL_ENABLED` unset, `/pro` redirects to Settings on the device as well.
-11. On a test API with `IAP_SUBSCRIPTION_REQUIRED=true` as well: a new account with no subscription sees the subscription screen instead of the app, can still reach Settings, and gets into the app as soon as the trial starts.
+11. A new account with no subscription sees the subscription screen instead of the app, can still reach Settings, and gets into the app as soon as the trial starts.
 
 ---
 
@@ -236,7 +235,7 @@ unaffected. The plain **Novara Connect** scheme is unchanged.
 
 **Local API settings** (on top of the usual local `.env`): `NODE_ENV=development`
 (what `pnpm run dev` sets), `IAP_PAYWALL_ENABLED=true`,
-`IAP_SUBSCRIPTION_REQUIRED=true`, `IAP_LOCAL_STOREKIT_TEST=true`, and the local
+`IAP_LOCAL_STOREKIT_TEST=true`, and the local
 database must have migrations 0004 and 0007. The local web app (port 5173) must
 be built from a branch that includes PR #29.
 

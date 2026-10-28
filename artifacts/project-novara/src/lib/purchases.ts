@@ -62,7 +62,7 @@ export const KEEP_YOUR_CONTACTS_NOTE =
   "If your subscription ends, your contacts are kept and come back as soon as you subscribe again.";
 
 /**
- * What the app shows a signed-in user while a subscription is required.
+ * What the app shows a signed-in user. There is no free plan.
  *  - "open": the requested screen.
  *  - "wait": nothing yet; the subscription status is still loading.
  *  - "subscribe": the subscription screen instead (SUBSCRIPTION_ROUTE).
@@ -70,12 +70,11 @@ export const KEEP_YOUR_CONTACTS_NOTE =
  * (Apple guideline 5.1.1(v)) without paying.
  */
 export function subscriptionGate(input: {
-  subscriptionRequired: boolean;
   isKnown: boolean;
   isPro: boolean;
   path: string;
 }): "open" | "wait" | "subscribe" {
-  if (!input.subscriptionRequired || input.isPro) return "open";
+  if (input.isPro) return "open";
   if (GATE_EXEMPT_PATHS.some((p) => input.path === p || input.path.startsWith(`${p}/`))) return "open";
   return input.isKnown ? "subscribe" : "wait";
 }
@@ -96,39 +95,21 @@ export function isPaywallVisible(input: {
   return input.nativePurchases && input.applePaywallFlag && !input.universityEntitled;
 }
 
-/** Free ceiling while a subscription is not yet required (the server's
- *  FREE_TIER_LIMIT). Once it is required, there is no free allowance. */
-export const FREE_TIER_LIMIT = 6;
-
 /**
- * Why Add Contact cannot save right now, or null when it can.
- *
- *  - "subscription": a subscription is required and this user has neither Pro
- *    nor a trial. Shown only once the status is known, so a slow answer never
- *    flashes the wall at a subscriber; the server refuses the save regardless.
- *  - "limit": before a subscription is required, Free users at the ceiling.
- *    While the status is unknown the Free limit is assumed, as the server does.
+ * Whether Add Contact must show the subscription wall: this user has neither
+ * Pro nor a trial. Shown only once the status is known, so a slow answer never
+ * flashes the wall at a subscriber; the server refuses the save regardless.
  */
-export function addContactBlock(input: {
-  isKnown: boolean;
-  isPro: boolean;
-  subscriptionRequired: boolean;
-  contactCount: number;
-}): "subscription" | "limit" | null {
-  if (input.subscriptionRequired) {
-    return input.isKnown && !input.isPro ? "subscription" : null;
-  }
-  const limitApplies = input.isKnown ? !input.isPro : true;
-  return limitApplies && input.contactCount >= FREE_TIER_LIMIT ? "limit" : null;
+export function needsSubscriptionToAdd(input: { isKnown: boolean; isPro: boolean }): boolean {
+  return input.isKnown && !input.isPro;
 }
 
 /** How this device can get Novara Pro: the paywall here, an app update first,
  *  or the iPhone app (from a browser). Null while Pro is not on sale at all. */
 export type SubscribeRoute = "paywall" | "update-app" | "iphone-app" | null;
 
-/** The words on Add Contact's wall for a given block. */
+/** The words on Add Contact's subscription wall. */
 export function addContactWall(
-  block: "subscription" | "limit",
   plan: SubscriptionPlan,
   route: SubscribeRoute,
 ): { title: string; message: string; action: string } {
@@ -136,13 +117,6 @@ export function addContactWall(
     route === "update-app" ? " Update Novara from the App Store to subscribe."
     : route === "iphone-app" ? " You can subscribe in the Novara app on iPhone."
     : "";
-  if (block === "limit") {
-    return {
-      title: "You've reached the contact limit",
-      message: `Novara Free includes up to ${FREE_TIER_LIMIT} contacts. Novara Pro removes the limit.${how}`,
-      action: "See Novara Pro",
-    };
-  }
   if (plan === "expired") {
     return {
       title: "Your Novara Pro has ended",
@@ -219,7 +193,6 @@ export function cancelledNotice(input: { isTrial: boolean; untilLong: string }):
 export function subscriptionLabel(
   plan: SubscriptionPlan,
   days: number | null,
-  subscriptionRequired: boolean,
   cancelledUntilShort: string | null = null,
 ): string {
   if (cancelledUntilShort && (plan === "trial" || plan === "monthly" || plan === "annual")) {
@@ -235,7 +208,7 @@ export function subscriptionLabel(
     case "expired":
       return "Subscription ended";
     case "none":
-      return subscriptionRequired ? "Not subscribed" : "Free Plan";
+      return "Not subscribed";
   }
 }
 

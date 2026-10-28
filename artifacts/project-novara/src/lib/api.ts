@@ -81,7 +81,6 @@ export async function createContact(
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as { code?: string; message?: string };
-    if (body.code === "CONTACT_LIMIT_REACHED") throw new Error("Contact limit reached");
     if (body.code === "SUBSCRIPTION_REQUIRED") throw new Error("Subscription required");
     throw new Error("Failed to create contact");
   }
@@ -217,9 +216,6 @@ export interface Features {
    *  until the App Store products, the RevenueCat webhook and the purchase
    *  build are all live. */
   applePaywall: boolean;
-  /** Whether adding contacts needs Novara Pro or its free trial. Only ever on
-   *  together with applePaywall. Off: Free keeps the 6-contact limit. */
-  subscriptionRequired: boolean;
   /** Local development API only: simulator StoreKit test purchases may be
    *  reported to it. Always false on Render. */
   localStoreKitTest: boolean;
@@ -245,7 +241,6 @@ export function readCachedFeatures(): Features | null {
       linkedinAiParse: !!data?.linkedinAiParse,
       linkedinScreenshotImport: !!data?.linkedinScreenshotImport,
       applePaywall: !!data?.applePaywall,
-      subscriptionRequired: !!data?.subscriptionRequired,
       localStoreKitTest: !!data?.localStoreKitTest,
     };
   } catch {
@@ -270,7 +265,6 @@ export async function fetchFeatures(getToken: GetAuthToken): Promise<Features> {
     linkedinAiParse: !!data?.linkedinAiParse,
     linkedinScreenshotImport: !!data?.linkedinScreenshotImport,
     applePaywall: !!data?.applePaywall,
-    subscriptionRequired: !!data?.subscriptionRequired,
     localStoreKitTest: !!data?.localStoreKitTest,
   };
 

@@ -57,9 +57,9 @@ to `importance` only if `base_priority` is null. This reads as an in-progress co
 (`importance` → `base_priority`) that was never fully completed with a cleanup migration — both
 columns are kept in sync on write, but only one (`base_priority`) is truly read going forward.
 
-**Business rule reflected in the schema:** the free-tier cap of 25 contacts per user
-(`routes/contacts.ts`, `FREE_TIER_LIMIT`) is enforced in application code at insert time, not by a
-database constraint.
+**Business rule reflected in the schema:** only subscribers (Pro or trial, from the
+`entitlements` table) may add contacts. This is enforced in application code at insert time
+(`canAddContacts()`), not by a database constraint.
 
 ## `user_settings`
 

@@ -2,13 +2,16 @@
 // routes and Postgres. The rules themselves are unit-tested in
 // tests/unit/followUpDates.test.ts; this proves the SQL stores and returns
 // them, and that an edit only reschedules when a date actually moves.
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 import request from "supertest";
-import { app, authHeaders } from "./testApp";
+import { app, authHeaders, grantPro } from "./testApp";
 import { pool } from "../src/db";
 import { addDays, MAINTENANCE_DAYS, utcDateString } from "../src/lib/followUpDates";
 
 const USER = "user_dates";
+
+// Adding contacts needs Novara Pro (or its trial).
+beforeEach(async () => { await grantPro(USER); });
 const TODAY = utcDateString();
 
 function contact(overrides: Record<string, unknown> = {}) {

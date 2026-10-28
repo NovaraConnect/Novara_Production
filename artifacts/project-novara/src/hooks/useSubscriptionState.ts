@@ -1,4 +1,3 @@
-import { useFeatures } from "@/hooks/useFeatures";
 import { useProStatus } from "@/hooks/useProStatus";
 import {
   cancelledUntil,
@@ -19,7 +18,7 @@ import {
  *    accessUntil (ISO date); false when it renews or that is not known
  *  - label: "Free Trial · 5 days left", "Pro · Monthly", "Pro · Yearly",
  *    "Cancelled · access until Nov 3", "Subscription ended", or
- *    "Not subscribed" ("Free Plan" while a subscription is not yet required)
+ *    "Not subscribed"
  *  - isKnown: false only while the first answer is loading
  *
  * Display only. The server decides access.
@@ -33,7 +32,6 @@ export function useSubscriptionState(): {
   isKnown: boolean;
 } {
   const { status, isKnown } = useProStatus();
-  const { subscriptionRequired } = useFeatures();
   const plan = subscriptionPlanFor(status);
   const days = plan === "trial" ? daysLeft(status?.expiresAt ?? null) : null;
   const until = cancelledUntil(status);
@@ -42,7 +40,7 @@ export function useSubscriptionState(): {
     daysLeft: days,
     cancelled: until !== null,
     accessUntil: until,
-    label: subscriptionLabel(plan, days, subscriptionRequired, until ? formatAccessDate(until, "short") : null),
+    label: subscriptionLabel(plan, days, until ? formatAccessDate(until, "short") : null),
     isKnown,
   };
 }
