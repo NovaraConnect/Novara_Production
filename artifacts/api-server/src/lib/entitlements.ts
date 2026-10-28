@@ -15,20 +15,16 @@
 // subscription whose RevenueCat period_type is TRIAL, so it grants Pro exactly
 // like a paid period.
 //
-// SUBSCRIBE TO START. Two switches on the API:
-//   - IAP_PAYWALL_ENABLED shows the paywall in purchase-capable app builds.
-//   - IAP_SUBSCRIPTION_REQUIRED (only with the paywall on) means there is no
-//     free plan: the web app shows the subscription screen in place of the app
-//     until the user has a trial or Pro, and this server refuses to add or
-//     import contacts without one. Without it the old Free ceiling applies.
+// SUBSCRIBE TO START. There is no free plan: the web app shows the
+// subscription screen in place of the app until the user has a trial or Pro,
+// and this server refuses to add or import contacts without one. This does not
+// depend on any switch. IAP_PAYWALL_ENABLED only decides whether
+// purchase-capable app builds show the paywall.
 // Nothing is deleted when a subscription ends. Account deletion and sign-out
 // stay reachable without a subscription.
 // ============================================================================
 import { pool } from "../db";
 import { logger } from "./logger";
-
-/** Free ceiling used while a subscription is not yet required. Pro removes it. */
-export const FREE_TIER_LIMIT = 6;
 
 /** RevenueCat entitlement identifier that grants Novara Pro. */
 export const NOVARA_PRO_ENTITLEMENT = "novara_pro";
@@ -77,15 +73,6 @@ function flagOn(v: string | undefined): boolean {
 /** Whether the paywall may be shown in purchase-capable app builds. */
 export function isPaywallEnabled(): boolean {
   return flagOn(process.env["IAP_PAYWALL_ENABLED"]);
-}
-
-/**
- * Whether adding contacts needs Pro or a trial. Only honoured while the paywall
- * is on too, so nobody can be asked to pay where they cannot buy, and removing
- * IAP_PAYWALL_ENABLED switches the whole thing off at once.
- */
-export function isSubscriptionRequired(): boolean {
-  return isPaywallEnabled() && flagOn(process.env["IAP_SUBSCRIPTION_REQUIRED"]);
 }
 
 /** Monthly or annual, from the App Store product ID (…pro.monthly / …pro.annual). */
@@ -144,29 +131,14 @@ export async function proStatusFor(userId: string): Promise<ProStatus> {
   };
 }
 
-/**
- * The most contacts this user may hold. Infinity for Pro (trial included).
- * Otherwise zero while a subscription is required, or the Free ceiling before
- * that. Callers compare counts against this; they must not hard-code a number.
- */
-export async function contactLimitFor(userId: string): Promise<number> {
-  const status = await proStatusFor(userId);
-  if (status.pro) return Infinity;
-  return isSubscriptionRequired() ? 0 : FREE_TIER_LIMIT;
+/** Whether this user may add or import contacts: Pro, trial included. */
+export async function canAddContacts(userId: string): Promise<boolean> {
+  return (await proStatusFor(userId)).pro;
 }
 
-/** The 403 body for an add or import refused by contactLimitFor(). */
-export function limitReachedBody(): { error: string; message: string; code: string } {
-  if (isSubscriptionRequired()) {
-    return {
-      error: "Subscription required",
-      message: "Novara needs an active subscription. Start the 7-day free trial in the Novara iPhone app. Your existing contacts are kept.",
-      code: "SUBSCRIPTION_REQUIRED",
-    };
-  }
-  return {
-    error: "Contact limit reached",
-    message: `Novara Free includes up to ${FREE_TIER_LIMIT} contacts. Novara Pro removes the limit.`,
-    code: "CONTACT_LIMIT_REACHED",
-  };
-}
+/** The 403 body for an add or import refused by canAddContacts(). */
+export const SUBSCRIPTION_REQUIRED_BODY = {
+  error: "Subscription required",
+  message: "Novara needs an active subscription. Start the 7-day free trial in the Novara iPhone app. Your existing contacts are kept.",
+  code: "SUBSCRIPTION_REQUIRED",
+} as const;

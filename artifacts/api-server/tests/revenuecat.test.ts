@@ -10,7 +10,6 @@ const WEBHOOK = "/api/webhooks/revenuecat";
 const SECRET = "rc-test-webhook-secret";
 const USER = "user_rc_pro";
 const DAY = 24 * 60 * 60 * 1000;
-const LIMIT = 6;
 
 let seq = 0;
 function makeEvent(over: Record<string, unknown> = {}) {
@@ -76,7 +75,7 @@ describe("RevenueCat webhook", () => {
     expect(res.status).toBe(400);
   });
 
-  it("an INITIAL_PURCHASE grants Pro, and Pro lifts the contact limit", async () => {
+  it("an INITIAL_PURCHASE grants Pro, and Pro allows adding contacts", async () => {
     const res = await deliver(makeEvent());
     expect(res.status).toBe(200);
     expect(res.body.outcome).toBe("applied");
@@ -85,9 +84,9 @@ describe("RevenueCat webhook", () => {
     expect(me.body.pro).toBe(true);
     expect(me.body.source).toBe("apple_iap");
 
-    await fill(LIMIT + 4);
+    await fill(10);
     const list = await request(app).get("/api/contacts").set(authHeaders(USER));
-    expect(list.body).toHaveLength(LIMIT + 4);
+    expect(list.body).toHaveLength(10);
   });
 
   it("a redelivered event is a no-op", async () => {
@@ -96,7 +95,7 @@ describe("RevenueCat webhook", () => {
     expect((await deliver(event)).body.outcome).toBe("duplicate");
   });
 
-  it("EXPIRATION removes Pro and the free ceiling applies again", async () => {
+  it("EXPIRATION removes Pro and adding contacts stops", async () => {
     await deliver(makeEvent());
     const expiredAt = Date.now() - 1000;
     const expired = await deliver(makeEvent({
@@ -109,10 +108,9 @@ describe("RevenueCat webhook", () => {
     const me = await request(app).get("/api/entitlements/me").set(authHeaders(USER));
     expect(me.body.pro).toBe(false);
 
-    await fill(LIMIT);
     const over = await request(app).post("/api/contacts").set(authHeaders(USER)).send(person(99));
     expect(over.status).toBe(403);
-    expect(over.body.code).toBe("CONTACT_LIMIT_REACHED");
+    expect(over.body.code).toBe("SUBSCRIPTION_REQUIRED");
   });
 
   it("an older event cannot overwrite a newer state", async () => {
@@ -237,7 +235,7 @@ describe("RevenueCat webhook", () => {
     expect(res.body.outcome).toBe("ignored");
   });
 
-  it("contact creation still works as Free if migration 0004 was not applied", async () => {
+  it("answers 'not subscribed' instead of failing if migration 0004 was not applied", async () => {
     const original = pool.query.bind(pool);
     const spy = vi.spyOn(pool, "query").mockImplementation(((text: unknown, ...rest: unknown[]) => {
       if (typeof text === "string" && text.includes("FROM entitlements")) {
@@ -247,7 +245,8 @@ describe("RevenueCat webhook", () => {
     }) as never);
     try {
       const res = await request(app).post("/api/contacts").set(authHeaders(USER)).send(person(1));
-      expect(res.status).toBe(201);
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe("SUBSCRIPTION_REQUIRED");
       const me = await request(app).get("/api/entitlements/me").set(authHeaders(USER));
       expect(me.body.pro).toBe(false);
     } finally {

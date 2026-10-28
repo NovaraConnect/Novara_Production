@@ -50,14 +50,12 @@ async function seedContacts(count: number) {
   }
 }
 
-const ENV_KEYS = ["REVENUECAT_WEBHOOK_AUTH", "IAP_PAYWALL_ENABLED", "IAP_SUBSCRIPTION_REQUIRED"] as const;
+const ENV_KEYS = ["REVENUECAT_WEBHOOK_AUTH", "IAP_PAYWALL_ENABLED"] as const;
 const saved: Record<string, string | undefined> = {};
 
-function requireSubscription(on: boolean, paywall = on) {
-  if (paywall) process.env["IAP_PAYWALL_ENABLED"] = "true";
+function paywall(on: boolean) {
+  if (on) process.env["IAP_PAYWALL_ENABLED"] = "true";
   else delete process.env["IAP_PAYWALL_ENABLED"];
-  if (on) process.env["IAP_SUBSCRIPTION_REQUIRED"] = "true";
-  else delete process.env["IAP_SUBSCRIPTION_REQUIRED"];
 }
 
 describe("subscription required (one Pro plan, 7-day trial)", () => {
@@ -65,7 +63,7 @@ describe("subscription required (one Pro plan, 7-day trial)", () => {
     for (const k of ENV_KEYS) saved[k] = process.env[k];
     process.env["REVENUECAT_WEBHOOK_AUTH"] = SECRET;
   });
-  afterEach(() => requireSubscription(false));
+  afterEach(() => paywall(false));
   afterAll(() => {
     for (const k of ENV_KEYS) {
       if (saved[k] === undefined) delete process.env[k];
@@ -74,7 +72,7 @@ describe("subscription required (one Pro plan, 7-day trial)", () => {
   });
 
   it("someone who never subscribed cannot add or import, and is told why", async () => {
-    requireSubscription(true);
+    paywall(true);
     const res = await add(1);
     expect(res.status).toBe(403);
     expect(res.body.code).toBe("SUBSCRIPTION_REQUIRED");
@@ -89,15 +87,19 @@ describe("subscription required (one Pro plan, 7-day trial)", () => {
     expect(features.body).toMatchObject({ applePaywall: true, subscriptionRequired: true });
   });
 
-  it("the requirement is ignored while the paywall is off, so nobody is asked to pay where they cannot buy", async () => {
-    requireSubscription(true, false);
-    expect((await add(1)).status).toBe(201);
+  it("there is no free plan, even with the paywall off", async () => {
+    await seedContacts(2);
+    const res = await add(3);
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe("SUBSCRIPTION_REQUIRED");
+    const imp = await request(app).post("/api/contacts/import").set(authHeaders(USER))
+      .send({ contacts: [person(4)] });
+    expect(imp.status).toBe(403);
     const features = await request(app).get("/api/features");
-    expect(features.body).toMatchObject({ applePaywall: false, subscriptionRequired: false });
+    expect(features.body).toMatchObject({ applePaywall: false, subscriptionRequired: true });
   });
 
   it("a free trial unlocks adding without a limit and reports days left", async () => {
-    requireSubscription(true);
     await deliver(event());
     const status = await me();
     expect(status).toMatchObject({ pro: true, state: "trial", billingPeriod: "monthly" });
@@ -107,14 +109,12 @@ describe("subscription required (one Pro plan, 7-day trial)", () => {
   });
 
   it("the trial turning into a paid annual plan reports Pro annual", async () => {
-    requireSubscription(true);
     await deliver(event({ product_id: ANNUAL }));
     await deliver(event({ type: "RENEWAL", product_id: ANNUAL, period_type: "NORMAL", expiration_at_ms: Date.now() + 365 * DAY }));
     expect(await me()).toMatchObject({ pro: true, state: "active", billingPeriod: "annual" });
   });
 
   it("after a trial lapses unpaid: nothing is lost, but adding stops", async () => {
-    requireSubscription(true);
     await seedContacts(3);
     await deliver(event());
     await deliver(event({ type: "EXPIRATION", expiration_at_ms: Date.now() - 1000 }));
@@ -137,13 +137,6 @@ describe("subscription required (one Pro plan, 7-day trial)", () => {
   it("an expiry date in the past counts as expired even without an EXPIRATION event", async () => {
     await deliver(event({ expiration_at_ms: Date.now() - 1000 }));
     expect(await me()).toMatchObject({ pro: false, state: "expired" });
-  });
-
-  it("before a subscription is required, Free keeps the 6-contact limit", async () => {
-    await seedContacts(6);
-    const res = await add(7);
-    expect(res.status).toBe(403);
-    expect(res.body.code).toBe("CONTACT_LIMIT_REACHED");
   });
 
   it("still answers 'not subscribed' if migration 0007 was not applied", async () => {

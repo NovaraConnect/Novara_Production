@@ -35,7 +35,7 @@ These were checked directly, not assumed.
 **Auth and data:**
 - Identity is Clerk. The API resolves `userId` from Clerk on each request (`requireAuth`).
 - Per-user settings live in Postgres table `user_settings`, including `has_seen_tutorial`. Schema is managed by hand-applied SQL migrations (see `artifacts/api-server/migrations/`, plus `0003` referenced in the news cache notes).
-- Contact limits are enforced in the live code. Commit `90660c3` set the free-tier ceiling to **6 contacts** as a single module-level constant, applied to both create paths and to `POST /contacts/import`. Existing contacts above the ceiling are kept and cannot be added to.
+- Adding contacts is enforced in the live code on both create paths and `POST /contacts/import`: only Pro (trial included) may add. The 6-contact free tier (commit `90660c3`) was removed on 2026-10-28.
 
 **Clients:**
 - The shipped iOS app is the web app (`artifacts/project-novara`) inside a native shell (Capacitor/TestFlight build 8, per comments in `Welcome.tsx` and `docs/production`). The shell hides the native tab bar on routes outside its four sections.
@@ -157,7 +157,7 @@ The shipped iOS app is a web view shell. StoreKit needs a native bridge, so the 
 
 - **No lifetime plan** at launch.
 - **7-day free trial** on both plans, as an Apple introductory offer. Apple allows one per subscription group per Apple Account.
-- **No free plan once a subscription is required.** Without Pro or the trial, a user keeps every contact and can view, edit, delete and follow them up, but cannot add or import new ones. Until the `IAP_SUBSCRIPTION_REQUIRED` switch is turned on (after the new app version is live), Free keeps the 6-contact limit.
+- **No free plan.** Without Pro or the trial, a user keeps every contact and can view, edit, delete and follow them up, but cannot add or import new ones.
 - **University-entitled users** remain unlimited and never see individual payment offers, upgrade prompts, or Pro pricing. This applies whether the entitlement comes from an invitation or (future) SSO.
 - **Web (Stripe):** no consumer web price is set. Consumer web checkout is out of this release (section 5).
 

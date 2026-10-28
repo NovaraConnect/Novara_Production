@@ -9,8 +9,8 @@
 //  - Manage. Subscribers see their plan, Manage Subscription and Restore.
 //
 // Payment controls render only when every gate in isPaywallVisible() passes.
-// In a browser or on an older app build: if a subscription is required, the
-// page explains where to subscribe; otherwise it redirects to Settings.
+// In a browser or on an older app build: without Pro, the page explains where
+// to subscribe; subscribers are redirected to Settings.
 //
 // The page never decides Pro itself. After Apple reports a purchase, it polls
 // the server (GET /api/entitlements/me) until the RevenueCat webhook has
@@ -76,11 +76,11 @@ export default function Paywall() {
   const { getToken, userId } = useAuth();
   const queryClient = useQueryClient();
   const { isPro } = useProStatus();
-  const { subscriptionRequired, localStoreKitTest } = useFeatures();
+  const { localStoreKitTest } = useFeatures();
   const subscription = useSubscriptionState();
   const visible = usePaywallAvailable();
   // Subscribe to start: this screen stands in for the whole app.
-  const required = subscriptionRequired && !isPro;
+  const required = !isPro;
 
   const [products, setProducts] = useState<NativeProProduct[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

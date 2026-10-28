@@ -13,11 +13,11 @@ import { recalculateContactsForUser } from "../lib/recalculate";
 import { analyzeContactWithAI } from "../lib/enrich";
 import { logger } from "../lib/logger";
 import { computeNextFollowUp, resolveContactDates, utcDateString } from "../lib/followUpDates";
-import { contactLimitFor, limitReachedBody } from "../lib/entitlements";
+import { canAddContacts, SUBSCRIPTION_REQUIRED_BODY } from "../lib/entitlements";
 
-// Who may add contacts (Free ceiling, or Pro / trial once a subscription is
-// required) is enforced on BOTH create paths (POST /contacts and
-// POST /contacts/import) through contactLimitFor() in lib/entitlements.ts.
+// Only Pro (trial included) may add contacts. This is enforced on BOTH create
+// paths (POST /contacts and POST /contacts/import) through canAddContacts() in
+// lib/entitlements.ts.
 
 const router = Router();
 
@@ -199,13 +199,8 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
 
 
   try {
-    const { rows: [countRow] } = await pool.query(
-      "SELECT COUNT(*) AS count FROM contacts WHERE user_id = $1",
-      [userId],
-    );
-    const limit = await contactLimitFor(userId);
-    if (parseInt(countRow.count, 10) >= limit) {
-      res.status(403).json(limitReachedBody());
+    if (!(await canAddContacts(userId))) {
+      res.status(403).json(SUBSCRIPTION_REQUIRED_BODY);
       return;
     }
 
@@ -593,22 +588,12 @@ router.post("/contacts/import", requireAuth, async (req: Request, res: Response)
     return;
   }
 
-  // The free ceiling applies here as well. Without this, a user could import
-  // an unlimited address book and never meet the limit that POST /contacts
-  // enforces — which would make the limit one API call from meaningless.
-  const { rows: [limitRow] } = await pool.query(
-    "SELECT COUNT(*) AS count FROM contacts WHERE user_id = $1",
-    [userId],
-  );
-  const alreadyStored = parseInt(limitRow.count, 10);
-  const limit = await contactLimitFor(userId);
-  if (alreadyStored >= limit) {
-    res.status(403).json(limitReachedBody());
+  // The subscription check applies here as well, or importing would be a way
+  // to add contacts without one.
+  if (!(await canAddContacts(userId))) {
+    res.status(403).json(SUBSCRIPTION_REQUIRED_BODY);
     return;
   }
-  // Partial imports are allowed: take what fits and report the remainder,
-  // rather than rejecting a whole batch because its tail overflows.
-  const capacity = limit - alreadyStored;
 
   const { rows: [settingsRow] } = await pool.query(
     "SELECT career_goals, career_statement, goal_tags FROM user_settings WHERE user_id = $1",
@@ -618,13 +603,8 @@ router.post("/contacts/import", requireAuth, async (req: Request, res: Response)
 
   let imported = 0;
   let skipped = 0;
-  let skippedOverLimit = 0;
 
   for (const c of contacts) {
-    if (imported >= capacity) {
-      skippedOverLimit++;
-      continue;
-    }
     try {
       const today = new Date().toISOString().split("T")[0];
       const firstContactDate = c.firstContactDate ?? c.createdAt?.split("T")[0] ?? today;
@@ -684,13 +664,7 @@ router.post("/contacts/import", requireAuth, async (req: Request, res: Response)
     }
   }
 
-  res.json({
-    imported,
-    skipped,
-    ...(skippedOverLimit > 0
-      ? { skippedOverLimit, limit, code: "CONTACT_LIMIT_REACHED" }
-      : {}),
-  });
+  res.json({ imported, skipped });
 });
 
 export default router;

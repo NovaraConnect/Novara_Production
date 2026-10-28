@@ -1,13 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
-  addContactBlock,
   annualSavingLabel,
   cancelledNotice,
   cancelledUntil,
   formatAccessDate,
   daysLeft,
-  FREE_TIER_LIMIT,
   isPaywallVisible,
+  needsSubscriptionToAdd,
   subscriptionGate,
   subscriptionLabel,
   subscriptionPlanFor,
@@ -56,27 +55,14 @@ describe("isPaywallVisible", () => {
   });
 });
 
-describe("addContactBlock", () => {
-  const base = { isKnown: true, isPro: false, subscriptionRequired: false, contactCount: 0 };
-
-  it("before a subscription is required, Free users stop at the ceiling", () => {
-    expect(addContactBlock({ ...base, contactCount: FREE_TIER_LIMIT - 1 })).toBeNull();
-    expect(addContactBlock({ ...base, contactCount: FREE_TIER_LIMIT })).toBe("limit");
-    expect(addContactBlock({ ...base, isPro: true, contactCount: 50 })).toBeNull();
-  });
-
-  it("keeps the Free limit while the status is unknown", () => {
-    expect(addContactBlock({ ...base, isKnown: false, contactCount: FREE_TIER_LIMIT })).toBe("limit");
-  });
-
-  it("once a subscription is required, anyone without Pro or a trial is asked to subscribe", () => {
-    const required = { ...base, subscriptionRequired: true };
-    expect(addContactBlock(required)).toBe("subscription");
-    expect(addContactBlock({ ...required, isPro: true, contactCount: 500 })).toBeNull();
+describe("needsSubscriptionToAdd", () => {
+  it("asks anyone without Pro or a trial to subscribe; there is no free allowance", () => {
+    expect(needsSubscriptionToAdd({ isKnown: true, isPro: false })).toBe(true);
+    expect(needsSubscriptionToAdd({ isKnown: true, isPro: true })).toBe(false);
   });
 
   it("does not flash the subscription wall while the status is loading", () => {
-    expect(addContactBlock({ ...base, subscriptionRequired: true, isKnown: false })).toBeNull();
+    expect(needsSubscriptionToAdd({ isKnown: false, isPro: false })).toBe(false);
   });
 });
 
@@ -112,23 +98,18 @@ describe("subscription plan and label", () => {
   });
 
   it("labels each plan", () => {
-    expect(subscriptionLabel("trial", 5, true)).toBe("Free Trial · 5 days left");
-    expect(subscriptionLabel("trial", 1, true)).toBe("Free Trial · 1 day left");
-    expect(subscriptionLabel("trial", 0, true)).toBe("Free Trial · ends today");
-    expect(subscriptionLabel("monthly", null, true)).toBe("Pro · Monthly");
-    expect(subscriptionLabel("annual", null, true)).toBe("Pro · Yearly");
-    expect(subscriptionLabel("expired", null, true)).toBe("Subscription ended");
-    expect(subscriptionLabel("none", null, true)).toBe("Not subscribed");
-    expect(subscriptionLabel("none", null, false)).toBe("Free Plan");
+    expect(subscriptionLabel("trial", 5)).toBe("Free Trial · 5 days left");
+    expect(subscriptionLabel("trial", 1)).toBe("Free Trial · 1 day left");
+    expect(subscriptionLabel("trial", 0)).toBe("Free Trial · ends today");
+    expect(subscriptionLabel("monthly", null)).toBe("Pro · Monthly");
+    expect(subscriptionLabel("annual", null)).toBe("Pro · Yearly");
+    expect(subscriptionLabel("expired", null)).toBe("Subscription ended");
+    expect(subscriptionLabel("none", null)).toBe("Not subscribed");
   });
 });
 
 describe("subscriptionGate (subscribe to start)", () => {
-  const base = { subscriptionRequired: true, isKnown: true, isPro: false, path: "/dashboard" };
-
-  it("is open for everyone while a subscription is not required", () => {
-    expect(subscriptionGate({ ...base, subscriptionRequired: false })).toBe("open");
-  });
+  const base = { isKnown: true, isPro: false, path: "/dashboard" };
 
   it("sends anyone without a trial or Pro to the subscription screen", () => {
     expect(subscriptionGate(base)).toBe("subscribe");
@@ -198,12 +179,12 @@ describe("cancelled subscriptions (auto-renew off, access continues)", () => {
   });
 
   it("labels it 'Cancelled · access until <date>' for trial and paid plans", () => {
-    expect(subscriptionLabel("trial", 7, true, "Nov 3")).toBe("Cancelled · access until Nov 3");
-    expect(subscriptionLabel("monthly", null, true, "Nov 3")).toBe("Cancelled · access until Nov 3");
-    expect(subscriptionLabel("annual", null, true, "Nov 3")).toBe("Cancelled · access until Nov 3");
+    expect(subscriptionLabel("trial", 7, "Nov 3")).toBe("Cancelled · access until Nov 3");
+    expect(subscriptionLabel("monthly", null, "Nov 3")).toBe("Cancelled · access until Nov 3");
+    expect(subscriptionLabel("annual", null, "Nov 3")).toBe("Cancelled · access until Nov 3");
     // Without a cancellation date the usual label stays.
-    expect(subscriptionLabel("trial", 7, true, null)).toBe("Free Trial · 7 days left");
-    expect(subscriptionLabel("expired", null, true, "Nov 3")).toBe("Subscription ended");
+    expect(subscriptionLabel("trial", 7, null)).toBe("Free Trial · 7 days left");
+    expect(subscriptionLabel("expired", null, "Nov 3")).toBe("Subscription ended");
   });
 
   it("formats the date with a short or long month in the user's locale", () => {

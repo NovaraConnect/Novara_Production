@@ -54,8 +54,8 @@ Returns all of the caller's contacts, ordered by `next_follow_up_date ASC`.
   `connectionStatus`, `notes`, `industry`, `function`, `interests` (all optional).
 - **Response `201`:** the created contact (camelCase, via `dbToContact()`).
 - **Response `400`:** missing required fields.
-- **Response `403`:** `{ error: "Contact limit reached", code: "CONTACT_LIMIT_REACHED" }` if the
-  caller already has 25 contacts (`FREE_TIER_LIMIT`).
+- **Response `403`:** `{ error: "Subscription required", code: "SUBSCRIPTION_REQUIRED" }` if the
+  caller has neither Novara Pro nor its free trial.
 - **Business rule:** on create, `current_priority` is the AI suggestion from
   `computeSuggestedPriority()` (`@workspace/novara-priority`) using the user's
   `career_goals`/`goal_tags`/`career_statement`, unless the request sets `priorityOverride`.

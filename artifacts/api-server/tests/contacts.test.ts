@@ -1,9 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 import request from "supertest";
-import { app, authHeaders } from "./testApp";
+import { app, authHeaders, grantPro } from "./testApp";
 
 const USER_A = "user_test_a";
 const USER_B = "user_test_b";
+
+// Adding contacts needs Novara Pro (or its trial).
+beforeEach(async () => { await grantPro(USER_A); await grantPro(USER_B); });
 
 function validContact(overrides: Record<string, unknown> = {}) {
   return {

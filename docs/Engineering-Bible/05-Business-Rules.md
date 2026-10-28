@@ -167,13 +167,12 @@ succeeded, genuinely no relevant articles), **error** (request failed), **config
 refresh failure). `GNEWS_API_KEY` is declared in `render.yaml` for the web service (value set in
 the Render dashboard, `sync: false`).
 
-## 6. Contact limit (beta constraint)
+## 6. Who can add contacts
 
-**Where:** `routes/contacts.ts`, `FREE_TIER_LIMIT = 25`.
+**Where:** `routes/contacts.ts`, `canAddContacts()` in `lib/entitlements.ts`.
 
-A hard cap of 25 contacts per user, enforced with a `COUNT(*)` check before insert. The user-facing
-error message ("You've reached the 25-contact limit for the beta. More spots are coming soon!")
-confirms this is a deliberate beta-stage constraint, not a bug.
+There is no free plan. Adding or importing contacts needs Novara Pro or its 7-day free trial;
+otherwise the API answers 403 `SUBSCRIPTION_REQUIRED`. Existing contacts are never removed.
 
 ## 7. Install flow (PWA)
 

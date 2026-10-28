@@ -19,7 +19,7 @@ import { BusinessCardScanner, type ScannedContact } from "@/components/BusinessC
 import { LinkedInScreenshotImport } from "@/components/LinkedInScreenshotImport";
 import type { LinkedInDraft } from "@/lib/linkedinParse";
 import { useAddContactAccess } from "@/hooks/useAddContactAccess";
-import { FREE_TIER_LIMIT, SUBSCRIPTION_ROUTE } from "@/lib/purchases";
+import { SUBSCRIPTION_ROUTE } from "@/lib/purchases";
 import {
   planLinkedInImport,
   LINKEDIN_IMPORT_FIELDS,
@@ -262,13 +262,12 @@ export default function AddContact() {
 
   const removeInterest = (tag: string) => setInterests(prev => prev.filter(t => t !== tag));
 
-  // The Free ceiling, or Pro / trial once a subscription is required. The
+  // Adding contacts needs Pro or a trial; there is no free plan. The
   // server enforces the real rule; this only decides what the screen shows.
-  const { wall, showPaywallLink } = useAddContactAccess(contacts.length);
-  const atLimit = wall !== null;
+  const { blocked, wall, showPaywallLink } = useAddContactAccess();
 
   const onSubmit = async (values: FormValues) => {
-    if (atLimit) return;
+    if (blocked) return;
     try {
       const created = await addContact.mutateAsync({
         ...values,
@@ -297,8 +296,6 @@ export default function AddContact() {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("Subscription required")) {
         toast.error("Adding contacts needs Novara Pro.");
-      } else if (msg.includes("limit") || msg.includes("403")) {
-        toast.error(`You've reached the ${FREE_TIER_LIMIT}-contact limit.`);
       } else {
         toast.error("Failed to save contact. Please try again.");
       }
@@ -317,8 +314,8 @@ export default function AddContact() {
       </header>
 
       <main className="flex-1 px-4 pt-4 pb-6">
-        {/* Contact limit wall */}
-        {atLimit && (
+        {/* Subscription wall */}
+        {blocked && (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
             <div className="w-16 h-16 rounded-full bg-cooling-soft border border-cooling/25 flex items-center justify-center">
               <span className="text-2xl">🎯</span>
@@ -340,7 +337,7 @@ export default function AddContact() {
           </div>
         )}
 
-        {!atLimit && (
+        {!blocked && (
           <>
             <div
               role="tablist"

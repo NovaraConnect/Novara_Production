@@ -37,10 +37,8 @@ The homepage copy targets "ambitious professionals" specifically. The settings m
 in `lib/priority.ts` that weighs contacts against a user's stated career goals) confirms this is
 built around *career-motivated* networking — the app actively reasons about whether a given
 contact is relevant to what the user says they're trying to achieve professionally, not just
-generic contact-list hygiene. The free-tier contact cap of 25 (`FREE_TIER_LIMIT` in
-`routes/contacts.ts`) and the phrase "beta" in that route's own error message ("You've reached the
-25-contact limit for the beta. More spots are coming soon!") indicate the product is, as of this
-writing, in a beta/pilot phase rather than a fully commercial, unlimited product.
+generic contact-list hygiene. There is no free plan: adding contacts needs Novara Pro or its 7-day
+free trial (`canAddContacts()` in `lib/entitlements.ts`).
 
 ## Core philosophy (as evidenced by the code, not stated anywhere as a mission doc)
 

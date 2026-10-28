@@ -1,8 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 import request from "supertest";
-import { app, authHeaders } from "./testApp";
+import { app, authHeaders, grantPro } from "./testApp";
 
 const USER = "user_birthday";
+
+// Adding contacts needs Novara Pro (or its trial).
+beforeEach(async () => { await grantPro(USER); });
 const base = { firstName: "Bea", lastName: "Day", company: "Acme" };
 
 describe("contact birthdays", () => {
