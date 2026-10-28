@@ -188,7 +188,7 @@ function FollowUpList({ title, people, overdue }: { title: string; people: Perso
             </span>
           )}
         </p>
-        <span className="flex items-center gap-0.5 text-sm font-medium text-primary">
+        <span className="flex items-center gap-0.5 text-sm font-medium text-foreground">
           View all
           <ChevronRight className="h-4 w-4" />
         </span>

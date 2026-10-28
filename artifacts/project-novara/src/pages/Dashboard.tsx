@@ -209,7 +209,7 @@ export default function Dashboard() {
           <Link href="/contacts">
             <div className="bg-card border border-border rounded-xl p-3 flex items-center justify-between">
               <span className="text-sm text-muted-foreground">{pipelineCount} contact{pipelineCount > 1 ? "s" : ""} in pipeline</span>
-              <span className="text-xs text-primary font-medium">View all</span>
+              <span className="text-xs text-foreground font-medium">View all</span>
             </div>
           </Link>
         )}
@@ -248,7 +248,7 @@ function FollowUpCard({
             </span>
           )}
         </h2>
-        <Link href="/contacts" className="flex items-center gap-0.5 text-sm font-medium text-primary">
+        <Link href="/contacts" className="flex items-center gap-0.5 text-sm font-medium text-foreground">
           View all
           <ChevronRight className="h-4 w-4" aria-hidden="true" />
         </Link>
