@@ -99,10 +99,12 @@ function PlayLogo({ className = "" }: { className?: string }) {
  *  saturated Novara blue because it is the call to action, Android is the
  *  muted version of it. Both edges are visible against the navy, so they read
  *  as one size. Android is deliberately not a link. No hover lift, so the two
- *  always line up. The border is a whole pixel: a 1.5px one put the logo and
- *  text on half pixels and blurred their edges. */
+ *  always line up. The soft 1.5px edge is an inset ring, not a border, so the
+ *  logo and text stay on whole pixels and crisp. The App Store ring is a shade
+ *  darker than its fill and Android's is the bright blue: a bright edge on the
+ *  bright badge made it look bigger than Android's. */
 const BADGE =
-  "box-border inline-flex h-14 w-[164px] shrink-0 items-center gap-2.5 rounded-2xl border px-3.5 sm:w-[176px]";
+  "inline-flex h-14 w-[164px] shrink-0 items-center gap-2.5 rounded-2xl px-3.5 sm:w-[176px]";
 
 function BadgeText({ small, big }: { small: string; big: string }) {
   return (
@@ -119,7 +121,7 @@ function StoreBadges({ platform }: { platform: Platform }) {
       <a
         href={APP_STORE_URL}
         onClick={() => track("hero:app_store", platform)}
-        className={`${BADGE} border-[#6B85FF] bg-[#3B5BFF] text-white transition-colors hover:bg-[#4A68FF]`}
+        className={`${BADGE} bg-[#3B5BFF] text-white shadow-[inset_0_0_0_1.5px_#2D4BE0] transition-colors hover:bg-[#4A68FF]`}
       >
         <span className="flex h-7 w-7 shrink-0 items-center justify-center">
           <AppleLogo className="h-7 w-7" />
@@ -128,7 +130,7 @@ function StoreBadges({ platform }: { platform: Platform }) {
       </a>
       <span
         aria-label="Android app coming soon"
-        className={`${BADGE} cursor-default select-none border-[#33459A] bg-[#131E45] text-[#9FB2FF]`}
+        className={`${BADGE} cursor-default select-none bg-[#131E45] text-[#9FB2FF] shadow-[inset_0_0_0_1.5px_#3B5BFF]`}
       >
         <span className="flex h-7 w-7 shrink-0 items-center justify-center">
           <PlayLogo className="h-6 w-6" />
