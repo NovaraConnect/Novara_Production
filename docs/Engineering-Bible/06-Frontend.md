@@ -57,8 +57,10 @@ The app supports being served from a non-root base path (`BASE_URL`/`BASE_PATH`,
 - **`ContactDetail.tsx`** — single-contact view, including the "mark as contacted" action,
   company news lookup (`useCompanyNews.ts`), and the Suggested message card
   (`components/SuggestedMessage.tsx`): one editable draft (≤500 chars) drafted on tap, with
-  Regenerate, Copy, and a send action for the preferred channel that opens Messages/Mail
-  prefilled (email gets the subject line) or copies it for LinkedIn. It never sends.
+  Regenerate, Copy, and a send action: the preferred (or only) channel in one tap, otherwise a
+  "Send with…" chooser. Text and email open Messages/Mail prefilled (email gets the subject
+  line); LinkedIn copies the draft and opens the profile in the same tap, ready to paste. It
+  never sends.
 - **`Settings.tsx`** — account info, career statement/goals editor (feeds priority scoring),
   auto-downgrade cadence selector, links to Notification settings, Support (feedback), and Install
   (PWA guide).
