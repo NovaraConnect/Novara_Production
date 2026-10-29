@@ -12,9 +12,10 @@
 // ProtectedRoute; InstallPrompt hides itself here because its "add to home
 // screen" banner would compete with the App Store button.
 //
-// The button adapts to the device: iPhone goes straight to the App Store,
-// desktop also gets a QR code to scan, Android (no Play Store build yet) is
-// told so. Every button reports to PostHog as `start_cta`.
+// The hero shows two store badges: the App Store, and an Android "coming
+// soon" badge that is not a link. Desktop also gets a QR code to scan; the
+// closing button tells Android visitors there is no Play Store build yet.
+// Every button reports to PostHog as `start_cta`.
 //
 // The phone plays real app screenshots (public/screens/, fictional demo
 // contacts) rather than a screen recording: the existing recordings show a
@@ -82,6 +83,44 @@ function DownloadButton({ platform, where }: { platform: Platform; where: string
       <AppleLogo className="h-5 w-5" />
       Download on the App Store
     </a>
+  );
+}
+
+function PlayLogo({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+      <path d="M4.2 2.4c-.3.3-.4.7-.4 1.2v16.8c0 .5.1.9.4 1.2l9.3-9.6-9.3-9.6Zm10.6 10.9 2.6 2.7-11.2 6.4 8.6-9.1Zm0-2.6L6.2 1.6l11.2 6.4-2.6 2.7Zm3.9-2.1 3 1.7c.9.5.9 1.3 0 1.8l-3 1.7-2.9-2.6 2.9-2.6Z" />
+    </svg>
+  );
+}
+
+/** The hero's pair of store badges: the App Store, live, and Android, not
+ *  yet. The Android one is deliberately not a link. */
+function StoreBadges({ platform }: { platform: Platform }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <a
+        href={APP_STORE_URL}
+        onClick={() => track("hero:app_store", platform)}
+        className="inline-flex h-14 items-center gap-2.5 rounded-2xl bg-white pl-4 pr-5 text-black shadow-[0_12px_32px_-10px_rgba(0,0,0,0.7)] transition-transform hover:-translate-y-0.5"
+      >
+        <AppleLogo className="h-7 w-7" />
+        <span className="flex flex-col leading-none">
+          <span className="text-[11px] font-medium">Download on the</span>
+          <span className="mt-0.5 text-xl font-semibold tracking-tight">App Store</span>
+        </span>
+      </a>
+      <span
+        aria-label="Android app coming soon"
+        className="inline-flex h-14 cursor-default select-none items-center gap-2.5 rounded-2xl border border-white/20 bg-white/[0.04] pl-4 pr-5 text-white/75"
+      >
+        <PlayLogo className="h-6 w-6" />
+        <span className="flex flex-col leading-none">
+          <span className="text-[11px] font-medium">Coming soon</span>
+          <span className="mt-0.5 text-xl font-semibold tracking-tight">Android</span>
+        </span>
+      </span>
+    </div>
   );
 }
 
@@ -226,7 +265,7 @@ export default function StartPage() {
               Novara turns people you meet into contacts you keep.
             </p>
             <div ref={heroCtaRef} className="mt-8 flex flex-col items-start gap-3">
-              <DownloadButton platform={platform} where="hero" />
+              <StoreBadges platform={platform} />
               <FinePrint platform={platform} />
             </div>
           </div>
