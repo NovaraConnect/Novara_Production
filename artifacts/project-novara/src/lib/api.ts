@@ -311,6 +311,32 @@ export async function enrichContact(
   return res.json();
 }
 
+// ── Suggested message ────────────────────────────────────────────────────────
+
+/** Hard ceiling on a reach-out message; the server enforces the same. */
+export const MAX_MESSAGE_LENGTH = 500;
+
+export interface SuggestedMessage {
+  subject: string;
+  message: string;
+  source: "ai" | "template";
+}
+
+/** One draft reach-out message for a contact, usable by text, email, or
+ *  LinkedIn, with a subject for email. The server always answers with a
+ *  draft (AI when available, else a template); nothing is ever sent. */
+export async function fetchSuggestedMessage(
+  getToken: GetAuthToken,
+  id: string,
+  body: { headline?: string },
+): Promise<SuggestedMessage> {
+  const res = await apiFetch(getToken, `/api/contacts/${id}/suggested-message`, { method: "POST", json: body });
+  if (res.status === 401) throw new Error("Unauthorized");
+  if (res.status === 429) throw new Error("Too many drafts in a row. Try again in a minute.");
+  if (!res.ok) throw new Error("Couldn't draft a message right now.");
+  return res.json();
+}
+
 // ── Contact photos ───────────────────────────────────────────────────────────
 
 async function contactFromResponse(res: Response, fallback: string): Promise<Contact> {

@@ -166,6 +166,7 @@ const REEL = [
   { src: shot("dashboard"), line: "See who needs you today" },
   { src: shot("contact"), line: "Priorities that follow your goals" },
   { src: shot("conversation-starters"), line: "Always something to say" },
+  { src: shot("suggested-message"), line: "A message ready to send" },
   { src: shot("add-card"), line: "Add anyone in seconds" },
 ];
 const REEL_MS = 2800;
@@ -212,7 +213,7 @@ function PhoneReel() {
 
 const PROOF = [
   { src: shot("dashboard"), title: "Know who to reach out to", body: "Overdue and upcoming, ranked by what matters to you." },
-  { src: shot("conversation-starters"), title: "Never send “just checking in”", body: "Fresh news on their company, every day." },
+  { src: shot("suggested-message"), title: "Never send “just checking in”", body: "A personal draft for every follow-up, ready to send." },
   { src: shot("add-card"), title: "Add someone in seconds", body: "Snap a business card or a LinkedIn screenshot." },
 ];
 

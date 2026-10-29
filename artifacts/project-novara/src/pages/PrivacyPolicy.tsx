@@ -9,7 +9,7 @@
 // EVERY CLAIM HERE WAS READ OUT OF THE IMPLEMENTATION, not assumed:
 //   • tables and columns        api-server/tests/schema.sql
 //   • account deletion          api-server/src/routes/account.ts
-//   • AI providers and payload  api-server/src/lib/{enrich,cardAiParse,linkedinAiParse}.ts
+//   • AI providers and payload  api-server/src/lib/{enrich,cardAiParse,linkedinAiParse,suggestedMessage}.ts
 //   • news lookups             api-server/src/routes/news.ts
 //   • feedback email            api-server/src/lib/email.ts
 //   • analytics                 index.html + App.tsx (PostHogIdentifier)
@@ -22,7 +22,7 @@ import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
 
 /** The date the text below was last materially changed. */
-const LAST_UPDATED = "19 September 2026";
+const LAST_UPDATED = "29 October 2026";
 
 /** Where privacy questions go. Also Novara's VAPID subject address. */
 const CONTACT_EMAIL = "hello@novaraconnect.group";
@@ -104,7 +104,8 @@ export default function PrivacyPolicy() {
             </strong>{" "}
             For each person you save, Novara stores what you enter: first and
             last name, company, job title, email address, phone number, LinkedIn
-            URL, where you met, your private notes, interests, and the
+            URL, where you met, their birthday (month and day), your private
+            notes, interests, and the
             scheduling fields Novara uses to time reminders (importance,
             priority, follow-up cadence, and the dates of first contact, last
             interaction and next follow-up).
@@ -170,7 +171,7 @@ export default function PrivacyPolicy() {
           <p>
             Some Novara features use an AI provider — Google (Gemini) or
             Anthropic (Claude) — to turn unstructured text into structured
-            fields. <strong className="text-foreground">Text only is ever sent. Images never are.</strong>
+            fields, or to draft a message for you to review. <strong className="text-foreground">Text only is ever sent. Images never are.</strong>
           </p>
           <Bullets
             items={[
@@ -193,6 +194,17 @@ export default function PrivacyPolicy() {
                 can suggest a priority level and infer the contact's industry.
                 This means your notes about a person may be processed by that
                 provider.
+              </>,
+              <>
+                <strong className="text-foreground">Suggested messages.</strong>{" "}
+                When you ask Novara to draft a message to a contact, it sends
+                that contact&apos;s first name, company and role, where you met,
+                roughly when you met and last spoke, whether their birthday is
+                coming up, a recent headline about their company, and your
+                notes about them, together with your career statement and
+                goals. Their last name, email address and phone number are not
+                sent. The draft is shown to you to edit, and Novara never sends
+                it for you.
               </>,
             ]}
           />

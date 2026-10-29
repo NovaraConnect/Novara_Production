@@ -156,6 +156,11 @@ const SCREENS = [
     caption: "Recent news about a contact’s company, refreshed daily, so every check-in has something to say.",
   },
   {
+    src: shot("suggested-message"),
+    title: "Suggested messages",
+    caption: "A ready-to-send draft for every follow-up, written from how you met, your notes and your goals. Edit it, then open Messages or Mail prefilled. Novara never sends for you.",
+  },
+  {
     src: shot("add-card"),
     title: "Scan a business card",
     caption: "Novara finds the card’s edges and fills in the details.",
@@ -186,7 +191,7 @@ const STEPS = [
   {
     icon: Newspaper,
     title: "Reach out with something to say",
-    body: "Recent news about a contact’s company becomes a conversation starter, so a check-in never has to be “just checking in”.",
+    body: "Recent news about a contact’s company and a ready-to-send draft from your notes, so a check-in never has to be “just checking in”.",
   },
 ];
 
@@ -214,6 +219,7 @@ const PRO_FEATURES = [
   "Follow-up scheduling and reminders",
   "Card, QR, LinkedIn and iPhone Contacts import",
   "Company news as conversation starters",
+  "Suggested messages for every follow-up",
   "Export your data at any time",
 ];
 

@@ -151,6 +151,13 @@ async function hasBirthdayColumn(): Promise<boolean> {
   return rows.length > 0;
 }
 
+async function hasMarkedContactedColumn(): Promise<boolean> {
+  const { rows } = await pool.query(
+    "SELECT 1 FROM information_schema.columns WHERE table_name = 'contacts' AND column_name = 'marked_contacted_at'",
+  );
+  return rows.length > 0;
+}
+
 async function applyBirthday<T extends { id: string }>(contact: T, value: string | null | undefined, userId: string): Promise<T> {
   if (value === undefined || !(await hasBirthdayColumn())) return contact;
   const { rows } = await pool.query(
@@ -575,6 +582,15 @@ router.post("/contacts/:id/mark-contacted", requireAuth, async (req: Request, re
     if (!contact) {
       res.status(404).json({ error: "Contact not found" });
       return;
+    }
+    // Remember that a reach-out happened (migration 0011), so the next
+    // suggested message is a personalized follow-up even when you met and
+    // messaged them on the same day.
+    if (await hasMarkedContactedColumn()) {
+      await pool.query(
+        "UPDATE contacts SET marked_contacted_at = NOW() WHERE id = $1 AND user_id = $2",
+        [id, userId],
+      );
     }
     res.json(dbToContact(contact));
   } catch (err) {

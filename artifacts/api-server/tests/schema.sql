@@ -36,6 +36,7 @@ phone text,
 preferred_contact_method text,
 photo text,
 birthday text,
+marked_contacted_at timestamptz,
 created_at timestamptz NOT NULL DEFAULT now(),
 updated_at timestamptz NOT NULL DEFAULT now()
 );

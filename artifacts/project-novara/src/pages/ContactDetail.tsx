@@ -5,6 +5,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { ContactPhotoEditor } from "@/components/ContactPhotoEditor";
 import { formatBirthday } from "@/components/BirthdayInput";
 import { ImportanceBadge } from "@/components/ImportanceBadge";
+import { SuggestedMessage } from "@/components/SuggestedMessage";
 import {
   ArrowLeft, Edit2, Trash2, Linkedin, MapPin, AlignLeft, CalendarDays, Cake,
   CheckCircle2, Bell, CalendarPlus, ExternalLink, Newspaper, Loader2, RefreshCw,
@@ -191,6 +192,8 @@ export default function ContactDetail() {
     toast.success("Test reminder sent");
   };
 
+  const newsHasHeadlines = newsStatus === "ok" || newsStatus === "stale" || (newsStatus === "timeout" && headlines.length > 0);
+
   const hasProfile = contact.industry || contact.function || (contact.interests && contact.interests.length > 0);
 
   return (
@@ -308,6 +311,13 @@ export default function ContactDetail() {
           </Button>
           {renderContactNow()}
         </div>
+
+        <SuggestedMessage
+          key={contact.id}
+          contact={contact}
+          headline={newsHasHeadlines ? headlines[0]?.title : undefined}
+          onSent={promptMarkContacted}
+        />
 
         {/* Calendar + Notifications row */}
         <div className="grid grid-cols-2 gap-3 mb-8">

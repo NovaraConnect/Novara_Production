@@ -74,9 +74,25 @@ supplied, that value is used verbatim; otherwise priority is recomputed.
 `404` if not found/not owned, else `{ success: true }`.
 
 ### `POST /api/contacts/:id/mark-contacted`
-No request body. Sets `last_interaction_date = CURRENT_DATE` and recomputes
+No request body. Sets `last_interaction_date = CURRENT_DATE` (and `marked_contacted_at = NOW()`
+once migration 0011 is applied) and recomputes
 `next_follow_up_date` — see `05-Business-Rules.md` for the exact auto-downgrade logic this
 implements.
+
+### `POST /api/contacts/:id/suggested-message`
+- **Request:** `{ headline?: string }` — optionally the top company headline the client is
+  already showing (≤300 chars). No channel: one draft serves text, email and LinkedIn.
+- **Response `200`:** `{ subject, message, source: "ai" | "template" }`. `message` is never over
+  500 characters; `subject` is used only when the user sends by email.
+- **Stage:** the first reach-out after meeting (`marked_contacted_at` unset and no interaction
+  logged after `first_contact_date`) may be very short. Every later draft must use at least one real profile detail (role, company,
+  headline, notes, goals); an AI draft that doesn't is replaced by the template, which always does.
+  Always a draft, never an error for AI trouble: the template is served when the AI is off,
+  the user has no active subscription or trial, a daily cap is reached (5 AI drafts per
+  contact, 40 per user, in memory), or the AI output fails validation (length, sentence count,
+  emojis, links, placeholders, slang, unprofessional form, numbers not in the input).
+- `404` if the contact isn't the caller's. Rate-limited to 20 requests/minute. Logs metadata only
+  (`lib/suggestedMessage.ts`); nothing is ever sent from the server.
 
 ### `POST /api/contacts/import`
 - **Request:** `{ contacts: object[] }` — a bulk import path explicitly for migrating contacts

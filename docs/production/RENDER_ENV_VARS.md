@@ -59,3 +59,21 @@ a graceful `{ ok:false, reason:"ai_disabled" }`.
 > trains on submitted content). Use **Anthropic** or a **paid / no-training
 > Gemini** project where submitted content is not used to improve Google
 > products. The endpoint never logs the OCR text or parsed fields.
+
+## Optional — Suggested message (`novara-prod-api`)
+
+Nothing to set: `POST /api/contacts/:id/suggested-message` reuses the provider and key above
+(`CARD_AI_PROVIDER`, else `LINKEDIN_AI_PROVIDER`). With neither set it serves a deterministic
+template draft, so the feature always works.
+
+| Variable | Value | Notes |
+|---|---|---|
+| `SUGGESTED_MESSAGE_AI` | `off` | Optional kill switch for the AI draft (template only). |
+| `SUGGESTED_MESSAGE_PROVIDER` | `anthropic` \| `gemini` | Optional override of the inherited provider. |
+| `SUGGESTED_MESSAGE_ANTHROPIC_MODEL` | `claude-haiku-4-5` | Optional model override. |
+
+> **Cost:** AI drafts only for active subscriptions/trials, capped at 5 per contact and 40 per
+> user per day (then the template). At Haiku pricing a draft is about $0.002.
+>
+> ⚠️ **Privacy:** the prompt includes the user's notes about the contact (first name only — never
+> last name, email or phone). The same rule applies: **no Gemini free tier**.

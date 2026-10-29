@@ -68,3 +68,21 @@ export function openContactMethod(contact: Contact, method: ContactMethod): bool
   }
   return true;
 }
+
+// ── Suggested message: prefilled drafts ─────────────────────────────────────
+// Same "never auto-send" rule: these only open the compose screen with the
+// draft filled in; the user still taps send in Messages / Mail.
+
+/** Compose URL with the draft prefilled, or null when the method can't carry
+ *  a body (LinkedIn has no compose link — the draft is copied instead).
+ *  `sms:NUMBER?&body=` is the form both iOS Messages and Android accept. */
+export function draftHref(contact: Contact, method: ContactMethod, body: string, subject = ""): string | null {
+  const href = methodHref(contact, method);
+  if (!href) return null;
+  if (method === "text") return `${href}?&body=${encodeURIComponent(body)}`;
+  if (method === "email") {
+    const params = [subject.trim() && `subject=${encodeURIComponent(subject.trim())}`, `body=${encodeURIComponent(body)}`];
+    return `${href}?${params.filter(Boolean).join("&")}`;
+  }
+  return null;
+}
