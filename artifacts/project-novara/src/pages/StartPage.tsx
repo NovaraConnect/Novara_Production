@@ -111,9 +111,11 @@ const ANDROID_SIZE = "h-14 w-[164px] px-3.5 sm:w-[176px]";
 
 function BadgeText({ small, big }: { small: string; big: string }) {
   return (
-    <span className="flex min-w-0 flex-col leading-none">
-      <span className="text-[11px] font-semibold">{small}</span>
-      <span className="mt-1 text-lg font-semibold tracking-tight sm:text-xl">{big}</span>
+    // Each line sets its own leading: text-lg / text-xl bring a tall default
+    // line height that would otherwise push the two lines apart.
+    <span className="flex min-w-0 flex-col">
+      <span className="text-[11px] font-semibold leading-[13px]">{small}</span>
+      <span className="text-lg font-semibold leading-[22px] tracking-tight sm:text-xl sm:leading-6">{big}</span>
     </span>
   );
 }
@@ -281,7 +283,7 @@ export default function StartPage() {
             <p className="mt-5 max-w-lg text-xl leading-relaxed text-[#C4CEDD] sm:text-2xl">
               Novara turns people you meet into contacts you keep.
             </p>
-            <div ref={heroCtaRef} className="mt-6 flex flex-col items-start gap-3">
+            <div ref={heroCtaRef} className="mt-8 flex flex-col items-start gap-3">
               <StoreBadges platform={platform} />
               <FinePrint platform={platform} />
             </div>
