@@ -281,7 +281,7 @@ export default function StartPage() {
             <p className="mt-5 max-w-lg text-xl leading-relaxed text-[#C4CEDD] sm:text-2xl">
               Novara turns people you meet into contacts you keep.
             </p>
-            <div ref={heroCtaRef} className="mt-8 flex flex-col items-start gap-3">
+            <div ref={heroCtaRef} className="mt-6 flex flex-col items-start gap-3">
               <StoreBadges platform={platform} />
               <FinePrint platform={platform} />
             </div>
@@ -315,7 +315,7 @@ export default function StartPage() {
                 key={p.title}
                 className="flex w-[64vw] max-w-[260px] shrink-0 snap-center flex-col items-center text-center md:w-auto md:max-w-none"
               >
-                <PhoneFrame src={p.src} alt={p.title} className="w-[170px] md:w-[200px]" />
+                <PhoneFrame src={p.src} alt={p.title} size="sm" className="w-[170px] md:w-[200px]" />
                 <p className="mt-6 font-serif text-xl font-bold">{p.title}</p>
                 <p className="mt-1.5 text-[#5B6272]">{p.body}</p>
               </div>
@@ -366,7 +366,7 @@ export default function StartPage() {
           <div className="flex items-center gap-3">
             <NovaraMark size={36} />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold leading-tight">Novara</p>
+              <p className="text-sm font-bold leading-tight">Novara Connect</p>
               <p className="truncate text-xs text-[#5B6272]">7 days free</p>
             </div>
             <a
