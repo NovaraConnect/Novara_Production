@@ -22,8 +22,10 @@ describe("POST /api/contacts/:id/suggested-message", () => {
     expect(res.body.message).not.toContain("Raman");
   });
 
-  it("uses a headline from the client", async () => {
-    const { body: created } = await request(app).post("/api/contacts").set(authHeaders(USER)).send(base);
+  it("personalizes a follow-up with a headline from the client", async () => {
+    // Spoke after the day they met → a follow-up, which must be personalized.
+    const { body: created } = await request(app).post("/api/contacts").set(authHeaders(USER))
+      .send({ ...base, firstContactDate: "2026-09-01", lastInteractionDate: "2026-10-01" });
     const res = await request(app).post(`/api/contacts/${created.id}/suggested-message`).set(authHeaders(USER))
       .send({ headline: "Northwind Labs opens a Denver office" });
     expect(res.status).toBe(200);

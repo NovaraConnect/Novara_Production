@@ -81,8 +81,11 @@ implements.
 ### `POST /api/contacts/:id/suggested-message`
 - **Request:** `{ headline?: string }` — optionally the top company headline the client is
   already showing (≤300 chars). No channel: one draft serves text, email and LinkedIn.
-- **Response `200`:** `{ subject, message, source: "ai" | "template" }`. `message` is 2–4
-  sentences and never over 500 characters; `subject` is used only when the user sends by email.
+- **Response `200`:** `{ subject, message, source: "ai" | "template" }`. `message` is never over
+  500 characters; `subject` is used only when the user sends by email.
+- **Stage:** the first reach-out after meeting (no interaction logged after `first_contact_date`)
+  may be very short. Every later draft must use at least one real profile detail (role, company,
+  headline, notes, goals); an AI draft that doesn't is replaced by the template, which always does.
   Always a draft, never an error for AI trouble: the template is served when the AI is off,
   the user has no active subscription or trial, a daily cap is reached (5 AI drafts per
   contact, 40 per user, in memory), or the AI output fails validation (length, sentence count,

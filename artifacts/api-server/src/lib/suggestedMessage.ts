@@ -9,6 +9,11 @@
 // spoke, notes, role/company, a company headline the client already shows, an
 // upcoming birthday) plus the user's career goals.
 //
+// STAGE: the first reach-out after meeting someone may be very short. Once
+// you've been in touch since (an interaction logged after the day you met),
+// every draft must use at least one real detail from their profile; the
+// validator rejects follow-ups that don't, and the template always has one.
+//
 // TONE: every draft must be grammatically correct, professional, and
 // respectful. The prompt asks for that, validateDraft() enforces it, and the
 // template is held to the same checks in tests.
@@ -187,6 +192,37 @@ function firstGoal(input: SuggestionInput): string {
   return goal ?? "";
 }
 
+/** True until an interaction is logged after the day you met: a new
+ *  contact's "last spoke" starts equal to "first met", and Mark contacted
+ *  moves it later. Exported for tests. */
+export function isFirstReachOut(input: SuggestionInput): boolean {
+  const first = parseDay(input.firstContactDate);
+  const last = parseDay(input.lastInteractionDate);
+  return first === null || last === null || last <= first;
+}
+
+const STOPWORDS = new Set([
+  "about", "after", "again", "their", "there", "these", "those", "which", "while", "would", "could",
+  "should", "where", "being", "other", "really", "great", "thing", "things", "people", "today",
+  "during", "before", "through", "since", "until", "still", "maybe", "might", "every", "first",
+]);
+
+/** Distinctive words from the profile a personalized message could use. */
+function profileTerms(input: SuggestionInput): Set<string> {
+  const text = [input.company, input.role, input.metAt, input.headline, input.notes, ...(input.careerGoals ?? [])]
+    .filter(Boolean).join(" ").toLowerCase();
+  const name = clean(input.firstName).toLowerCase();
+  return new Set((text.match(/[a-z][a-z'-]{3,}/g) ?? []).filter((w) => w.length >= 4 && w !== name && !STOPWORDS.has(w)));
+}
+
+/** Does the message use at least one detail from the profile? Profiles with
+ *  nothing to draw on pass, so a sparse contact still gets a draft. */
+export function usesProfileDetail(message: string, input: SuggestionInput): boolean {
+  const terms = profileTerms(input);
+  if (terms.size === 0) return true;
+  return (message.toLowerCase().match(/[a-z][a-z'-]{3,}/g) ?? []).some((w) => terms.has(w));
+}
+
 function capitalized(name: string): string {
   return name ? name.charAt(0).toUpperCase() + name.slice(1) : name;
 }
@@ -199,7 +235,11 @@ const SYSTEM_PROMPT =
   `Write in the user's voice, first person: warm, professional, and respectful — like a thoughtful professional, not a template and not salesy.\n` +
   `Use correct grammar, spelling, capitalization, and punctuation in complete sentences. No slang, text-speak, abbreviations, or overly casual phrasing ("hey", "gonna", "grab a coffee").\n` +
   `Rules:\n` +
-  `- 2 to 4 sentences and at most ${MAX_MESSAGE_LENGTH} characters in total.\n` +
+  `- At most ${MAX_MESSAGE_LENGTH} characters in total. Length depends on STAGE:\n` +
+  `  - FIRST REACH-OUT (first message since meeting): short and simple is best — 2 sentences is fine. Refer to where you met if known.\n` +
+  `  - FOLLOW-UP (you have been in touch before): 2 to 4 sentences that MUST be personalized with at least one specific, ` +
+  `relevant detail from the input (their role or company, a company headline, something from the notes, a shared interest, ` +
+  `or a goal of mine that relates to their work). A generic check-in is not acceptable.\n` +
   `- Start with "Hi <first name>," (or "Happy birthday, <first name>." if their birthday is today).\n` +
   `- Be respectful of their time: no pressure, no flattery, nothing presumptuous or overly familiar.\n` +
   `- Use ONLY facts given in the input. NEVER invent events, dates, numbers, shared history, or details about the company.\n` +
@@ -226,6 +266,7 @@ export function buildPrompt(input: SuggestionInput, today: Date): string {
         : `in ${bday} day${bday === 1 ? "" : "s"}`;
 
   return (
+    `STAGE: ${isFirstReachOut(input) ? "FIRST REACH-OUT" : "FOLLOW-UP"}\n\n` +
     "CONTACT\n" +
     `- First name: ${capitalized(clean(input.firstName, 60)) || "(unknown)"}\n` +
     `- Role: ${clean(input.role) || "(unknown)"}\n` +
@@ -299,19 +340,31 @@ export function validateSubject(value: unknown, prompt: string): string | null {
 
 /** The AI draft if its message validates. A bad subject alone doesn't throw
  *  away a good message — it's swapped for the template subject. */
-export function validateDraft(raw: unknown, prompt: string, fallbackSubject: string): Draft | null {
+export function validateDraft(
+  raw: unknown,
+  prompt: string,
+  fallbackSubject: string,
+  input?: SuggestionInput,
+): Draft | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
   const message = validateMessage(o["message"], prompt);
   if (!message) return null;
+  // Follow-ups must be personalized; a generic one falls back to the
+  // template, which always is.
+  if (input && !isFirstReachOut(input) && !usesProfileDetail(message, input)) return null;
   return { message, subject: validateSubject(o["subject"], prompt) ?? fallbackSubject };
 }
 
 // ── deterministic template ───────────────────────────────────────────────────
 
 /** Always-available draft from the same fields. Exported for tests. Uses no
- *  free text it can't phrase safely — notes are left out on purpose. Optional
- *  sentences are dropped, least important first, to stay under the cap. */
+ *  free text it can't phrase safely — notes are left out on purpose.
+ *
+ *  First reach-out: short — where you met and a simple ask. Follow-up: always
+ *  personalized with the company news or their role/company, plus a related
+ *  goal when there is one; optional sentences are dropped, least important
+ *  first, to stay under the cap. */
 export function templateDraft(input: SuggestionInput, today: Date): Draft {
   const name = capitalized(clean(input.firstName, 60)) || "there";
   const company = clean(input.company, 80);
@@ -321,17 +374,27 @@ export function templateDraft(input: SuggestionInput, today: Date): Draft {
   const goal = firstGoal(input).replace(/[.!?]+$/, "");
   const lastSpoke = daysSince(input.lastInteractionDate, today);
   const birthdayToday = daysUntilBirthday(input.birthday, today) === 0;
-  const recentMeeting = !!metAt && (lastSpoke === null || lastSpoke < 60);
   const longGap = lastSpoke !== null && lastSpoke >= 60;
+  const close = "If you are open to it, I would appreciate a brief call or coffee in the coming weeks.";
+
+  if (isFirstReachOut(input)) {
+    const where = metAt ? ` at ${metAt}` : "";
+    const opening = birthdayToday
+      ? `Happy birthday, ${name}. I hope you have a wonderful day.`
+      : longGap
+        ? `Hi ${name}, I hope you are doing well. It has been a while since we met${where}.`
+        : `Hi ${name}, it was a pleasure meeting you${where}.`;
+    const subject = birthdayToday
+      ? "Happy birthday"
+      : metAt && metAt.length <= 45 ? `Following up from ${metAt}` : "Following up on our introduction";
+    return { subject, message: `${opening} I would welcome the chance to stay in touch, and I hope we can talk again soon.` };
+  }
 
   let opening: string;
   let subject: string;
   if (birthdayToday) {
     opening = `Happy birthday, ${name}. I hope you have a wonderful day.`;
     subject = "Happy birthday";
-  } else if (recentMeeting) {
-    opening = `Hi ${name}, it was a pleasure meeting you at ${metAt}.`;
-    subject = metAt.length <= 45 ? `Following up from ${metAt}` : "Following up on our conversation";
   } else if (longGap) {
     opening = `Hi ${name}, I hope you are doing well. It has been a while since we last spoke.`;
     subject = "Reconnecting";
@@ -340,28 +403,32 @@ export function templateDraft(input: SuggestionInput, today: Date): Draft {
     subject = headline && company ? `Recent news at ${company}` : "Checking in";
   }
 
-  // Middle sentences in order of preference; each has a shorter fallback (or
-  // none) used when the full draft would pass the cap.
+  // Middle sentences in order of preference; each has a shorter fallback used
+  // when the full draft would pass the cap. The company line is the one
+  // detail always kept, so a follow-up is never generic.
   const news = headline && company
     ? [`I read the recent news about ${company} ("${headline}") and thought of you.`, `I read the recent news about ${company} and thought of you.`]
     : null;
   const work = !news && company
-    ? [role
-      ? `I would welcome the chance to hear how things are going in your role as ${role} at ${company}.`
-      : `I would welcome the chance to hear how things are going at ${company}.`]
+    ? [
+      role
+        ? `I would welcome the chance to hear how things are going in your role as ${role} at ${company}.`
+        : `I would welcome the chance to hear how things are going at ${company}.`,
+      `I would welcome the chance to hear how things are going at ${company}.`,
+    ]
     : null;
   const goalLine = goal
     ? [`I am currently working toward a goal related to your field (${goal}), and I would value your perspective.`]
     : null;
-  const close = "If you are open to it, I would appreciate a brief call or coffee in the coming weeks.";
 
-  const options = [news, work, goalLine].filter((o): o is string[] => !!o);
+  const options = [news ?? work, goalLine].filter((o): o is string[] => !!o);
   const chosen = options.map((o) => o[0]);
   const build = () => [opening, ...chosen.filter(Boolean), close].join(" ");
-  // Shrink from the least important sentence (last) backwards.
+  // Shrink from the least important sentence (last) backwards; the first
+  // (the company detail) only ever shrinks to its short form.
   for (let i = options.length - 1; i >= 0 && build().length > MAX_MESSAGE_LENGTH; i--) {
     chosen[i] = options[i][1] ?? "";
-    if (build().length > MAX_MESSAGE_LENGTH) chosen[i] = "";
+    if (build().length > MAX_MESSAGE_LENGTH && i > 0) chosen[i] = "";
   }
   return { subject, message: build() };
 }
@@ -425,7 +492,7 @@ export async function suggestMessageWith(
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const raw = await complete(SYSTEM_PROMPT, prompt, controller.signal);
-    const draft = raw ? validateDraft(extractJson(raw), prompt, template.subject) : null;
+    const draft = raw ? validateDraft(extractJson(raw), prompt, template.subject, input) : null;
     return draft ? { ...draft, source: "ai" } : fallback;
   } catch (err) {
     // The provider's own error shape only — never the prompt or notes.

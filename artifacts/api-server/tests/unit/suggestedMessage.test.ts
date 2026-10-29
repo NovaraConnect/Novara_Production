@@ -10,6 +10,8 @@ import {
   isSuggestedMessageAiEnabled,
   activeMessageProvider,
   daysUntilBirthday,
+  isFirstReachOut,
+  usesProfileDetail,
   DraftBudget,
   MAX_MESSAGE_LENGTH,
   type SuggestionInput,
@@ -160,12 +162,58 @@ describe("validateSubject", () => {
   });
 });
 
+// BASE has an interaction logged after the day they met, so it's a follow-up.
+const FIRST: SuggestionInput = { ...BASE, firstContactDate: "2026-10-25", lastInteractionDate: "2026-10-25" };
+
+describe("isFirstReachOut", () => {
+  it("is true until an interaction is logged after the day you met", () => {
+    expect(isFirstReachOut(FIRST)).toBe(true);
+    expect(isFirstReachOut({ firstName: "Sam" })).toBe(true);
+    expect(isFirstReachOut(BASE)).toBe(false);
+  });
+
+  it("tells the model which stage it is drafting for", () => {
+    expect(buildPrompt(FIRST, TODAY)).toMatch(/^STAGE: FIRST REACH-OUT/);
+    expect(buildPrompt(BASE, TODAY)).toMatch(/^STAGE: FOLLOW-UP/);
+  });
+});
+
+describe("follow-ups must be personalized", () => {
+  const generic = "Hi Priya, I hope you are doing well. Would you be open to catching up soon?";
+
+  it("detects whether a profile detail is used", () => {
+    expect(usesProfileDetail(generic, BASE)).toBe(false);
+    expect(usesProfileDetail("Hi Priya, I hope things are going well at Northwind. Coffee soon?", BASE)).toBe(true);
+    expect(usesProfileDetail("Hi Priya, how was the trail running season? Coffee soon?", BASE)).toBe(true); // from notes
+    expect(usesProfileDetail(generic, { firstName: "Priya" })).toBe(true); // nothing to draw on
+  });
+
+  it("rejects a generic AI follow-up but accepts a short first reach-out", () => {
+    const raw = { subject: "Checking in", message: generic };
+    expect(validateDraft(raw, buildPrompt(BASE, TODAY), "Checking in", BASE)).toBeNull();
+    expect(validateDraft(raw, buildPrompt(FIRST, TODAY), "Checking in", FIRST)).not.toBeNull();
+  });
+
+  it("falls back to the personalized template when the AI follow-up is generic", async () => {
+    const r = await suggestMessageWith(BASE, async () => JSON.stringify({ subject: "Checking in", message: generic }), TODAY);
+    expect(r.source).toBe("template");
+    expect(r.message).toContain("Northwind Labs");
+  });
+});
+
 describe("templateDraft — deterministic fallback", () => {
-  it("builds one draft from where you met, the news, the goal, and an ask", () => {
+  it("keeps the first reach-out after meeting short", () => {
+    expect(templateDraft(FIRST, TODAY)).toEqual({
+      subject: "Following up from the Austin product meetup",
+      message: "Hi Priya, it was a pleasure meeting you at the Austin product meetup. I would welcome the chance to stay in touch, and I hope we can talk again soon.",
+    });
+  });
+
+  it("personalizes a follow-up with the news, the goal, and an ask", () => {
     const d = templateDraft(BASE, TODAY);
-    expect(d.subject).toBe("Following up from the Austin product meetup");
+    expect(d.subject).toBe("Recent news at Northwind Labs");
     expect(d.message).toBe(
-      "Hi Priya, it was a pleasure meeting you at the Austin product meetup. " +
+      "Hi Priya, I hope you are doing well. " +
         'I read the recent news about Northwind Labs ("Northwind Labs opens a new office in Denver") and thought of you. ' +
         "I am currently working toward a goal related to your field (Land a product role at a growth-stage startup), and I would value your perspective. " +
         "If you are open to it, I would appreciate a brief call or coffee in the coming weeks.",
@@ -173,15 +221,15 @@ describe("templateDraft — deterministic fallback", () => {
     expect(d.message.length).toBeLessThanOrEqual(MAX_MESSAGE_LENGTH);
   });
 
-  it("drops optional sentences to stay under the cap", () => {
-    const d = templateDraft({
-      ...BASE,
-      metAt: "a".repeat(80),
-      headline: "h".repeat(200),
-      careerGoals: ["g".repeat(120)],
-    }, TODAY);
+  it("uses their role and company when there is no news", () => {
+    const d = templateDraft({ ...BASE, headline: null, careerGoals: [] }, TODAY);
+    expect(d.message).toContain("your role as Head of Growth at Northwind Labs");
+  });
+
+  it("drops optional sentences to stay under the cap but keeps the company detail", () => {
+    const d = templateDraft({ ...BASE, headline: "h".repeat(200), careerGoals: ["g".repeat(120)], role: "r".repeat(80) }, TODAY);
     expect(d.message.length).toBeLessThanOrEqual(MAX_MESSAGE_LENGTH);
-    expect(d.message).toMatch(/^Hi Priya, it was a pleasure meeting you/);
+    expect(d.message).toContain("Northwind Labs");
     expect(d.message).toMatch(/in the coming weeks\.$/);
   });
 
@@ -192,13 +240,9 @@ describe("templateDraft — deterministic fallback", () => {
   });
 
   it("acknowledges a long gap", () => {
-    const d = templateDraft({ ...BASE, lastInteractionDate: "2026-03-01" }, TODAY);
+    const d = templateDraft({ ...BASE, firstContactDate: "2025-12-01", lastInteractionDate: "2026-03-01" }, TODAY);
     expect(d.message).toMatch(/^Hi Priya, I hope you are doing well\. It has been a while since we last spoke\./);
     expect(d.subject).toBe("Reconnecting");
-  });
-
-  it("matches the subject to the news when that is the hook", () => {
-    expect(templateDraft({ ...BASE, metAt: null }, TODAY).subject).toBe("Recent news at Northwind Labs");
   });
 
   it("never uses the private notes", () => {
@@ -207,18 +251,22 @@ describe("templateDraft — deterministic fallback", () => {
 
   it("works with nothing but a first name, and capitalizes it", () => {
     expect(templateDraft({ firstName: "sam" }, TODAY)).toEqual({
-      subject: "Checking in",
-      message: "Hi Sam, I hope you are doing well. If you are open to it, I would appreciate a brief call or coffee in the coming weeks.",
+      subject: "Following up on our introduction",
+      message: "Hi Sam, it was a pleasure meeting you. I would welcome the chance to stay in touch, and I hope we can talk again soon.",
     });
   });
 
-  it("passes its own professionalism checks in every situation", () => {
-    for (const extra of [{}, { birthday: "--10-29" }, { lastInteractionDate: "2026-01-01" }, { headline: null }, { metAt: null }, { company: null }]) {
-      const input = { ...BASE, ...extra };
-      const d = templateDraft(input, TODAY);
-      const prompt = buildPrompt(input, TODAY);
-      expect(validateMessage(d.message, prompt), d.message).toBe(d.message);
-      expect(validateSubject(d.subject, prompt), d.subject).toBe(d.subject);
+  it("passes its own professionalism and personalization checks in every situation", () => {
+    const cases = [{}, { birthday: "--10-29" }, { firstContactDate: "2025-12-01", lastInteractionDate: "2026-01-01" }, { headline: null }, { metAt: null }, { careerGoals: [] }];
+    for (const base of [BASE, FIRST]) {
+      for (const extra of cases) {
+        const input = { ...base, ...extra };
+        const d = templateDraft(input, TODAY);
+        const prompt = buildPrompt(input, TODAY);
+        expect(validateMessage(d.message, prompt), d.message).toBe(d.message);
+        expect(validateSubject(d.subject, prompt), d.subject).toBe(d.subject);
+        expect(validateDraft(d, prompt, "x", input), d.message).not.toBeNull();
+      }
     }
   });
 });
