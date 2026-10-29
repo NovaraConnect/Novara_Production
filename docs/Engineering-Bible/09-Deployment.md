@@ -84,16 +84,25 @@ has never been gated by CI's pass/fail state — a red CI run does not block a b
 
 ## Deploy process (as configured)
 
-Render's GitHub integration auto-deploys both services on every push to `main` — this is Render's
-own platform behavior, not something configured in this repository's files beyond having the
-services connected to the GitHub repo in Render's dashboard. There is no staging environment;
-`render.yaml` and the two services above point at what appears to be a single production
-environment.
+The two production services deploy differently (checked in Render on 2026-10-29):
+
+| Service | Auto-deploy | After a merge to `main` |
+|---|---|---|
+| `novara-prod-web` (static site) | **On**, on every commit to `main` | Deploys by itself. |
+| `novara-prod-api` (web service) | **Off** | Stays on the old code until someone clicks **Manual Deploy → Deploy latest commit** in Render (or triggers it through the Render API). |
+
+So any merge that changes `artifacts/api-server` needs a manual API deploy, or the new web app
+will call endpoints the live API doesn't have yet. Apply any migration the change needs first,
+then deploy the API. To confirm the new code is live, request a new authenticated endpoint
+without signing in: it answers `401` once deployed and `404` before.
+
+There is no staging environment. `render.yaml` describes legacy services and must not be used
+for deployment.
 
 ## Rollback
 
-Per `INCIDENT_RESPONSE.md`: revert the offending commit(s) on `main` and let auto-deploy redeploy
-the reverted state, or use Render's dashboard to manually redeploy a previously-successful build if
+Per `INCIDENT_RESPONSE.md`: revert the offending commit(s) on `main`; the web app redeploys by
+itself, and the API needs a manual deploy of the reverted commit, or use Render's dashboard to manually redeploy a previously-successful build if
 one is still cached. No blue/green or canary deployment mechanism exists — a new deploy replaces
 the running instance directly.
 

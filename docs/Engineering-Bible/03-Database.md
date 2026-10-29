@@ -4,7 +4,7 @@ See also: `diagrams/database-erd.mmd`.
 
 ## Overview
 
-> **Which Neon branch is live?** `production_clean` (`br-old-band-atl4jpg9`), NOT the branch named `production`. Verify before every migration — see `docs/production/NEON_SETUP.md`.
+> **Which Neon branch is live?** The `production` branch (`br-cool-waterfall-b4n0gtja`) of the Neon project "novara restore" (`long-sun-85238559`), verified 2026-10-29. The older `production_clean` branch is no longer in use. Verify before every migration: see `docs/production/NEON_SETUP.md`.
 
 
 A single Neon (serverless Postgres) database. Four tables exist, per direct reading of

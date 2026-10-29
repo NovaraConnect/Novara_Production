@@ -4,38 +4,43 @@ Order matters: **Neon → Clerk → Backend → Frontend → Domains → Mobile.
 is independent of the pilot. Nothing here touches pilot services. Steps that hit a
 live external account are marked ⚠️ NEEDS APPROVAL — do not run without Cloe's go-ahead.
 
-> ## ⚠️ THE LIVE BRANCH IS `production_clean`, NOT `production`
+> ## ⚠️ THE LIVE DATABASE IS THE `production` BRANCH OF THE NEON PROJECT "novara restore"
 >
-> **Verified 2026-09-19 against the running production API.**
+> **Verified 2026-10-29**, when migration `0011_contact_marked_contacted_at.sql`
+> was applied.
 >
-> | Neon branch | ID | Status |
-> |---|---|---|
-> | **`production_clean`** | `br-old-band-atl4jpg9` | ✅ **LIVE** — this is what `novara-prod-api` connects to |
-> | `production` | `br-wandering-poetry-at9cqdyx` | ❌ **STALE** — flagged "Default" in the Neon UI, but unused |
+> | Neon project | Branch | ID | Status |
+> |---|---|---|---|
+> | **novara restore** (`long-sun-85238559`, created 2026-10-26) | **`production`** | `br-cool-waterfall-b4n0gtja` | ✅ **LIVE**: this is what `novara-prod-api` writes to |
+> | novara restore | `local-test-add-page`, `api-tests-throwaway`, `restore_test` | | Test branches. Never migrate these for production. |
 >
-> The plan below says to create a branch named `production`. That is **not**
-> what ended up being used. The branch name and Neon's "Default" flag are both
-> actively misleading here.
+> The production data was restored into a new Neon project on 2026-10-26. The
+> older project, with its `production_clean` (`br-old-band-atl4jpg9`) and stale
+> `production` (`br-wandering-poetry-at9cqdyx`) branches, no longer appears in
+> the Neon account. Earlier notes that call `production_clean` the live branch
+> are out of date.
 >
-> **How to tell them apart without guessing:**
-> - `production_clean` has **6 tables** including `apns_tokens` (migration 0002)
->   and `company_news_cache` (migration 0003), and holds real APNs device tokens.
-> - `production` has **4 tables**, no `apns_tokens`, and no live data.
+> **How it was identified.** It is the only project in the account. Its
+> `production` branch has all 9 tables, including `apns_tokens` (migration 0002)
+> and `company_news_cache` (migration 0003), holds a real APNs device token, and
+> had a contact edited by the app the same morning. The Render `DATABASE_URL`
+> itself was not read.
 >
-> **Before running ANY migration, verify the actual production connection —
-> never trust the branch name.** On 2026-09-19 migration
-> `0003_company_news_cache.sql` was applied to `production` by mistake; it was
-> only caught because the API kept logging
-> `company_news_cache table is missing` afterwards.
+> **Before running ANY migration, verify the actual production connection.
+> Never trust a branch name.** On 2026-09-19 migration
+> `0003_company_news_cache.sql` was applied to the wrong branch by mistake; it
+> was only caught because the API kept logging `company_news_cache table is
+> missing` afterwards.
 >
 > Recommended check before migrating:
-> 1. In the Neon SQL Editor, confirm the branch selector reads `production_clean`.
-> 2. Run `SELECT to_regclass('public.apns_tokens') IS NOT NULL;` — must be `t`.
-> 3. After migrating, confirm the Render API logs stop reporting the table as missing.
+> 1. Compare the host in `novara-prod-api`'s `DATABASE_URL` (Render → Environment)
+>    with the branch's endpoint host in Neon. They must match.
+> 2. On that branch, run `SELECT to_regclass('public.apns_tokens') IS NOT NULL;`.
+>    It must return `t`.
+> 3. After migrating, confirm the Render API logs show no "table is missing" or
+>    "column is missing" warnings.
 >
-> An empty, unused `company_news_cache` table remains on the stale `production`
-> branch from that mistake. It is harmless and is deliberately being left in
-> place for now. **Do not delete either branch.**
+> **Do not delete any branch** without checking with Cloé first.
 
 ## 0. GitHub (branch model)
 - Create branch `production` from this clean branch. Keep `main` as pilot.
@@ -57,6 +62,7 @@ custom domain, copy `pk_live_`/`sk_live_`, configure allowed origins.
 - Health check path: `/api/healthz`
 - Plan: **Starter or higher** (never free — cold starts break the notification cron).
 - Auto-Deploy: **OFF initially** (deploy manually until production is proven), then optionally ON for `production` only.
+  - **Current state (2026-10-29):** auto-deploy is still **OFF** for `novara-prod-api`, so every API change needs **Manual Deploy → Deploy latest commit** after it merges. `novara-prod-web` auto-deploys from `main`.
 - Env vars: the BACKEND block of `.env.production.example` / `RENDER_ENV_VARS.md`.
 - Suggested name: `novara-prod-api`.
 
