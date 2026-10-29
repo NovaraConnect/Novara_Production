@@ -10,6 +10,7 @@ import feedbackRouter from "./feedback";
 import featuresRouter from "./features";
 import parseCardRouter from "./parseCard";
 import parseLinkedInRouter from "./parseLinkedIn";
+import suggestedMessageRouter from "./suggestedMessage";
 import entitlementsRouter from "./entitlements";
 import revenuecatRouter from "./revenuecat";
 import storekitTestRouter from "./storekitTest";
@@ -27,6 +28,7 @@ router.use(feedbackRouter);
 router.use(featuresRouter);
 router.use(parseCardRouter);
 router.use(parseLinkedInRouter);
+router.use(suggestedMessageRouter);
 router.use(entitlementsRouter);
 router.use(revenuecatRouter);
 // Local development only; answers 404 everywhere else (see the file header).

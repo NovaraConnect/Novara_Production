@@ -311,6 +311,28 @@ export async function enrichContact(
   return res.json();
 }
 
+// ── Suggested message ────────────────────────────────────────────────────────
+
+export interface SuggestedMessage {
+  message: string;
+  source: "ai" | "template";
+  channel: "text" | "email" | "linkedin";
+}
+
+/** A draft reach-out message for one contact. The server always answers with
+ *  a draft (AI when configured, else a template); nothing is ever sent. */
+export async function fetchSuggestedMessage(
+  getToken: GetAuthToken,
+  id: string,
+  body: { channel?: SuggestedMessage["channel"]; headline?: string },
+): Promise<SuggestedMessage> {
+  const res = await apiFetch(getToken, `/api/contacts/${id}/suggested-message`, { method: "POST", json: body });
+  if (res.status === 401) throw new Error("Unauthorized");
+  if (res.status === 429) throw new Error("Too many drafts in a row. Try again in a minute.");
+  if (!res.ok) throw new Error("Couldn't draft a message right now.");
+  return res.json();
+}
+
 // ── Contact photos ───────────────────────────────────────────────────────────
 
 async function contactFromResponse(res: Response, fallback: string): Promise<Contact> {
