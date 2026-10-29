@@ -17,6 +17,11 @@ import { startHealthSnapshotScheduler } from "./lib/networkHealth";
 
 const app: Express = express();
 
+// Render sits in front of the API, so the client address is in
+// X-Forwarded-For. Without this every request looks like it comes from the
+// proxy and all users share one rate-limit bucket.
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,
@@ -61,7 +66,8 @@ app.use(
         callback(null, true);
         return;
       }
-      callback(new Error("Not allowed by CORS"));
+      // No CORS headers, so the browser blocks it; not a server error.
+      callback(null, false);
     },
   }),
   );

@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import rateLimit from "express-rate-limit";
 import { requireAuth } from "../middlewares/auth";
+import { requireSubscription } from "../middlewares/subscription";
 import {
   isLinkedInAiParseEnabled,
   activeLinkedInProvider,
@@ -23,7 +24,7 @@ const linkedinParseLimiter = rateLimit({
 // contacts LinkedIn. Best-effort: returns { ok:false, reason } (HTTP 200)
 // whenever AI is disabled/unusable so the client silently falls back to the
 // deterministic parser.
-router.post("/parse-linkedin-text", requireAuth, linkedinParseLimiter, async (req: Request, res: Response) => {
+router.post("/parse-linkedin-text", requireAuth, requireSubscription, linkedinParseLimiter, async (req: Request, res: Response) => {
   const text = typeof req.body?.text === "string" ? req.body.text : "";
   if (!text.trim() || text.length > 8000) {
     res.status(400).json({ error: "text is required (1..8000 chars)" });

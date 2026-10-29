@@ -62,7 +62,12 @@ export default defineConfig({
         ],
       },
       injectManifest: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // No HTML. A precached index.html made the service worker answer the
+        // first load after a deploy with the previous build, so the old UI
+        // showed until the next visit. Pages now always come from the server
+        // (Render revalidates them on every request); hashed assets stay
+        // precached.
+        globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"],
       },
     }),
   ],

@@ -129,9 +129,61 @@ describe("subscription required (one Pro plan, 7-day trial)", () => {
     const [first, second] = list.body;
     const edit = await request(app).put(`/api/contacts/${first.id}`).set(authHeaders(USER))
       .send({ ...person(0), firstName: "Edited" });
-    expect(edit.status).toBe(200);
+    expect(edit.status).toBe(403);
+    expect(edit.body.code).toBe("SUBSCRIPTION_REQUIRED");
     const del = await request(app).delete(`/api/contacts/${second.id}`).set(authHeaders(USER));
     expect(del.status).toBeLessThan(300);
+  });
+
+  // Every route that shows or works on contacts, or runs a paid AI call, as
+  // [method, path, body]. Listing and deleting are left open on purpose.
+  const gated = (id: string): [string, string, Record<string, unknown>?][] => [
+    ["get", `/api/contacts/${id}`],
+    ["put", `/api/contacts/${id}`, { ...person(0), firstName: "Edited" }],
+    ["put", `/api/contacts/${id}/photo`, { photo: "data:image/png;base64,AAAA" }],
+    ["post", `/api/contacts/${id}/mark-contacted`, {}],
+    ["post", `/api/contacts/${id}/suggested-message`, {}],
+    ["post", "/api/contacts/recalculate", {}],
+    ["post", "/api/parse-card-text", { text: "Jane Doe\nAcme" }],
+    ["post", "/api/parse-linkedin-text", { text: "Jane Doe\nEngineer at Acme" }],
+    ["get", "/api/company-news?company=Acme"],
+    ["get", "/api/network-health/trend"],
+  ];
+  const call = (method: string, path: string, body?: Record<string, unknown>) => {
+    const r = (request(app) as unknown as Record<string, (p: string) => request.Test>)[method](path).set(authHeaders(USER));
+    return body ? r.send(body) : r;
+  };
+
+  it("without a trial or Pro, the server refuses to show, edit or run AI on contacts", async () => {
+    requireSubscription(true);
+    await seedContacts(2);
+    const { rows: [{ id }] } = await pool.query("SELECT id FROM contacts WHERE user_id = $1 LIMIT 1", [USER]);
+
+    for (const [method, path, body] of gated(id)) {
+      const res = await call(method, path, body);
+      expect(res.status, `${method.toUpperCase()} ${path}`).toBe(403);
+      expect(res.body.code, `${method.toUpperCase()} ${path}`).toBe("SUBSCRIPTION_REQUIRED");
+    }
+
+    // Still open, so the data can be exported or removed.
+    expect((await request(app).get("/api/contacts").set(authHeaders(USER))).body).toHaveLength(2);
+    expect((await request(app).delete(`/api/contacts/${id}`).set(authHeaders(USER))).status).toBeLessThan(300);
+  });
+
+  it("during a trial, and before a subscription is required, none of those are refused", async () => {
+    await seedContacts(1);
+    const { rows: [{ id }] } = await pool.query("SELECT id FROM contacts WHERE user_id = $1 LIMIT 1", [USER]);
+    const notRefused = async () => {
+      for (const [method, path, body] of gated(id)) {
+        const res = await call(method, path, body);
+        expect(res.body?.code, `${method.toUpperCase()} ${path}`).not.toBe("SUBSCRIPTION_REQUIRED");
+      }
+    };
+
+    await notRefused(); // requirement off
+    requireSubscription(true);
+    await deliver(event());
+    await notRefused(); // trial
   });
 
   it("an expiry date in the past counts as expired even without an EXPIRATION event", async () => {

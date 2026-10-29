@@ -200,7 +200,7 @@ async function completeViaGemini(userText: string): Promise<string | null> {
 // ── Anthropic Claude (fallback) — lazy-imported SDK ──────────────────────────
 async function completeViaAnthropic(userText: string): Promise<string | null> {
   const { default: Anthropic } = await import("@anthropic-ai/sdk");
-  const client = new Anthropic();
+  const client = new Anthropic({ timeout: REQUEST_TIMEOUT_MS, maxRetries: 0 });
   const message = await client.messages.create({
     model: ANTHROPIC_MODEL,
     max_tokens: 300,
