@@ -95,12 +95,12 @@ function PlayLogo({ className = "" }: { className?: string }) {
 }
 
 /** The hero's pair of store badges: the App Store, live, and Android, not
- *  yet. They are the same badge, black with a light border like Apple's own,
- *  so they look the same size: a white badge beside a dark one always reads
- *  as bigger, however equal the boxes. Android differs only in dimmed text,
- *  and is deliberately not a link. No hover lift, so they stay aligned. */
+ *  yet. Same box; the App Store one is solid white because it is the call to
+ *  action. Android gets a bright white outline rather than a faint one: a
+ *  faint edge next to a white block made it read smaller. It is deliberately
+ *  not a link. No hover lift, so the two always line up. */
 const BADGE =
-  "box-border inline-flex h-14 w-[164px] shrink-0 items-center gap-2.5 rounded-2xl border border-white/55 bg-black px-3.5 sm:w-[176px]";
+  "box-border inline-flex h-14 w-[164px] shrink-0 items-center gap-2.5 rounded-2xl border-[1.5px] border-white px-3.5 sm:w-[176px]";
 
 function BadgeText({ small, big }: { small: string; big: string }) {
   return (
@@ -117,7 +117,7 @@ function StoreBadges({ platform }: { platform: Platform }) {
       <a
         href={APP_STORE_URL}
         onClick={() => track("hero:app_store", platform)}
-        className={`${BADGE} text-white transition-colors hover:border-white`}
+        className={`${BADGE} bg-white text-black transition-opacity hover:opacity-90`}
       >
         <span className="flex h-7 w-7 shrink-0 items-center justify-center">
           <AppleLogo className="h-6 w-6" />
@@ -126,7 +126,7 @@ function StoreBadges({ platform }: { platform: Platform }) {
       </a>
       <span
         aria-label="Android app coming soon"
-        className={`${BADGE} cursor-default select-none text-white/60`}
+        className={`${BADGE} cursor-default select-none bg-transparent text-white`}
       >
         <span className="flex h-7 w-7 shrink-0 items-center justify-center">
           <PlayLogo className="h-6 w-6" />
