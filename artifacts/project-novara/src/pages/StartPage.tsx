@@ -95,12 +95,13 @@ function PlayLogo({ className = "" }: { className?: string }) {
 }
 
 /** The hero's pair of store badges: the App Store, live, and Android, not
- *  yet. Same box; the App Store one is solid white because it is the call to
- *  action. Android gets a bright white outline rather than a faint one: a
- *  faint edge next to a white block made it read smaller. It is deliberately
- *  not a link. No hover lift, so the two always line up. */
+ *  yet. Same box and the same blue family: the App Store one is a bright,
+ *  saturated Novara blue because it is the call to action, Android is the
+ *  muted version of it. Both edges are visible against the navy, so they read
+ *  as one size. Android is deliberately not a link. No hover lift, so the two
+ *  always line up. */
 const BADGE =
-  "box-border inline-flex h-14 w-[164px] shrink-0 items-center gap-2.5 rounded-2xl border-[1.5px] border-white px-3.5 sm:w-[176px]";
+  "box-border inline-flex h-14 w-[164px] shrink-0 items-center gap-2.5 rounded-2xl border-[1.5px] px-3.5 sm:w-[176px]";
 
 function BadgeText({ small, big }: { small: string; big: string }) {
   return (
@@ -117,16 +118,16 @@ function StoreBadges({ platform }: { platform: Platform }) {
       <a
         href={APP_STORE_URL}
         onClick={() => track("hero:app_store", platform)}
-        className={`${BADGE} bg-white text-black transition-opacity hover:opacity-90`}
+        className={`${BADGE} border-[#6B85FF] bg-[#3B5BFF] text-white transition-colors hover:bg-[#4A68FF]`}
       >
         <span className="flex h-7 w-7 shrink-0 items-center justify-center">
-          <AppleLogo className="h-6 w-6" />
+          <AppleLogo className="h-7 w-7" />
         </span>
         <BadgeText small="Download on the" big="App Store" />
       </a>
       <span
         aria-label="Android app coming soon"
-        className={`${BADGE} cursor-default select-none bg-transparent text-white`}
+        className={`${BADGE} cursor-default select-none border-[#33459A] bg-[#131E45] text-[#9FB2FF]`}
       >
         <span className="flex h-7 w-7 shrink-0 items-center justify-center">
           <PlayLogo className="h-6 w-6" />
