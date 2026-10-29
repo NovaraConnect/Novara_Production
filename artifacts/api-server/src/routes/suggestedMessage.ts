@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import rateLimit from "express-rate-limit";
 import { pool, toDateStr } from "../db";
 import { requireAuth, type AuthedRequest } from "../middlewares/auth";
+import { requireSubscription } from "../middlewares/subscription";
 import { proStatusFor } from "../lib/entitlements";
 import {
   DraftBudget,
@@ -34,6 +35,7 @@ const budget = new DraftBudget(5, 40);
 router.post(
   "/contacts/:id/suggested-message",
   requireAuth,
+  requireSubscription,
   suggestedMessageLimiter,
   async (req: Request, res: Response) => {
     const userId = (req as AuthedRequest).userId;

@@ -12,7 +12,7 @@ const DOWNGRADE_MONTHS: (number | null)[] = [9, 12, 18, null];
 
 function toArrayLiteral(arr: string[]): string {
   if (!arr.length) return "{}";
-  return `{${arr.map(t => `"${String(t).replace(/"/g, '\\"')}"`).join(",")}}`;
+  return `{${arr.map(t => `"${String(t).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(",")}}`;
 }
 
 // GET /api/settings

@@ -1,11 +1,18 @@
 import pg from "pg";
 import { normalizePriority } from "./lib/priority";
+import { logger } from "./lib/logger";
 
 const { Pool } = pg;
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL ?? process.env.NEON_DATABASE_URL,
+  connectionTimeoutMillis: 10_000,
+  idleTimeoutMillis: 30_000,
 });
+
+// Neon closes idle connections; without a listener that error would crash the
+// process. The pool drops the dead client and opens a new one when needed.
+pool.on("error", (err) => logger.error({ err }, "idle Postgres client error"));
 
 export type Contact = {
   id: string;

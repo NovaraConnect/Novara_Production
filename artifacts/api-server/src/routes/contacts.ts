@@ -1,6 +1,8 @@
 import { Router } from "express";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { pool, dbToContact, toDateStr } from "../db";
 import { requireAuth, type AuthedRequest } from "../middlewares/auth";
+import { requireSubscription } from "../middlewares/subscription";
 import type { Request, Response } from "express";
 import {
   computeSuggestedPriority,
@@ -18,8 +20,22 @@ import { contactLimitFor, limitReachedBody } from "../lib/entitlements";
 // Who may add contacts (Free ceiling, or Pro / trial once a subscription is
 // required) is enforced on BOTH create paths (POST /contacts and
 // POST /contacts/import) through contactLimitFor() in lib/entitlements.ts.
+// Viewing, editing and the AI behind them need a subscription too, once one is
+// required (requireSubscription). Listing and deleting stay open, so a lapsed
+// user can still export or remove their data.
 
 const router = Router();
+
+// Re-scoring runs the AI over every contact, so cap it per user (a 500-contact
+// user calling this in a loop would otherwise be a large AI bill).
+const recalculateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => (req as AuthedRequest).userId ?? ipKeyGenerator(req.ip ?? "unknown"),
+  message: { error: "Too many recalculations. Please try again later." },
+});
 
 const PREFERRED_METHODS = new Set(["text", "email", "linkedin"]);
 /** Only "text" | "email" | "linkedin" persist; anything else (incl. "none") → null. */
@@ -29,7 +45,7 @@ function normalizePreferred(v: unknown): string | null {
 
 function toArrayLiteral(arr: string[]): string {
   if (!arr.length) return "{}";
-  return `{${arr.map(t => `"${String(t).replace(/"/g, '\\"')}"`).join(",")}}`;
+  return `{${arr.map(t => `"${String(t).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(",")}}`;
 }
 
 // GET /api/contacts
@@ -59,7 +75,7 @@ async function hasPhotoColumn(): Promise<boolean> {
   return rows.length > 0;
 }
 
-router.put("/contacts/:id/photo", requireAuth, async (req: Request, res: Response) => {
+router.put("/contacts/:id/photo", requireAuth, requireSubscription, async (req: Request, res: Response) => {
   const userId = (req as AuthedRequest).userId;
   const photo = (req.body as { photo?: unknown })?.photo;
   if (typeof photo !== "string" || photo.length > MAX_PHOTO_CHARS || !PHOTO_PREFIX.test(photo)) {
@@ -112,17 +128,14 @@ router.delete("/contacts/:id/photo", requireAuth, async (req: Request, res: Resp
 // POST /api/contacts/recalculate  — authenticated, idempotent maintenance.
 // Recomputes AI Suggested Priority + automatic cadence for the caller's
 // non-overridden contacts and returns a report. Safe to run repeatedly.
-router.post("/contacts/recalculate", requireAuth, async (req: Request, res: Response) => {
+router.post("/contacts/recalculate", requireAuth, requireSubscription, recalculateLimiter, async (req: Request, res: Response) => {
   const userId = (req as AuthedRequest).userId;
   try {
     const report = await recalculateContactsForUser(userId);
     res.json({ ok: true, ...report });
   } catch (err) {
-    res.status(500).json({
-      ok: false,
-      error: "Recalculation failed",
-      detail: err instanceof Error ? err.message : String(err),
-    });
+    logger.error({ err }, "recalculate failed");
+    res.status(500).json({ ok: false, error: "Recalculation failed" });
   }
 });
 
@@ -315,12 +328,12 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
     res.status(201).json(dbToContact(await applyBirthday(contact, birthday.value, userId)));
   } catch (err) {
     console.error("[contacts POST] DB error:", err);
-    res.status(500).json({ error: "Failed to create contact", detail: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: "Failed to create contact" });
   }
 });
 
 // GET /api/contacts/:id
-router.get("/contacts/:id", requireAuth, async (req: Request, res: Response) => {
+router.get("/contacts/:id", requireAuth, requireSubscription, async (req: Request, res: Response) => {
   const userId = (req as AuthedRequest).userId;
   const { id } = req.params;
   try {
@@ -339,7 +352,7 @@ router.get("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
 });
 
 // PUT /api/contacts/:id
-router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => {
+router.put("/contacts/:id", requireAuth, requireSubscription, async (req: Request, res: Response) => {
   const userId = (req as AuthedRequest).userId;
   const { id } = req.params;
   const {
@@ -531,7 +544,7 @@ router.put("/contacts/:id", requireAuth, async (req: Request, res: Response) => 
     res.json(dbToContact(await applyBirthday(contact, birthday.value, userId)));
   } catch (err) {
     console.error("[contacts PUT] DB error:", err);
-    res.status(500).json({ error: "Failed to update contact", detail: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: "Failed to update contact" });
   }
 });
 
@@ -555,7 +568,7 @@ router.delete("/contacts/:id", requireAuth, async (req: Request, res: Response) 
 });
 
 // POST /api/contacts/:id/mark-contacted
-router.post("/contacts/:id/mark-contacted", requireAuth, async (req: Request, res: Response) => {
+router.post("/contacts/:id/mark-contacted", requireAuth, requireSubscription, async (req: Request, res: Response) => {
   const userId = (req as AuthedRequest).userId;
   const { id } = req.params;
 
@@ -595,7 +608,7 @@ router.post("/contacts/:id/mark-contacted", requireAuth, async (req: Request, re
     res.json(dbToContact(contact));
   } catch (err) {
     console.error("[contacts mark-contacted] DB error:", err);
-    res.status(500).json({ error: "Failed to mark contact", detail: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: "Failed to mark contact" });
   }
 });
 

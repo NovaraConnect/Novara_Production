@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { requireAuth, type AuthedRequest } from "../middlewares/auth";
+import { requireSubscription } from "../middlewares/subscription";
 import { recordHealthSnapshots, scoreAMonthAgo } from "../lib/networkHealth";
 import { logger } from "../lib/logger";
 
@@ -10,7 +11,7 @@ const router = Router();
 // Records today's score for the caller, then returns the score from about a
 // month ago (or null while there is not yet a month of history). The app
 // compares it with the score it shows.
-router.get("/network-health/trend", requireAuth, async (req: Request, res: Response) => {
+router.get("/network-health/trend", requireAuth, requireSubscription, async (req: Request, res: Response) => {
   const userId = (req as AuthedRequest).userId;
   try {
     await recordHealthSnapshots(userId);

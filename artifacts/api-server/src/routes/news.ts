@@ -24,6 +24,7 @@
 // ============================================================================
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth";
+import { requireSubscription } from "../middlewares/subscription";
 import { selectHeadlines, type NewsHeadline } from "../lib/newsRanking";
 import { companyCacheKey, displayCompanyName } from "../lib/news/companyKey";
 import { getCompanyArticles } from "../lib/news/cache";
@@ -39,7 +40,7 @@ export type Headline = NewsHeadline;
  *  best few. Raising this would not cost more; it would just show more. */
 const HEADLINES_SHOWN = 3;
 
-router.get("/company-news", requireAuth, async (req, res) => {
+router.get("/company-news", requireAuth, requireSubscription, async (req, res) => {
   const rawCompany = (req.query["company"] as string | undefined)?.trim();
   const industry = ((req.query["industry"] as string | undefined) ?? "").trim();
   const role = ((req.query["role"] as string | undefined) ?? "").trim();

@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { logger } from "../lib/logger";
 import { pool } from "../db";
 
 const router: IRouter = Router();
@@ -46,7 +47,7 @@ router.get("/healthz", (_req, res) => {
 // A deep check is cached briefly so pointing a monitor at it cannot recreate
 // the always-awake problem by accident.
 const DEEP_CACHE_MS = 30_000;
-let lastDeepCheck: { at: number; connected: boolean; error: string | null } | null = null;
+let lastDeepCheck: { at: number; connected: boolean } | null = null;
 
 // GET /api/healthz/db — readiness. Actually queries Postgres, so it wakes the
 // database. For manual checks and deploy verification, NOT for a polling probe.
@@ -56,13 +57,11 @@ router.get("/healthz/db", async (_req, res) => {
   if (!lastDeepCheck || now - lastDeepCheck.at > DEEP_CACHE_MS) {
     try {
       await pool.query("SELECT 1");
-      lastDeepCheck = { at: now, connected: true, error: null };
+      lastDeepCheck = { at: now, connected: true };
     } catch (err) {
-      lastDeepCheck = {
-        at: now,
-        connected: false,
-        error: err instanceof Error ? err.message : String(err),
-      };
+      // Public endpoint: the driver's message stays in the logs, not the response.
+      logger.error({ err }, "health check: database unreachable");
+      lastDeepCheck = { at: now, connected: false };
     }
   }
 
@@ -72,8 +71,7 @@ router.get("/healthz/db", async (_req, res) => {
     environment: process.env.NODE_ENV ?? "unknown",
     databaseConnected: lastDeepCheck.connected,
     checkedAt: new Date(lastDeepCheck.at).toISOString(),
-    cached: now - lastDeepCheck.at > 0 && now !== lastDeepCheck.at,
-    ...(lastDeepCheck.error ? { databaseError: lastDeepCheck.error } : {}),
+    cached: now !== lastDeepCheck.at,
     ...(missing.length ? { missingEnvVars: missing } : {}),
     timestamp: new Date().toISOString(),
   });

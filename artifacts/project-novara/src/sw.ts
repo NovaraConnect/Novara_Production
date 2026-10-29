@@ -7,7 +7,7 @@ import { clientsClaim } from "workbox-core";
 // content-hashed asset revisions and cleanupOutdatedCaches() below, this
 // guarantees stale pages (e.g. an old cached "/install" landing screen)
 // cannot be served forever once a new version is deployed.
-const SW_CACHE_VERSION = "2026-07-16.1";
+const SW_CACHE_VERSION = "2026-10-29.1";
 void SW_CACHE_VERSION;
 
 declare const self: ServiceWorkerGlobalScope & {
