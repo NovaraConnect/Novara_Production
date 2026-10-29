@@ -100,11 +100,14 @@ function PlayLogo({ className = "" }: { className?: string }) {
  *  muted version of it. Both edges are visible against the navy, so they read
  *  as one size. Android is deliberately not a link. No hover lift, so the two
  *  always line up. The soft 1.5px edge is an inset ring, not a border, so the
- *  logo and text stay on whole pixels and crisp. The App Store ring is a shade
- *  darker than its fill and Android's is the bright blue: a bright edge on the
- *  bright badge made it look bigger than Android's. */
-const BADGE =
-  "inline-flex h-14 w-[164px] shrink-0 items-center gap-2.5 rounded-2xl px-3.5 sm:w-[176px]";
+ *  logo and text stay on whole pixels and crisp. Edges are kept soft: the App
+ *  Store ring only just separates from its fill, Android's is a translucent
+ *  blue on a slightly lighter navy. The bright App Store box is drawn 4px
+ *  smaller each way and centred on the same line: a bright shape on navy
+ *  looks bigger than a dark one, so equal boxes did not look equal. */
+const BADGE = "inline-flex shrink-0 items-center gap-2.5 rounded-[18px]";
+const APP_STORE_SIZE = "h-[52px] w-[160px] px-3 sm:w-[172px]";
+const ANDROID_SIZE = "h-14 w-[164px] px-3.5 sm:w-[176px]";
 
 function BadgeText({ small, big }: { small: string; big: string }) {
   return (
@@ -121,7 +124,7 @@ function StoreBadges({ platform }: { platform: Platform }) {
       <a
         href={APP_STORE_URL}
         onClick={() => track("hero:app_store", platform)}
-        className={`${BADGE} bg-[#3B5BFF] text-white shadow-[inset_0_0_0_1.5px_#2D4BE0] transition-colors hover:bg-[#4A68FF]`}
+        className={`${BADGE} ${APP_STORE_SIZE} bg-[#3B5BFF] text-white shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.12)] transition-colors hover:bg-[#4A68FF]`}
       >
         <span className="flex h-7 w-7 shrink-0 items-center justify-center">
           <AppleLogo className="h-7 w-7" />
@@ -130,7 +133,7 @@ function StoreBadges({ platform }: { platform: Platform }) {
       </a>
       <span
         aria-label="Android app coming soon"
-        className={`${BADGE} cursor-default select-none bg-[#131E45] text-[#9FB2FF] shadow-[inset_0_0_0_1.5px_#3B5BFF]`}
+        className={`${BADGE} ${ANDROID_SIZE} cursor-default select-none bg-[#172352] text-[#9FB2FF] shadow-[inset_0_0_0_1.5px_rgba(107,133,255,0.5)]`}
       >
         <span className="flex h-7 w-7 shrink-0 items-center justify-center">
           <PlayLogo className="h-6 w-6" />
