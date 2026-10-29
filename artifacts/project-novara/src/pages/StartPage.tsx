@@ -98,21 +98,39 @@ function BadgeText({ small, big }: { small: string; big: string }) {
   );
 }
 
+/** Two looks: "brand" (bright Novara blue, the hero) and "classic" (white
+ *  App Store, translucent grey Android, the closing section). */
+const BADGE_LOOK = {
+  brand: {
+    appStore:
+      "bg-[#3B5BFF] text-white shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.12)] transition-colors hover:bg-[#4A68FF]",
+    android: "bg-[#172352] text-[#9FB2FF] shadow-[inset_0_0_0_1.5px_rgba(107,133,255,0.5)]",
+  },
+  classic: {
+    appStore: "bg-white text-black transition-opacity hover:opacity-90",
+    android:
+      "bg-white/[0.06] text-white/80 shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.22)] backdrop-blur-md",
+  },
+};
+
 function StoreBadges({
   platform,
   where,
+  look = "brand",
   className = "",
 }: {
   platform: Platform;
   where: string;
+  look?: keyof typeof BADGE_LOOK;
   className?: string;
 }) {
+  const l = BADGE_LOOK[look];
   return (
     <div className={`flex items-center gap-3 ${className}`}>
       <a
         href={APP_STORE_URL}
         onClick={() => track(`${where}:app_store`, platform)}
-        className={`${BADGE} ${APP_STORE_SIZE} bg-[#3B5BFF] text-white shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.12)] transition-colors hover:bg-[#4A68FF]`}
+        className={`${BADGE} ${APP_STORE_SIZE} ${l.appStore}`}
       >
         <span className="flex h-7 w-7 shrink-0 items-center justify-center">
           <AppleLogo className="h-7 w-7" />
@@ -121,7 +139,7 @@ function StoreBadges({
       </a>
       <span
         aria-label="Android app coming soon"
-        className={`${BADGE} ${ANDROID_SIZE} cursor-default select-none bg-[#172352] text-[#9FB2FF] shadow-[inset_0_0_0_1.5px_rgba(107,133,255,0.5)]`}
+        className={`${BADGE} ${ANDROID_SIZE} cursor-default select-none ${l.android}`}
       >
         <span className="flex h-7 w-7 shrink-0 items-center justify-center">
           <PlayLogo className="h-6 w-6" />
@@ -324,7 +342,7 @@ export default function StartPage() {
             Your next opportunity is probably someone you’ve already met.
           </h2>
           <div ref={finalCtaRef} className="mt-9 flex flex-col items-center gap-3">
-            <StoreBadges platform={platform} where="final" className="justify-center" />
+            <StoreBadges platform={platform} where="final" look="classic" className="justify-center" />
             <FinePrint platform={platform} />
           </div>
         </div>
