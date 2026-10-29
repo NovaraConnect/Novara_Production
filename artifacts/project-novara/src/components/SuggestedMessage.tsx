@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useAuth } from "@clerk/react";
 import { Copy, Linkedin, Loader2, Mail, MessageSquare, PenLine, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { fetchSuggestedMessage } from "@/lib/api";
+import { fetchSuggestedMessage, MAX_MESSAGE_LENGTH } from "@/lib/api";
 import {
-  availableMethods, draftHref, openContactMethod, usablePreferred, METHOD_LABEL, type ContactMethod,
+  availableMethods, draftHref, openContactMethod, usablePreferred, type ContactMethod,
 } from "@/lib/contactActions";
 import { cn } from "@/lib/utils";
 import { Contact } from "@/types/contact";
@@ -35,43 +36,39 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 /**
- * A ready-to-send draft for reaching out, shown near "Contact now". The user
- * edits it, then copies it or opens their messaging app with it prefilled —
- * nothing is ever sent from Novara. Drafts itself once the follow-up is due
- * (and company news has settled, so a headline can be used); before that it
- * waits for a tap, so browsing contacts doesn't spend AI calls.
+ * One ready-to-send draft for reaching out, shown near "Contact now". The
+ * same message works as a text, email, or LinkedIn message (at most 500
+ * characters); email also gets a subject line. The user edits it, then copies
+ * it or opens their preferred channel with it prefilled — nothing is ever
+ * sent from Novara. Drafted only on tap, so browsing contacts costs nothing.
  */
 export function SuggestedMessage({
   contact,
   headline,
-  newsSettled,
   onSent,
 }: {
   contact: Contact;
   headline?: string;
-  newsSettled: boolean;
   onSent: () => void;
 }) {
   const { getToken } = useAuth();
   const methods = availableMethods(contact);
-  const [channel, setChannel] = useState<ContactMethod>(() => usablePreferred(contact) ?? methods[0] ?? "text");
+  const sendMethod: ContactMethod | null = usablePreferred(contact) ?? methods[0] ?? null;
   const [draft, setDraft] = useState("");
+  const [subject, setSubject] = useState("");
   const [source, setSource] = useState<"ai" | "template" | null>(null);
-  const [edited, setEdited] = useState(false);
   const [loading, setLoading] = useState(false);
   const requestId = useRef(0);
 
-  const due = !!contact.nextFollowUpDate && new Date(contact.nextFollowUpDate) <= new Date();
-
-  const generate = useCallback(async (forChannel: ContactMethod) => {
+  const generate = useCallback(async () => {
     const id = ++requestId.current;
     setLoading(true);
     try {
-      const result = await fetchSuggestedMessage(getToken, contact.id, { channel: forChannel, headline });
+      const result = await fetchSuggestedMessage(getToken, contact.id, { headline });
       if (id !== requestId.current) return;
-      setDraft(result.message);
+      setDraft(result.message.slice(0, MAX_MESSAGE_LENGTH));
+      setSubject(result.subject);
       setSource(result.source);
-      setEdited(false);
     } catch (err) {
       if (id === requestId.current) toast.error(err instanceof Error ? err.message : "Couldn't draft a message right now.");
     } finally {
@@ -79,28 +76,14 @@ export function SuggestedMessage({
     }
   }, [getToken, contact.id, headline]);
 
-  // Auto-draft once per contact when a follow-up is due.
-  const autoDrafted = useRef<string | null>(null);
-  useEffect(() => {
-    if (!due || !newsSettled || autoDrafted.current === contact.id) return;
-    autoDrafted.current = contact.id;
-    void generate(channel);
-  }, [due, newsSettled, contact.id, channel, generate]);
-
-  const pickChannel = (m: ContactMethod) => {
-    if (m === channel) return;
-    setChannel(m);
-    // Re-size the draft for the new channel unless the user has made it theirs.
-    if (draft && !edited) void generate(m);
-  };
-
   const handleCopy = async () => {
     if (await copyText(draft)) toast.success("Message copied");
     else toast.error("Couldn't copy — select the text and copy it instead.");
   };
 
   const handleSend = async () => {
-    if (channel === "linkedin") {
+    if (!sendMethod) return;
+    if (sendMethod === "linkedin") {
       // LinkedIn has no compose link, so the draft goes to the clipboard and
       // the profile opens from the toast (a tap, so it isn't popup-blocked).
       if (!(await copyText(draft))) {
@@ -114,46 +97,19 @@ export function SuggestedMessage({
       });
       return;
     }
-    const href = draftHref(contact, channel, draft);
+    const href = draftHref(contact, sendMethod, draft, subject);
     if (!href) return;
     window.location.href = href;
     onSent();
   };
 
-  const canSend = methods.includes(channel) && draft.trim().length > 0;
-  const SendIcon = METHOD_ICON[channel];
+  const SendIcon = sendMethod ? METHOD_ICON[sendMethod] : Mail;
 
   return (
     <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm mb-4" data-testid="suggested-message">
-      <div className="flex items-center justify-between gap-2 mb-3">
-        <div className="flex items-center gap-2">
-          <PenLine className="w-4 h-4 text-primary" />
-          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Suggested message</h3>
-        </div>
-        {methods.length > 1 && (
-          <div className="flex items-center gap-1" role="radiogroup" aria-label="Channel">
-            {methods.map((m) => {
-              const Icon = METHOD_ICON[m];
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  role="radio"
-                  aria-checked={m === channel}
-                  aria-label={METHOD_LABEL[m]}
-                  onClick={() => pickChannel(m)}
-                  className={cn(
-                    "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
-                    m === channel ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary/80",
-                  )}
-                  data-testid={`suggested-channel-${m}`}
-                >
-                  <Icon className="w-4 h-4" />
-                </button>
-              );
-            })}
-          </div>
-        )}
+      <div className="flex items-center gap-2 mb-3">
+        <PenLine className="w-4 h-4 text-primary" />
+        <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Suggested message</h3>
       </div>
 
       {!draft && !loading ? (
@@ -161,17 +117,30 @@ export function SuggestedMessage({
           <p className="text-xs text-muted-foreground mb-4">
             A short draft for {contact.firstName}, based on how you met, your notes, and recent news. You review it before anything is sent.
           </p>
-          <Button variant="outline" className="w-full h-12 rounded-xl font-semibold gap-2" onClick={() => void generate(channel)} data-testid="button-draft-message">
+          <Button variant="outline" className="w-full h-12 rounded-xl font-semibold gap-2" onClick={() => void generate()} data-testid="button-draft-message">
             <PenLine className="w-4 h-4" />Draft a message
           </Button>
         </>
       ) : (
         <>
+          {sendMethod === "email" && (
+            <Input
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              maxLength={120}
+              disabled={loading}
+              aria-label="Email subject"
+              placeholder="Subject"
+              className="mb-2 rounded-xl"
+              data-testid="input-suggested-subject"
+            />
+          )}
           <div className="relative">
             <Textarea
               value={draft}
-              onChange={(e) => { setDraft(e.target.value); setEdited(true); }}
-              rows={channel === "text" ? 5 : 8}
+              onChange={(e) => setDraft(e.target.value)}
+              maxLength={MAX_MESSAGE_LENGTH}
+              rows={12}
               disabled={loading}
               aria-label={`Suggested message to ${contact.firstName}`}
               className="leading-relaxed resize-none"
@@ -183,20 +152,23 @@ export function SuggestedMessage({
               </div>
             )}
           </div>
-          <p className="text-[10px] text-muted-foreground mt-2">
-            {source === "ai" ? "AI draft from your notes · check it before sending" : "Draft from this contact's details · edit to make it yours"}
-          </p>
+          <div className="flex items-start justify-between gap-3 mt-2 text-[10px] text-muted-foreground">
+            <p>{source === "ai" ? "AI draft from your notes · check it before sending" : "Draft from this contact's details · edit to make it yours"}</p>
+            <p className={cn("shrink-0 tabular-nums", draft.length >= MAX_MESSAGE_LENGTH && "text-cooling")}>
+              {draft.length}/{MAX_MESSAGE_LENGTH}
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-2 mt-3">
-            <Button variant="outline" className="h-11 rounded-xl font-semibold gap-1.5" onClick={() => void generate(channel)} disabled={loading} data-testid="button-regenerate-message">
+            <Button variant="outline" className="h-11 rounded-xl font-semibold gap-1.5" onClick={() => void generate()} disabled={loading} data-testid="button-regenerate-message">
               <RefreshCw className="w-4 h-4" />Regenerate
             </Button>
             <Button variant="outline" className="h-11 rounded-xl font-semibold gap-1.5" onClick={() => void handleCopy()} disabled={loading || !draft.trim()} data-testid="button-copy-message">
               <Copy className="w-4 h-4" />Copy
             </Button>
           </div>
-          {methods.includes(channel) && (
-            <Button className="w-full h-12 rounded-xl font-semibold gap-2 mt-2" onClick={() => void handleSend()} disabled={loading || !canSend} data-testid="button-send-message">
-              <SendIcon className="w-4 h-4" />{SEND_LABEL[channel]}
+          {sendMethod && (
+            <Button className="w-full h-12 rounded-xl font-semibold gap-2 mt-2" onClick={() => void handleSend()} disabled={loading || !draft.trim()} data-testid="button-send-message">
+              <SendIcon className="w-4 h-4" />{SEND_LABEL[sendMethod]}
             </Button>
           )}
         </>

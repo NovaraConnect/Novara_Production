@@ -2,12 +2,16 @@ import { describe, it, expect, afterEach } from "vitest";
 import {
   buildPrompt,
   validateMessage,
-  templateMessage,
+  validateSubject,
+  validateDraft,
+  templateDraft,
   suggestMessageWith,
   suggestedMessageLogFields,
   isSuggestedMessageAiEnabled,
   activeMessageProvider,
   daysUntilBirthday,
+  DraftBudget,
+  MAX_MESSAGE_LENGTH,
   type SuggestionInput,
 } from "../../src/lib/suggestedMessage";
 
@@ -25,18 +29,15 @@ const BASE: SuggestionInput = {
   headline: "Northwind Labs opens a new office in Denver",
   careerStatement: "Moving into product management in consumer tech.",
   careerGoals: ["Land a product role at a growth-stage startup"],
-  channel: "text",
 };
 
-const GOOD = JSON.stringify({
-  message:
-    "Hi Priya, it was a pleasure meeting you at the Austin product meetup. I read that Northwind Labs is opening a Denver office and thought of you. Would you be open to catching up soon?",
-});
+const GOOD_MESSAGE =
+  "Hi Priya, it was a pleasure meeting you at the Austin product meetup. I read that Northwind Labs is opening a Denver office and thought of you. Would you be open to catching up soon?";
+const GOOD = JSON.stringify({ subject: "Following up from the product meetup", message: GOOD_MESSAGE });
 
 describe("buildPrompt", () => {
   it("includes the profile fields the draft is built from", () => {
     const p = buildPrompt(BASE, TODAY);
-    expect(p).toContain("CHANNEL: TEXT");
     expect(p).toContain("First name: Priya");
     expect(p).toContain("Role: Head of Growth");
     expect(p).toContain("Company: Northwind Labs");
@@ -57,8 +58,7 @@ describe("buildPrompt", () => {
   });
 
   it("marks missing fields (none)/(unknown) so the model skips them", () => {
-    const p = buildPrompt({ firstName: "Sam", channel: "email" }, TODAY);
-    expect(p).toContain("CHANNEL: EMAIL");
+    const p = buildPrompt({ firstName: "Sam" }, TODAY);
     expect(p).toContain("Company: (unknown)");
     expect(p).toContain("Recent company news headline: (none)");
     expect(p).toContain("My notes about them: (none)");
@@ -87,43 +87,34 @@ describe("daysUntilBirthday", () => {
 
 describe("validateMessage", () => {
   const prompt = buildPrompt(BASE, TODAY);
-  const ok = (message: string, channel: SuggestionInput["channel"] = "text") =>
-    validateMessage({ message }, channel, prompt);
+  const ok = (message: string) => validateMessage(message, prompt);
 
   it("accepts a natural 2-4 sentence draft", () => {
-    expect(ok(JSON.parse(GOOD).message)).toMatch(/^Hi Priya/);
+    expect(ok(GOOD_MESSAGE)).toBe(GOOD_MESSAGE);
   });
 
-  it("rejects non-objects and missing/non-string messages", () => {
-    expect(validateMessage(null, "text", prompt)).toBeNull();
-    expect(validateMessage({ msg: "hi" }, "text", prompt)).toBeNull();
-    expect(validateMessage({ message: 42 }, "text", prompt)).toBeNull();
+  it("rejects non-strings", () => {
+    expect(validateMessage(42, prompt)).toBeNull();
+    expect(validateMessage(undefined, prompt)).toBeNull();
   });
 
   it("rejects emojis, links, emails, and placeholders", () => {
-    expect(ok("Hi Priya, great to meet you! 🎉 Want to grab coffee soon?")).toBeNull();
+    expect(ok("Hi Priya, great to meet you. 🎉 Would you like to meet soon?")).toBeNull();
     expect(ok("Hi Priya, great to meet you. Here is my site https://me.example. Coffee soon?")).toBeNull();
     expect(ok("Hi Priya, great to meet you. Email me at me@example.com. Coffee soon?")).toBeNull();
     expect(ok("Hi Priya, great to meet you. Coffee soon? Best, [Your Name]")).toBeNull();
   });
 
   it("rejects numbers that are not in the input (invented facts)", () => {
-    expect(ok("Hi Priya, congrats on raising $40M last week. Coffee soon?")).toBeNull();
+    expect(ok("Hi Priya, congratulations on raising $40M last week. Coffee soon?")).toBeNull();
   });
 
-  it("enforces length and sentence count per channel", () => {
+  it(`never accepts more than ${MAX_MESSAGE_LENGTH} characters`, () => {
+    const long = ("Hi Priya, it was a pleasure meeting you and I enjoyed our conversation. ").repeat(7).trim();
+    expect(long.length).toBeGreaterThan(MAX_MESSAGE_LENGTH);
+    expect(ok(long)).toBeNull();
     expect(ok("Hi Priya.")).toBeNull(); // too short
-    const long = "Hi Priya, it was great meeting you and I really enjoyed the conversation. ".repeat(6);
-    expect(ok(long, "text")).toBeNull();
-    const sixSentences = "Hi Priya. One. Two. Three. Four. Five.";
-    expect(ok(sixSentences, "email")).toBeNull();
-    const fuller =
-      "Hi Priya, it was great meeting you at the Austin product meetup and I keep thinking about our conversation. " +
-      "I saw Northwind Labs is opening a new office in Denver, which sounds like an exciting time for the team. " +
-      "I'm working toward a product role at a growth-stage startup, so I'd love to hear how you approach growth there. " +
-      "Would you be open to a quick call in the next couple of weeks?";
-    expect(ok(fuller, "text")).toBeNull();
-    expect(ok(fuller, "email")).toBe(fuller);
+    expect(ok("Hi Priya. One. Two. Three. Four. Five.")).toBeNull(); // too many sentences
   });
 
   it("strips surrounding quotes and collapses whitespace", () => {
@@ -143,78 +134,108 @@ describe("validateMessage", () => {
 
   it("allows all-caps words that come from the input (acronyms)", () => {
     const p = buildPrompt({ ...BASE, company: "NASDAQ" }, TODAY);
-    expect(validateMessage({ message: "Hi Priya, I hope things are going well at NASDAQ. Would you be open to catching up soon?" }, "text", p)).not.toBeNull();
+    expect(validateMessage("Hi Priya, I hope things are going well at NASDAQ. Would you be open to catching up soon?", p)).not.toBeNull();
   });
 });
 
-describe("templateMessage — deterministic fallback", () => {
-  it("builds a short text from where you met + news + ask", () => {
-    const m = templateMessage(BASE, TODAY);
-    expect(m).toBe(
-      "Hi Priya, it was a pleasure meeting you at the Austin product meetup. I read the recent news about Northwind Labs and thought of you. Would you be open to catching up soon?",
-    );
-    expect(m.length).toBeLessThanOrEqual(320);
+describe("validateSubject", () => {
+  const prompt = buildPrompt(BASE, TODAY);
+
+  it("accepts a short professional subject", () => {
+    expect(validateSubject("Following up from the product meetup", prompt)).toBe("Following up from the product meetup");
+    expect(validateSubject("Subject: Reconnecting", prompt)).toBe("Reconnecting");
   });
 
-  it("is fuller for email: quotes the headline and mentions the goal", () => {
-    const m = templateMessage({ ...BASE, channel: "email" }, TODAY);
-    expect(m).toContain('("Northwind Labs opens a new office in Denver")');
-    expect(m).toContain("(Land a product role at a growth-stage startup)");
-    expect(m).toContain("a brief call or coffee in the coming weeks");
+  it("rejects casual, punctuated, or overlong subjects", () => {
+    expect(validateSubject("hey!!", prompt)).toBeNull();
+    expect(validateSubject("Quick question.", prompt)).toBeNull();
+    expect(validateSubject("Catching up 🙂", prompt)).toBeNull();
+    expect(validateSubject("x".repeat(80), prompt)).toBeNull();
+    expect(validateSubject("Congrats on the $40M round", prompt)).toBeNull();
+  });
+
+  it("keeps a good AI message when only the subject is bad", () => {
+    const d = validateDraft({ subject: "yo", message: GOOD_MESSAGE }, prompt, "Checking in");
+    expect(d).toEqual({ subject: "Checking in", message: GOOD_MESSAGE });
+  });
+});
+
+describe("templateDraft — deterministic fallback", () => {
+  it("builds one draft from where you met, the news, the goal, and an ask", () => {
+    const d = templateDraft(BASE, TODAY);
+    expect(d.subject).toBe("Following up from the Austin product meetup");
+    expect(d.message).toBe(
+      "Hi Priya, it was a pleasure meeting you at the Austin product meetup. " +
+        'I read the recent news about Northwind Labs ("Northwind Labs opens a new office in Denver") and thought of you. ' +
+        "I am currently working toward a goal related to your field (Land a product role at a growth-stage startup), and I would value your perspective. " +
+        "If you are open to it, I would appreciate a brief call or coffee in the coming weeks.",
+    );
+    expect(d.message.length).toBeLessThanOrEqual(MAX_MESSAGE_LENGTH);
+  });
+
+  it("drops optional sentences to stay under the cap", () => {
+    const d = templateDraft({
+      ...BASE,
+      metAt: "a".repeat(80),
+      headline: "h".repeat(200),
+      careerGoals: ["g".repeat(120)],
+    }, TODAY);
+    expect(d.message.length).toBeLessThanOrEqual(MAX_MESSAGE_LENGTH);
+    expect(d.message).toMatch(/^Hi Priya, it was a pleasure meeting you/);
+    expect(d.message).toMatch(/in the coming weeks\.$/);
   });
 
   it("leads with a birthday greeting when it is their birthday", () => {
-    expect(templateMessage({ ...BASE, birthday: "--10-29" }, TODAY)).toMatch(/^Happy birthday, Priya\. I hope you have a wonderful day\./);
+    const d = templateDraft({ ...BASE, birthday: "--10-29" }, TODAY);
+    expect(d.message).toMatch(/^Happy birthday, Priya\. I hope you have a wonderful day\./);
+    expect(d.subject).toBe("Happy birthday");
   });
 
-  it("acknowledges a long gap instead of 'great meeting you'", () => {
-    const m = templateMessage({ ...BASE, lastInteractionDate: "2026-03-01" }, TODAY);
-    expect(m).toMatch(/^Hi Priya, I hope you are doing well\. It has been a while since we last spoke\./);
+  it("acknowledges a long gap", () => {
+    const d = templateDraft({ ...BASE, lastInteractionDate: "2026-03-01" }, TODAY);
+    expect(d.message).toMatch(/^Hi Priya, I hope you are doing well\. It has been a while since we last spoke\./);
+    expect(d.subject).toBe("Reconnecting");
+  });
+
+  it("matches the subject to the news when that is the hook", () => {
+    expect(templateDraft({ ...BASE, metAt: null }, TODAY).subject).toBe("Recent news at Northwind Labs");
   });
 
   it("never uses the private notes", () => {
-    expect(templateMessage({ ...BASE, channel: "email" }, TODAY)).not.toContain("trail running");
+    expect(templateDraft(BASE, TODAY).message).not.toContain("trail running");
   });
 
-  it("works with nothing but a first name", () => {
-    expect(templateMessage({ firstName: "Sam", channel: "linkedin" }, TODAY)).toBe(
-      "Hi Sam, I hope you are doing well. If you are open to it, I would appreciate a brief call or coffee in the coming weeks, whenever is convenient for you.",
-    );
+  it("works with nothing but a first name, and capitalizes it", () => {
+    expect(templateDraft({ firstName: "sam" }, TODAY)).toEqual({
+      subject: "Checking in",
+      message: "Hi Sam, I hope you are doing well. If you are open to it, I would appreciate a brief call or coffee in the coming weeks.",
+    });
   });
 
-  it("capitalizes a lowercase first name", () => {
-    expect(templateMessage({ firstName: "priya", channel: "text" }, TODAY)).toMatch(/^Hi Priya,/);
-  });
-
-  it("passes its own professionalism checks on every channel", () => {
-    for (const channel of ["text", "email", "linkedin"] as const) {
-      for (const extra of [{}, { birthday: "--10-29" }, { lastInteractionDate: "2026-01-01" }, { headline: null }]) {
-        const input = { ...BASE, ...extra, channel };
-        const m = templateMessage(input, TODAY);
-        expect(validateMessage({ message: m }, channel, buildPrompt(input, TODAY)), m).toBe(m);
-      }
+  it("passes its own professionalism checks in every situation", () => {
+    for (const extra of [{}, { birthday: "--10-29" }, { lastInteractionDate: "2026-01-01" }, { headline: null }, { metAt: null }, { company: null }]) {
+      const input = { ...BASE, ...extra };
+      const d = templateDraft(input, TODAY);
+      const prompt = buildPrompt(input, TODAY);
+      expect(validateMessage(d.message, prompt), d.message).toBe(d.message);
+      expect(validateSubject(d.subject, prompt), d.subject).toBe(d.subject);
     }
-  });
-
-  it("contains no emojis", () => {
-    expect(templateMessage({ ...BASE, birthday: "--10-29", channel: "email" }, TODAY)).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 });
 
 describe("suggestMessageWith — AI or fallback", () => {
   it("uses the AI draft when it validates", async () => {
     const r = await suggestMessageWith(BASE, async () => GOOD, TODAY);
-    expect(r.source).toBe("ai");
-    expect(r.message).toMatch(/Denver office/);
+    expect(r).toEqual({ source: "ai", subject: "Following up from the product meetup", message: GOOD_MESSAGE });
   });
 
   it("falls back to the template with no provider", async () => {
     const r = await suggestMessageWith(BASE, null, TODAY);
-    expect(r).toEqual({ source: "template", message: templateMessage(BASE, TODAY) });
+    expect(r).toEqual({ source: "template", ...templateDraft(BASE, TODAY) });
   });
 
   it("falls back on invalid JSON, null output, or a failing draft", async () => {
-    for (const out of ["not json", null, JSON.stringify({ message: "Hi Priya 🎉. Coffee?" })]) {
+    for (const out of ["not json", null, JSON.stringify({ subject: "Hi", message: "Hi Priya 🎉. Coffee?" })]) {
       const r = await suggestMessageWith(BASE, async () => out, TODAY);
       expect(r.source).toBe("template");
     }
@@ -235,45 +256,81 @@ describe("suggestMessageWith — AI or fallback", () => {
   });
 });
 
-describe("feature gating — must be explicitly enabled", () => {
+describe("DraftBudget — daily cost cap", () => {
+  it("caps AI drafts per contact and per user, and resets the next day", () => {
+    const b = new DraftBudget(2, 3);
+    const day1 = new Date("2026-10-29T10:00:00Z");
+    expect(b.take("u1", "c1", day1)).toBe(true);
+    expect(b.take("u1", "c1", day1)).toBe(true);
+    expect(b.take("u1", "c1", day1)).toBe(false); // contact cap
+    expect(b.take("u1", "c2", day1)).toBe(true);
+    expect(b.take("u1", "c3", day1)).toBe(false); // user cap
+    expect(b.take("u2", "c1", day1)).toBe(true); // other users unaffected
+    expect(b.take("u1", "c1", new Date("2026-10-30T00:01:00Z"))).toBe(true);
+  });
+});
+
+describe("provider — reuses the one already chosen for AI text", () => {
   const saved = { ...process.env };
   afterEach(() => {
     process.env = { ...saved };
   });
+  const clear = () => {
+    for (const k of ["SUGGESTED_MESSAGE_AI", "SUGGESTED_MESSAGE_PROVIDER", "CARD_AI_PROVIDER", "LINKEDIN_AI_PROVIDER", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"]) {
+      delete process.env[k];
+    }
+  };
 
-  it("is off when the flag is unset, even with a provider and key", () => {
-    delete process.env["SUGGESTED_MESSAGE_AI"];
-    process.env["SUGGESTED_MESSAGE_PROVIDER"] = "anthropic";
+  it("inherits the card parser's provider with no extra setup", () => {
+    clear();
+    process.env["CARD_AI_PROVIDER"] = "anthropic";
     process.env["ANTHROPIC_API_KEY"] = "sk-test";
-    expect(isSuggestedMessageAiEnabled()).toBe(false);
+    expect(activeMessageProvider()).toBe("anthropic");
+    expect(isSuggestedMessageAiEnabled()).toBe(true);
   });
 
-  it("has no auto-default provider and no cross-provider fallback", () => {
-    process.env["SUGGESTED_MESSAGE_AI"] = "on";
-    delete process.env["SUGGESTED_MESSAGE_PROVIDER"];
-    process.env["GEMINI_API_KEY"] = "g-test";
-    expect(activeMessageProvider()).toBeNull();
-    process.env["SUGGESTED_MESSAGE_PROVIDER"] = "anthropic";
-    delete process.env["ANTHROPIC_API_KEY"];
-    expect(activeMessageProvider()).toBeNull();
-    expect(isSuggestedMessageAiEnabled()).toBe(false);
-  });
-
-  it("is on with flag + explicit provider + that provider's key", () => {
-    process.env["SUGGESTED_MESSAGE_AI"] = "on";
-    process.env["SUGGESTED_MESSAGE_PROVIDER"] = "gemini";
+  it("falls back to the LinkedIn parser's provider", () => {
+    clear();
+    process.env["LINKEDIN_AI_PROVIDER"] = "gemini";
     process.env["GEMINI_API_KEY"] = "g-test";
     expect(activeMessageProvider()).toBe("gemini");
-    expect(isSuggestedMessageAiEnabled()).toBe(true);
+  });
+
+  it("has no auto-default: a key alone does nothing", () => {
+    clear();
+    process.env["GEMINI_API_KEY"] = "g-test";
+    process.env["ANTHROPIC_API_KEY"] = "sk-test";
+    expect(activeMessageProvider()).toBeNull();
+    expect(isSuggestedMessageAiEnabled()).toBe(false);
+  });
+
+  it("does not switch providers when the chosen one has no key", () => {
+    clear();
+    process.env["CARD_AI_PROVIDER"] = "anthropic";
+    process.env["GEMINI_API_KEY"] = "g-test";
+    expect(activeMessageProvider()).toBeNull();
+  });
+
+  it("can be switched off", () => {
+    clear();
+    process.env["CARD_AI_PROVIDER"] = "anthropic";
+    process.env["ANTHROPIC_API_KEY"] = "sk-test";
+    process.env["SUGGESTED_MESSAGE_AI"] = "off";
+    expect(isSuggestedMessageAiEnabled()).toBe(false);
   });
 });
 
 describe("logging is metadata-only", () => {
-  it("never includes the notes, profile fields, or message", async () => {
-    const r = await suggestMessageWith({ ...BASE, channel: "email" }, async () => GOOD, TODAY);
-    const logged = suggestedMessageLogFields(r, "email", 120, "anthropic");
-    expect(Object.keys(logged).sort()).toEqual(["channel", "event", "length", "ms", "provider", "source"]);
+  it("never includes the notes, profile fields, subject, or message", async () => {
+    const r = await suggestMessageWith(BASE, async () => GOOD, TODAY);
+    const logged = suggestedMessageLogFields(r, 120, "anthropic", null);
+    expect(Object.keys(logged).sort()).toEqual(["event", "length", "ms", "provider", "reason", "source"]);
     const s = JSON.stringify(logged);
     for (const secret of ["Priya", "Northwind", "trail", "meetup", "Denver"]) expect(s).not.toContain(secret);
+  });
+
+  it("records why a template was served", () => {
+    const r = { source: "template" as const, subject: "Checking in", message: "Hi." };
+    expect(suggestedMessageLogFields(r, 1, null, "daily_cap").reason).toBe("daily_cap");
   });
 });

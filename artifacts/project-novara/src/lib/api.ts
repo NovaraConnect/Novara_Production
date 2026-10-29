@@ -313,18 +313,22 @@ export async function enrichContact(
 
 // ── Suggested message ────────────────────────────────────────────────────────
 
+/** Hard ceiling on a reach-out message; the server enforces the same. */
+export const MAX_MESSAGE_LENGTH = 500;
+
 export interface SuggestedMessage {
+  subject: string;
   message: string;
   source: "ai" | "template";
-  channel: "text" | "email" | "linkedin";
 }
 
-/** A draft reach-out message for one contact. The server always answers with
- *  a draft (AI when configured, else a template); nothing is ever sent. */
+/** One draft reach-out message for a contact, usable by text, email, or
+ *  LinkedIn, with a subject for email. The server always answers with a
+ *  draft (AI when available, else a template); nothing is ever sent. */
 export async function fetchSuggestedMessage(
   getToken: GetAuthToken,
   id: string,
-  body: { channel?: SuggestedMessage["channel"]; headline?: string },
+  body: { headline?: string },
 ): Promise<SuggestedMessage> {
   const res = await apiFetch(getToken, `/api/contacts/${id}/suggested-message`, { method: "POST", json: body });
   if (res.status === 401) throw new Error("Unauthorized");

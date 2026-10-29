@@ -2,33 +2,44 @@
 // "Suggested message" for a contact's reach-out moment. Best-effort, never
 // throws.
 //
-// Drafts a short first-person message the user can edit and send themselves
-// (the app never sends it). Built from the contact's profile — where/when you
-// met, last spoke, notes, role/company, a company headline the client already
-// shows, an upcoming birthday — plus the user's career goals, sized to the
-// channel (short for a text, a little fuller for email/LinkedIn).
+// Drafts ONE short first-person message (at most 500 characters) that works
+// as a text, an email, or a LinkedIn message, plus a subject line used when
+// it goes by email. The user edits and sends it themselves — the app never
+// sends anything. Built from the contact's profile (where/when you met, last
+// spoke, notes, role/company, a company headline the client already shows, an
+// upcoming birthday) plus the user's career goals.
 //
-// Always returns a message: with the AI disabled, unconfigured, slow, or
-// returning anything that fails validation, it falls back to a deterministic
-// template built from the same fields.
+// TONE: every draft must be grammatically correct, professional, and
+// respectful. The prompt asks for that, validateDraft() enforces it, and the
+// template is held to the same checks in tests.
+//
+// Always returns a draft: with the AI disabled, unconfigured, over its daily
+// cap, slow, or returning anything that fails validation, it falls back to a
+// deterministic template built from the same fields.
+//
+// COST: one call per draft on the cheapest models already in use (Claude
+// Haiku / Gemini Flash), roughly a fifth of a cent each. DraftBudget caps AI
+// drafts per contact and per user per day; past a cap the template is served,
+// so a user never sees an error and spend stays bounded.
 //
 // PRIVACY: the prompt carries the contact's FIRST name only (never last name,
-// email, or phone), but it does carry the user's free-text notes about them.
-// This module NEVER logs the prompt, the notes, or the message — only
-// metadata (provider, duration, channel, source, length). As with the
-// LinkedIn parser, the provider MUST be selected explicitly: the Gemini FREE
-// tier trains on inputs and MUST NOT be used for real contact notes, so there
-// is no auto-default and no cross-provider fallback.
+// email, or phone), but it does carry the user's notes about them. This module
+// NEVER logs the prompt, the notes, or the draft — metadata only. It uses the
+// provider already chosen explicitly for the card parser (CARD_AI_PROVIDER, or
+// LINKEDIN_AI_PROVIDER), so there is still no auto-default: with neither set,
+// the AI is off. As documented for those parsers, a Gemini key must be a
+// paid / no-training setup.
 //
 // Config (all optional; the template works with none set):
-//   SUGGESTED_MESSAGE_AI=on                        enable the AI draft
-//   SUGGESTED_MESSAGE_PROVIDER=anthropic|gemini    REQUIRED with the flag
-//   ANTHROPIC_API_KEY / GEMINI_API_KEY             provider credential
+//   SUGGESTED_MESSAGE_AI=off             switch the AI draft off (on by default
+//                                        whenever a provider is configured)
+//   SUGGESTED_MESSAGE_PROVIDER           override the inherited provider
+//   CARD_AI_PROVIDER / LINKEDIN_AI_PROVIDER  inherited provider choice
+//   ANTHROPIC_API_KEY / GEMINI_API_KEY   provider credential
 //   GEMINI_MODEL, SUGGESTED_MESSAGE_ANTHROPIC_MODEL  optional model overrides
 // ============================================================================
 import { extractJson } from "./cardAiParse";
 
-export type MessageChannel = "text" | "email" | "linkedin";
 export type MessageProvider = "anthropic" | "gemini";
 
 export interface SuggestionInput {
@@ -47,38 +58,82 @@ export interface SuggestionInput {
   headline?: string | null;
   careerStatement?: string | null;
   careerGoals?: string[] | null;
-  channel: MessageChannel;
 }
 
-export interface SuggestionResult {
+export interface Draft {
+  subject: string;
   message: string;
+}
+
+export interface SuggestionResult extends Draft {
   source: "ai" | "template";
 }
 
+/** Hard ceiling on a reach-out message, for every channel. */
+export const MAX_MESSAGE_LENGTH = 500;
+const MAX_SUBJECT_LENGTH = 70;
 const TIMEOUT_MS = 6000;
 const MAX_NOTES = 1000;
 const GEMINI_DEFAULT_MODEL = "gemini-3.6-flash";
 const ANTHROPIC_DEFAULT_MODEL = "claude-haiku-4-5";
-/** Upper bound on the drafted message, by channel. */
-const MAX_LENGTH: Record<MessageChannel, number> = { text: 320, email: 700, linkedin: 600 };
 const BIRTHDAY_WINDOW_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function flagOn(v: string | undefined): boolean {
-  return !!v && ["1", "true", "on", "yes"].includes(v.trim().toLowerCase());
+function flagOff(v: string | undefined): boolean {
+  return !!v && ["0", "false", "off", "no"].includes(v.trim().toLowerCase());
 }
 
-/** Chosen provider, or null when unusable. Explicit selection only — see the
- *  PRIVACY note above. */
+function providerFor(pref: string | undefined): MessageProvider | null {
+  const p = pref?.trim().toLowerCase();
+  if (p === "anthropic") return process.env["ANTHROPIC_API_KEY"] ? "anthropic" : null;
+  if (p === "gemini") return process.env["GEMINI_API_KEY"] ? "gemini" : null;
+  return null;
+}
+
+/** The provider the app already uses for AI text (explicitly chosen for the
+ *  card / LinkedIn parsers), or null when none is configured. */
 export function activeMessageProvider(): MessageProvider | null {
-  const pref = process.env["SUGGESTED_MESSAGE_PROVIDER"]?.trim().toLowerCase();
-  if (pref === "anthropic") return process.env["ANTHROPIC_API_KEY"] ? "anthropic" : null;
-  if (pref === "gemini") return process.env["GEMINI_API_KEY"] ? "gemini" : null;
+  for (const key of ["SUGGESTED_MESSAGE_PROVIDER", "CARD_AI_PROVIDER", "LINKEDIN_AI_PROVIDER"]) {
+    const pref = process.env[key];
+    if (pref?.trim()) return providerFor(pref);
+  }
   return null;
 }
 
 export function isSuggestedMessageAiEnabled(): boolean {
-  return flagOn(process.env["SUGGESTED_MESSAGE_AI"]) && activeMessageProvider() !== null;
+  return !flagOff(process.env["SUGGESTED_MESSAGE_AI"]) && activeMessageProvider() !== null;
+}
+
+// ── daily cost cap ───────────────────────────────────────────────────────────
+
+/**
+ * Per-day AI draft allowance, per contact and per user. In memory: it resets
+ * on a deploy or restart, which is fine for a cost ceiling (it can only ever
+ * allow one extra day's worth). Exported for tests.
+ */
+export class DraftBudget {
+  private day = "";
+  private perUser = new Map<string, number>();
+  private perContact = new Map<string, number>();
+
+  constructor(readonly maxPerContact = 5, readonly maxPerUser = 40) {}
+
+  /** Uses one AI draft if both allowances have room. */
+  take(userId: string, contactId: string, now: Date = new Date()): boolean {
+    const today = now.toISOString().slice(0, 10);
+    if (today !== this.day) {
+      this.day = today;
+      this.perUser.clear();
+      this.perContact.clear();
+    }
+    const contactKey = `${userId}:${contactId}`;
+    const u = this.perUser.get(userId) ?? 0;
+    const c = this.perContact.get(contactKey) ?? 0;
+    if (u >= this.maxPerUser || c >= this.maxPerContact) return false;
+    this.perUser.set(userId, u + 1);
+    this.perContact.set(contactKey, c + 1);
+    return true;
+  }
 }
 
 // ── shared field helpers ─────────────────────────────────────────────────────
@@ -132,14 +187,19 @@ function firstGoal(input: SuggestionInput): string {
   return goal ?? "";
 }
 
+function capitalized(name: string): string {
+  return name ? name.charAt(0).toUpperCase() + name.slice(1) : name;
+}
+
 // ── prompt ───────────────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT =
-  `You draft a short networking message that the user will review, edit, and send themselves to one contact.\n` +
+  `You draft a short networking message that the user will review, edit, and send themselves to one contact, ` +
+  `by text, email, or LinkedIn — the same message must read well in any of them.\n` +
   `Write in the user's voice, first person: warm, professional, and respectful — like a thoughtful professional, not a template and not salesy.\n` +
   `Use correct grammar, spelling, capitalization, and punctuation in complete sentences. No slang, text-speak, abbreviations, or overly casual phrasing ("hey", "gonna", "grab a coffee").\n` +
   `Rules:\n` +
-  `- 2 to 4 sentences. For a TEXT keep it under 300 characters; for EMAIL or LINKEDIN it can be a little fuller.\n` +
+  `- 2 to 4 sentences and at most ${MAX_MESSAGE_LENGTH} characters in total.\n` +
   `- Start with "Hi <first name>," (or "Happy birthday, <first name>." if their birthday is today).\n` +
   `- Be respectful of their time: no pressure, no flattery, nothing presumptuous or overly familiar.\n` +
   `- Use ONLY facts given in the input. NEVER invent events, dates, numbers, shared history, or details about the company.\n` +
@@ -148,8 +208,10 @@ const SYSTEM_PROMPT =
   `- Mention a news headline only if it reads as positive or neutral, and only in passing.\n` +
   `- Mention the user's career goals only if they relate to this contact's role or company.\n` +
   `- End with a light, low-pressure ask or check-in.\n` +
-  `- No emojis, no hashtags, no links, no subject line, no sign-off or name at the end, no placeholders like [Your Name].\n` +
-  `Return ONLY strict minified JSON: {"message": string}`;
+  `- No emojis, no hashtags, no links, no sign-off or name at the end, no placeholders like [Your Name].\n` +
+  `Also write an email subject line for the same message: professional, specific to what the message is about, ` +
+  `3 to 8 words, sentence case, no ending punctuation, no emojis (e.g. "Following up from the product meetup").\n` +
+  `Return ONLY strict minified JSON: {"subject": string, "message": string}`;
 
 /** The user prompt. Exported for tests. Contains the contact's first name
  *  only — no last name, email, or phone. */
@@ -164,12 +226,11 @@ export function buildPrompt(input: SuggestionInput, today: Date): string {
         : `in ${bday} day${bday === 1 ? "" : "s"}`;
 
   return (
-    `CHANNEL: ${input.channel.toUpperCase()}\n\n` +
     "CONTACT\n" +
-    `- First name: ${clean(input.firstName, 60) || "(unknown)"}\n` +
+    `- First name: ${capitalized(clean(input.firstName, 60)) || "(unknown)"}\n` +
     `- Role: ${clean(input.role) || "(unknown)"}\n` +
     `- Company: ${clean(input.company) || "(unknown)"}\n` +
-    `- Where we met: ${clean(input.metAt) || "(unknown)"}\n` +
+    `- Where we met: ${clean(input.metAt, 100) || "(unknown)"}\n` +
     `- When we met: ${met === null ? "(unknown)" : describeGap(met)}\n` +
     `- Last spoke: ${describeGap(lastSpoke)}\n` +
     `- Birthday: ${birthdayLine}\n` +
@@ -194,84 +255,115 @@ function sentenceCount(text: string): number {
   return text.split(/(?<=[.!?])\s+/).filter((s) => s.trim()).length;
 }
 
-/** The drafted message if it passes every check, else null (→ template).
- *  Exported for tests. `prompt` is what the model saw: any number in the
- *  draft must appear there, so it can't invent dates or figures. */
-export function validateMessage(raw: unknown, channel: MessageChannel, prompt: string): string | null {
-  if (!raw || typeof raw !== "object") return null;
-  const value = (raw as Record<string, unknown>)["message"];
-  if (typeof value !== "string") return null;
-  const message = value.replace(/\s+/g, " ").trim().replace(/^["']|["']$/g, "").trim();
+function normalize(value: string): string {
+  return value.replace(/\s+/g, " ").trim().replace(/^["']|["']$/g, "").trim();
+}
 
-  if (message.length < 20 || message.length > MAX_LENGTH[channel]) return null;
-  if (EMOJI_RE.test(message) || LINK_RE.test(message) || PLACEHOLDER_RE.test(message)) return null;
-  // Professional form: no slang, opens with a capital, ends on punctuation,
-  // and isn't shouting.
-  if (INFORMAL_RE.test(message)) return null;
-  if (!/^[A-Z]/.test(message) || !/[.!?]$/.test(message)) return null;
-  if ((message.match(/!/g) ?? []).length > 1) return null;
-  // All-caps words are shouting, unless the input has them (an acronym like
-  // a company name).
-  for (const word of message.match(/\b[A-Z]{5,}\b/g) ?? []) {
-    if (!prompt.includes(word)) return null;
+/** Checks shared by message and subject: no emoji, links, placeholders,
+ *  slang, shouting, or numbers the input doesn't contain (invented facts). */
+function passesCommonChecks(text: string, prompt: string): boolean {
+  if (EMOJI_RE.test(text) || LINK_RE.test(text) || PLACEHOLDER_RE.test(text) || INFORMAL_RE.test(text)) return false;
+  if (!/^[A-Z]/.test(text)) return false;
+  // All-caps words are shouting, unless the input has them (an acronym).
+  for (const word of text.match(/\b[A-Z]{5,}\b/g) ?? []) {
+    if (!prompt.includes(word)) return false;
   }
+  for (const n of text.match(/\d+/g) ?? []) {
+    if (!prompt.includes(n)) return false;
+  }
+  return true;
+}
+
+/** The message if it passes every check, else null. Exported for tests. */
+export function validateMessage(value: unknown, prompt: string): string | null {
+  if (typeof value !== "string") return null;
+  const message = normalize(value);
+  if (message.length < 20 || message.length > MAX_MESSAGE_LENGTH) return null;
+  if (!passesCommonChecks(message, prompt)) return null;
+  if (!/[.!?]$/.test(message)) return null;
+  if ((message.match(/!/g) ?? []).length > 1) return null;
   const sentences = sentenceCount(message);
   if (sentences < 2 || sentences > 5) return null;
-  for (const n of message.match(/\d+/g) ?? []) {
-    if (!prompt.includes(n)) return null;
-  }
   return message;
+}
+
+/** The subject if it passes, else null. Exported for tests. */
+export function validateSubject(value: unknown, prompt: string): string | null {
+  if (typeof value !== "string") return null;
+  const subject = normalize(value).replace(/^subject:\s*/i, "");
+  if (subject.length < 3 || subject.length > MAX_SUBJECT_LENGTH) return null;
+  if (/[.!?:;,]$/.test(subject)) return null;
+  if (!passesCommonChecks(subject, prompt)) return null;
+  return subject;
+}
+
+/** The AI draft if its message validates. A bad subject alone doesn't throw
+ *  away a good message — it's swapped for the template subject. */
+export function validateDraft(raw: unknown, prompt: string, fallbackSubject: string): Draft | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const message = validateMessage(o["message"], prompt);
+  if (!message) return null;
+  return { message, subject: validateSubject(o["subject"], prompt) ?? fallbackSubject };
 }
 
 // ── deterministic template ───────────────────────────────────────────────────
 
 /** Always-available draft from the same fields. Exported for tests. Uses no
- *  free text it can't phrase safely — notes are left out on purpose. */
-export function templateMessage(input: SuggestionInput, today: Date): string {
-  const rawName = clean(input.firstName, 60);
-  // Names typed in lowercase ("priya") still open the message properly.
-  const name = rawName ? rawName.charAt(0).toUpperCase() + rawName.slice(1) : "there";
-  const company = clean(input.company);
-  const role = clean(input.role);
-  const metAt = clean(input.metAt);
+ *  free text it can't phrase safely — notes are left out on purpose. Optional
+ *  sentences are dropped, least important first, to stay under the cap. */
+export function templateDraft(input: SuggestionInput, today: Date): Draft {
+  const name = capitalized(clean(input.firstName, 60)) || "there";
+  const company = clean(input.company, 80);
+  const role = clean(input.role, 80);
+  const metAt = clean(input.metAt, 80);
   const headline = clean(input.headline, 200);
-  const goal = firstGoal(input);
-  const short = input.channel === "text";
+  const goal = firstGoal(input).replace(/[.!?]+$/, "");
   const lastSpoke = daysSince(input.lastInteractionDate, today);
   const birthdayToday = daysUntilBirthday(input.birthday, today) === 0;
+  const recentMeeting = !!metAt && (lastSpoke === null || lastSpoke < 60);
+  const longGap = lastSpoke !== null && lastSpoke >= 60;
 
-  const parts: string[] = [];
+  let opening: string;
+  let subject: string;
   if (birthdayToday) {
-    parts.push(`Happy birthday, ${name}. I hope you have a wonderful day.`);
-  } else if (metAt && (lastSpoke === null || lastSpoke < 60)) {
-    parts.push(`Hi ${name}, it was a pleasure meeting you at ${metAt}.`);
-  } else if (lastSpoke !== null && lastSpoke >= 60) {
-    parts.push(`Hi ${name}, I hope you are doing well. It has been a while since we last spoke.`);
+    opening = `Happy birthday, ${name}. I hope you have a wonderful day.`;
+    subject = "Happy birthday";
+  } else if (recentMeeting) {
+    opening = `Hi ${name}, it was a pleasure meeting you at ${metAt}.`;
+    subject = metAt.length <= 45 ? `Following up from ${metAt}` : "Following up on our conversation";
+  } else if (longGap) {
+    opening = `Hi ${name}, I hope you are doing well. It has been a while since we last spoke.`;
+    subject = "Reconnecting";
   } else {
-    parts.push(`Hi ${name}, I hope you are doing well.`);
+    opening = `Hi ${name}, I hope you are doing well.`;
+    subject = headline && company ? `Recent news at ${company}` : "Checking in";
   }
 
-  if (headline && company) {
-    parts.push(short
-      ? `I read the recent news about ${company} and thought of you.`
-      : `I read the recent news about ${company} ("${headline}") and thought of you.`);
-  } else if (role && company && !short) {
-    parts.push(`I would welcome the chance to hear how things are going in your role as ${role} at ${company}.`);
-  } else if (company && !short) {
-    parts.push(`I would welcome the chance to hear how things are going at ${company}.`);
+  // Middle sentences in order of preference; each has a shorter fallback (or
+  // none) used when the full draft would pass the cap.
+  const news = headline && company
+    ? [`I read the recent news about ${company} ("${headline}") and thought of you.`, `I read the recent news about ${company} and thought of you.`]
+    : null;
+  const work = !news && company
+    ? [role
+      ? `I would welcome the chance to hear how things are going in your role as ${role} at ${company}.`
+      : `I would welcome the chance to hear how things are going at ${company}.`]
+    : null;
+  const goalLine = goal
+    ? [`I am currently working toward a goal related to your field (${goal}), and I would value your perspective.`]
+    : null;
+  const close = "If you are open to it, I would appreciate a brief call or coffee in the coming weeks.";
+
+  const options = [news, work, goalLine].filter((o): o is string[] => !!o);
+  const chosen = options.map((o) => o[0]);
+  const build = () => [opening, ...chosen.filter(Boolean), close].join(" ");
+  // Shrink from the least important sentence (last) backwards.
+  for (let i = options.length - 1; i >= 0 && build().length > MAX_MESSAGE_LENGTH; i--) {
+    chosen[i] = options[i][1] ?? "";
+    if (build().length > MAX_MESSAGE_LENGTH) chosen[i] = "";
   }
-
-  if (goal && !short) {
-    // Goals are free text ("Land a PM role", "Product in beauty"), so they go
-    // in parentheses rather than into a sentence that assumes their grammar.
-    parts.push(`I am currently working toward a goal related to your field (${goal.replace(/[.!?]+$/, "")}), and I would value your perspective.`);
-  }
-
-  parts.push(short
-    ? "Would you be open to catching up soon?"
-    : "If you are open to it, I would appreciate a brief call or coffee in the coming weeks, whenever is convenient for you.");
-
-  return parts.join(" ");
+  return { subject, message: build() };
 }
 
 // ── providers (self-contained, like linkedinAiParse) ─────────────────────────
@@ -287,7 +379,7 @@ async function completeGemini(system: string, user: string, signal: AbortSignal)
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
       contents: [{ role: "user", parts: [{ text: user }] }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0.7, maxOutputTokens: 400 },
+      generationConfig: { responseMimeType: "application/json", temperature: 0.7, maxOutputTokens: 300 },
     }),
     signal,
   });
@@ -307,7 +399,7 @@ async function completeAnthropic(system: string, user: string, signal: AbortSign
   const client = new Anthropic({ apiKey });
   const model = process.env["SUGGESTED_MESSAGE_ANTHROPIC_MODEL"]?.trim() || ANTHROPIC_DEFAULT_MODEL;
   const msg = await client.messages.create(
-    { model, max_tokens: 400, temperature: 0.7, system, messages: [{ role: "user", content: user }] },
+    { model, max_tokens: 300, temperature: 0.7, system, messages: [{ role: "user", content: user }] },
     { signal },
   );
   let text = "";
@@ -318,13 +410,14 @@ async function completeAnthropic(system: string, user: string, signal: AbortSign
 export type CompleteFn = (system: string, user: string, signal: AbortSignal) => Promise<string | null>;
 
 /** Testable core: draft via an injected completion fn (or none → template).
- *  Never throws, always returns a message. */
+ *  Never throws, always returns a draft. */
 export async function suggestMessageWith(
   input: SuggestionInput,
   complete: CompleteFn | null,
   today: Date = new Date(),
 ): Promise<SuggestionResult> {
-  const fallback: SuggestionResult = { message: templateMessage(input, today), source: "template" };
+  const template = templateDraft(input, today);
+  const fallback: SuggestionResult = { ...template, source: "template" };
   if (!complete) return fallback;
 
   const prompt = buildPrompt(input, today);
@@ -332,8 +425,8 @@ export async function suggestMessageWith(
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const raw = await complete(SYSTEM_PROMPT, prompt, controller.signal);
-    const message = raw ? validateMessage(extractJson(raw), input.channel, prompt) : null;
-    return message ? { message, source: "ai" } : fallback;
+    const draft = raw ? validateDraft(extractJson(raw), prompt, template.subject) : null;
+    return draft ? { ...draft, source: "ai" } : fallback;
   } catch (err) {
     // The provider's own error shape only — never the prompt or notes.
     const e = err as { name?: string; status?: number; message?: string };
@@ -351,25 +444,32 @@ export async function suggestMessageWith(
   }
 }
 
-/** Draft using the configured provider, or the template when AI is off. */
-export async function suggestMessage(input: SuggestionInput, today: Date = new Date()): Promise<SuggestionResult> {
-  const provider = isSuggestedMessageAiEnabled() ? activeMessageProvider() : null;
+/** Draft with the configured provider when `allowAi`, else the template. */
+export async function suggestMessage(
+  input: SuggestionInput,
+  allowAi: boolean,
+  today: Date = new Date(),
+): Promise<SuggestionResult> {
+  const provider = allowAi && isSuggestedMessageAiEnabled() ? activeMessageProvider() : null;
   const complete = provider === "anthropic" ? completeAnthropic : provider === "gemini" ? completeGemini : null;
   return suggestMessageWith(input, complete, today);
 }
 
-/** Log payload — METADATA ONLY. Never the prompt, notes, or message text. */
+/** Why a draft came from the template, for the log. */
+export type TemplateReason = "ai_off" | "not_subscribed" | "daily_cap" | "ai_failed";
+
+/** Log payload — METADATA ONLY. Never the prompt, notes, subject, or message. */
 export function suggestedMessageLogFields(
   result: SuggestionResult,
-  channel: MessageChannel,
   ms: number,
   provider: MessageProvider | null,
+  reason: TemplateReason | null,
 ) {
   return {
     event: "suggested_message",
     provider,
-    channel,
     source: result.source,
+    reason: result.source === "ai" ? null : reason ?? "ai_failed",
     ms,
     length: result.message.length,
   };

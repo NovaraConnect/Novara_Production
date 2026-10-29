@@ -28,6 +28,9 @@ code when a variable is absent, verified by reading the relevant source, not ass
 | `FEEDBACK_TO_EMAIL` | No | No | `lib/email.ts`, `.env.example` | Defaults to `novaraconnect@gmail.com` if unset. |
 | `RESEND_FROM_EMAIL` | No | No | `lib/email.ts`, `.env.example` | Defaults to Resend's shared sandbox sender (`onboarding@resend.dev`), which only delivers to the email address that owns the Resend account. Verify a domain in Resend and set this for reliable delivery to any `FEEDBACK_TO_EMAIL`. |
 | `LOG_LEVEL` | No | No | `.env.example`, `logger.ts` (pino) | Defaults to pino's own default level if unset. |
+| `SUGGESTED_MESSAGE_AI` | No | No | `lib/suggestedMessage.ts` | On by default whenever a provider is configured; set `off` to serve only the template draft. |
+| `SUGGESTED_MESSAGE_PROVIDER` | No | No | `lib/suggestedMessage.ts` | Overrides the provider; otherwise inherits `CARD_AI_PROVIDER`, then `LINKEDIN_AI_PROVIDER`. With none set, suggested messages use the deterministic template. |
+| `SUGGESTED_MESSAGE_ANTHROPIC_MODEL` | No | No | `lib/suggestedMessage.ts` | Defaults to `claude-haiku-4-5`. Gemini uses `GEMINI_MODEL`. |
 
 ## Web frontend (`artifacts/project-novara`, deployed as `novara-mobile2-frontend`)
 

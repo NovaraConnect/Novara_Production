@@ -2,18 +2,20 @@ import { Router, type Request, type Response } from "express";
 import rateLimit from "express-rate-limit";
 import { pool, toDateStr } from "../db";
 import { requireAuth, type AuthedRequest } from "../middlewares/auth";
+import { proStatusFor } from "../lib/entitlements";
 import {
+  DraftBudget,
   activeMessageProvider,
   isSuggestedMessageAiEnabled,
   suggestMessage,
   suggestedMessageLogFields,
-  type MessageChannel,
+  type TemplateReason,
 } from "../lib/suggestedMessage";
 
 const router = Router();
 
 // Auth-gated AND rate-limited so Regenerate can't turn this into an open LLM
-// proxy.
+// proxy. The real spend ceiling is the daily DraftBudget below.
 const suggestedMessageLimiter = rateLimit({
   windowMs: 60_000,
   max: 20,
@@ -21,21 +23,21 @@ const suggestedMessageLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-function asChannel(v: unknown): MessageChannel | null {
-  return v === "text" || v === "email" || v === "linkedin" ? v : null;
-}
+// 5 AI drafts per contact and 40 per user per day; past that, the template.
+const budget = new DraftBudget(5, 40);
 
-// POST /api/contacts/:id/suggested-message  { channel?, headline? }
-// Always answers with a draft: the AI one when configured and valid, else the
-// deterministic template. Never sends anything — the client shows the draft
-// for the user to edit and send themselves.
+// POST /api/contacts/:id/suggested-message  { headline? }
+// Always answers with one draft — { subject, message, source } — that works
+// as a text, email, or LinkedIn message: the AI one for subscribers within the
+// daily cap when a provider is configured, else the deterministic template.
+// Never sends anything; the client shows it for the user to edit and send.
 router.post(
   "/contacts/:id/suggested-message",
   requireAuth,
   suggestedMessageLimiter,
   async (req: Request, res: Response) => {
     const userId = (req as AuthedRequest).userId;
-    const { id } = req.params;
+    const id = String(req.params["id"]);
     const headline = typeof req.body?.headline === "string" ? req.body.headline.slice(0, 300) : null;
 
     try {
@@ -52,8 +54,14 @@ router.post(
         [userId],
       );
 
-      const channel = asChannel(req.body?.channel) ?? asChannel(contact.preferred_contact_method) ?? "text";
-      const provider = isSuggestedMessageAiEnabled() ? activeMessageProvider() : null;
+      // AI drafts cost money, so only an active subscription or trial gets
+      // them (in that order of checks, so the cap isn't spent on a refusal).
+      let reason: TemplateReason | null = null;
+      if (!isSuggestedMessageAiEnabled()) reason = "ai_off";
+      else if (!(await proStatusFor(userId)).pro) reason = "not_subscribed";
+      else if (!budget.take(userId, id)) reason = "daily_cap";
+
+      const provider = reason ? null : activeMessageProvider();
       const t0 = Date.now();
       const result = await suggestMessage({
         firstName: contact.first_name,
@@ -67,16 +75,15 @@ router.post(
         headline,
         careerStatement: settings?.career_statement ?? null,
         careerGoals: settings?.career_goals ?? [],
-        channel,
-      });
+      }, reason === null);
 
-      // METADATA ONLY — never the notes, the prompt, or the drafted message.
+      // METADATA ONLY — never the notes, the prompt, or the draft.
       console.log(
         "[suggested-message]",
-        JSON.stringify(suggestedMessageLogFields(result, channel, Date.now() - t0, provider)),
+        JSON.stringify(suggestedMessageLogFields(result, Date.now() - t0, provider, reason)),
       );
 
-      res.json({ message: result.message, source: result.source, channel });
+      res.json({ subject: result.subject, message: result.message, source: result.source });
     } catch (err) {
       console.error("[suggested-message] DB error:", err instanceof Error ? err.message : String(err));
       res.status(500).json({ error: "Failed to draft a message" });

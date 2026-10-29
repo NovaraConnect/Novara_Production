@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { draftHref, DRAFT_EMAIL_SUBJECT } from "./contactActions";
+import { draftHref } from "./contactActions";
 import { Contact } from "@/types/contact";
 
 const contact = {
@@ -20,11 +20,15 @@ describe("draftHref", () => {
   });
 
   it("prefills an email subject and body, encoding reserved characters", () => {
-    const href = draftHref(contact, "email", body)!;
+    const href = draftHref(contact, "email", body, "Following up from the product meetup")!;
     expect(href.startsWith("mailto:priya@northwind.example?subject=")).toBe(true);
     const params = new URLSearchParams(href.split("?")[1]);
-    expect(params.get("subject")).toBe(DRAFT_EMAIL_SUBJECT);
+    expect(params.get("subject")).toBe("Following up from the product meetup");
     expect(params.get("body")).toBe(body);
+  });
+
+  it("leaves the subject out when there is none", () => {
+    expect(draftHref(contact, "email", body)).toBe(`mailto:priya@northwind.example?body=${encodeURIComponent(body)}`);
   });
 
   it("has no compose link for LinkedIn (the draft is copied instead)", () => {

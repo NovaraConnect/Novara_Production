@@ -54,8 +54,11 @@ The app supports being served from a non-root base path (`BASE_URL`/`BASE_PATH`,
 - **`AddContact.tsx` / `EditContact.tsx`** — contact create/edit forms, including the LinkedIn-URL
   import flow (`BusinessCardScanner.tsx`/`QRScanner.tsx` also live alongside these for alternate
   intake methods).
-- **`ContactDetail.tsx`** — single-contact view, including the "mark as contacted" action and
-  company news lookup (`useCompanyNews.ts`).
+- **`ContactDetail.tsx`** — single-contact view, including the "mark as contacted" action,
+  company news lookup (`useCompanyNews.ts`), and the Suggested message card
+  (`components/SuggestedMessage.tsx`): one editable draft (≤500 chars) drafted on tap, with
+  Regenerate, Copy, and a send action for the preferred channel that opens Messages/Mail
+  prefilled (email gets the subject line) or copies it for LinkedIn. It never sends.
 - **`Settings.tsx`** — account info, career statement/goals editor (feeds priority scoring),
   auto-downgrade cadence selector, links to Notification settings, Support (feedback), and Install
   (PWA guide).

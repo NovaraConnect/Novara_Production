@@ -316,7 +316,6 @@ export default function ContactDetail() {
           key={contact.id}
           contact={contact}
           headline={newsHasHeadlines ? headlines[0]?.title : undefined}
-          newsSettled={newsStatus !== "idle" && newsStatus !== "loading"}
           onSent={promptMarkContacted}
         />
 
