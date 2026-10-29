@@ -155,17 +155,26 @@ export default function StartPage() {
   const [platform, setPlatform] = useState<Platform>("desktop");
   const [showSticky, setShowSticky] = useState(false);
   const heroCtaRef = useRef<HTMLDivElement>(null);
+  const finalCtaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => setPlatform(detectPlatform()), []);
 
-  // The sticky bar appears once the hero's own button has scrolled away.
+  // The sticky bar shows only while neither of the page's own buttons is on
+  // screen, so two download buttons never stack at the bottom.
   useEffect(() => {
-    const el = heroCtaRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(([entry]) => setShowSticky(!entry.isIntersecting), {
-      rootMargin: "0px 0px -40px 0px",
-    });
-    io.observe(el);
+    const targets = [heroCtaRef.current, finalCtaRef.current].filter(Boolean) as Element[];
+    const visible = new Set<Element>();
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) visible.add(e.target);
+          else visible.delete(e.target);
+        }
+        setShowSticky(visible.size === 0);
+      },
+      { rootMargin: "0px 0px -40px 0px" },
+    );
+    targets.forEach((t) => io.observe(t));
     return () => io.disconnect();
   }, []);
 
@@ -208,14 +217,13 @@ export default function StartPage() {
 
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 pb-20 pt-6 sm:px-6 lg:min-h-[calc(100dvh-4rem)] lg:grid-cols-[1.1fr_0.9fr] lg:pb-16 lg:pt-0">
           <div>
-            <p className="text-sm font-semibold text-[#8FA6FF]">For students &amp; young professionals</p>
+            <p className="text-sm font-semibold text-[#8FA6FF]">Networking for students &amp; young professionals</p>
             <h1 className="mt-3 font-serif text-[2.6rem] font-bold leading-[1.04] sm:text-6xl lg:text-7xl">
-              You met the right people.{" "}
-              <span className="text-[#8FA6FF]">Now keep them.</span>
+              Great chat.{" "}
+              <span className="text-[#8FA6FF]">Now what?</span>
             </h1>
-            <p className="mt-5 max-w-lg text-lg leading-relaxed text-[#C4CEDD]">
-              Novara tells you who to follow up with, and when, so the career fair, the coffee
-              chat and the conference never turn into “we lost touch.”
+            <p className="mt-5 max-w-lg text-xl leading-relaxed text-[#C4CEDD] sm:text-2xl">
+              Novara turns people you meet into contacts you keep.
             </p>
             <div ref={heroCtaRef} className="mt-8 flex flex-col items-start gap-3">
               <DownloadButton platform={platform} where="hero" />
@@ -271,7 +279,7 @@ export default function StartPage() {
           <h2 className="font-serif text-3xl font-bold leading-tight sm:text-5xl">
             Your next opportunity is probably someone you’ve already met.
           </h2>
-          <div className="mt-9 flex flex-col items-center gap-3">
+          <div ref={finalCtaRef} className="mt-9 flex flex-col items-center gap-3">
             <DownloadButton platform={platform} where="final" />
             <FinePrint platform={platform} />
           </div>
