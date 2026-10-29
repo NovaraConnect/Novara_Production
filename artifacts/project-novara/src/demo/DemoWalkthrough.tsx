@@ -2,15 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { ChevronRight, X, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import { computeHealthScore, computeStatus } from "@/lib/utils";
-import { APP_STORE_URL } from "@/lib/appStore";
-import { DEMO_CONTACTS } from "./demoData";
-
-// The tour quotes the demo's own numbers, so its words can never disagree
-// with the screen (they once said 66/100 over a dashboard showing 0).
-const connected = DEMO_CONTACTS.filter((c) => c.connectionStatus === "connected");
-const DEMO_SCORE = computeHealthScore(connected);
-const DEMO_COOLING = connected.filter((c) => computeStatus(c) === "Cooling").length;
 
 const STEPS = [
   {
@@ -18,7 +9,7 @@ const STEPS = [
     page: "dashboard" as const,
     title: "View your network health",
     description:
-      `Network Health shows how well you're keeping up with the people who matter. ${DEMO_SCORE}/100 is solid, but ${DEMO_COOLING} contacts are cooling.`,
+      "Your Network Health Score reflects how well you're maintaining key relationships. 66/100 means you're doing well — but 2 contacts are cooling.",
     targetId: "demo-health",
   },
   {
@@ -26,7 +17,7 @@ const STEPS = [
     page: "dashboard" as const,
     title: "See who needs follow-up",
     description:
-      "Novara lists who to follow up with, highest priority first: Emma, Priya and Marc are overdue, and Sarah is due today. Tap Next to open Sarah's profile.",
+      "Novara automatically flags contacts due for follow-up. Sarah is due today, Marc and Priya are already overdue. Tap Next to open Sarah's profile.",
     targetId: "demo-attention",
     nextNavigates: true,
   },
@@ -35,7 +26,7 @@ const STEPS = [
     page: "contact" as const,
     title: "Open a contact",
     description:
-      "This is Sarah Jones, a recruiter you met at an event. She's still Warm: you last spoke a month ago and her follow-up is due today.",
+      "You're on Sarah Jones' profile. She's Warm — you last reached out 25 days ago. Her follow-up is due today.",
     targetId: "demo-profile",
   },
   {
@@ -43,7 +34,7 @@ const STEPS = [
     page: "contact" as const,
     title: "See recent company news",
     description:
-      "In the app, Novara pulls the latest Tesla headlines every day, so you always have something real to say when you reach out.",
+      "Novara pulls live Tesla headlines — so you always have something meaningful to say when you reach out to Sarah.",
     targetId: "demo-news",
   },
   {
@@ -51,7 +42,7 @@ const STEPS = [
     page: "contact" as const,
     title: "Mark contact as reached out to",
     description:
-      "One tap logs the check-in and resets the clock. Novara will remind you about Sarah again in 30 days.",
+      "One tap resets the follow-up clock. Novara will remind you to reach out to Sarah again in 30 days.",
     targetId: "demo-mark-contacted",
     isLast: true,
   },
@@ -74,16 +65,13 @@ function resetStep() {
 
 interface DemoWalkthroughProps {
   page: "dashboard" | "contact";
-  /** False hides the tour, e.g. on a contact other than Sarah, whom the
-   *  contact steps describe. */
-  active?: boolean;
 }
 
-export function DemoWalkthrough({ page, active = true }: DemoWalkthroughProps) {
+export function DemoWalkthrough({ page }: DemoWalkthroughProps) {
   const [step, setStepState] = useState(() => {
     const stored = getStoredStep();
     // If navigating directly to contact page, jump past dashboard steps
-    const adjusted = active && page === "contact" && stored < 3 ? 3 : stored;
+    const adjusted = page === "contact" && stored < 3 ? 3 : stored;
     if (adjusted !== stored) storeStep(adjusted);
     return adjusted;
   });
@@ -98,14 +86,14 @@ export function DemoWalkthrough({ page, active = true }: DemoWalkthroughProps) {
   const currentStepDef = STEPS.find((s) => s.step === step && s.page === page);
 
   useEffect(() => {
-    if (!active || !currentStepDef?.targetId) return;
+    if (!currentStepDef?.targetId) return;
     const el = document.getElementById(currentStepDef.targetId);
     if (el) {
       setTimeout(() => {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
       }, 150);
     }
-  }, [active, currentStepDef]);
+  }, [currentStepDef]);
 
   const handleNext = () => {
     const current = STEPS.find((s) => s.step === step);
@@ -113,11 +101,11 @@ export function DemoWalkthrough({ page, active = true }: DemoWalkthroughProps) {
 
     if (current.isLast) {
       resetStep();
-      toast.success("That's Novara. Ready to use it with your own network?", {
-        duration: 8000,
+      toast.success("Tour complete! Ready to try Novara with your real contacts?", {
+        duration: 5000,
         action: {
-          label: "Get the app",
-          onClick: () => window.location.assign(APP_STORE_URL),
+          label: "Get started free",
+          onClick: () => setLocation("/sign-up"),
         },
       });
       setDismissed(true);
@@ -126,7 +114,7 @@ export function DemoWalkthrough({ page, active = true }: DemoWalkthroughProps) {
 
     if (current.nextNavigates) {
       setStep(step + 1);
-      setLocation("/try/contacts/demo-sarah");
+      setLocation("/demo/contacts/demo-sarah");
       return;
     }
 
@@ -138,13 +126,13 @@ export function DemoWalkthrough({ page, active = true }: DemoWalkthroughProps) {
     setDismissed(true);
   };
 
-  if (!active || dismissed || !currentStepDef) return null;
+  if (dismissed || !currentStepDef) return null;
 
   const totalSteps = STEPS.length;
   const progressWidth = (step / totalSteps) * 100;
 
   return (
-    <div className="fixed bottom-[76px] left-0 right-0 z-40 px-3 pb-1">
+    <div className="fixed bottom-20 left-0 right-0 z-40 px-3 pb-1">
       <div className="bg-elevated border border-border rounded-2xl shadow-[var(--shadow-raised)] overflow-hidden max-w-md mx-auto">
         {/* Progress bar */}
         <div className="h-1 bg-subtle">

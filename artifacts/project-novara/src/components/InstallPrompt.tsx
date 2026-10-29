@@ -35,17 +35,9 @@ export default function InstallPrompt() {
     if (localStorage.getItem(key) === "1") setDismissed(true);
   }, []);
 
-  // Marketing pages and the demo: investors aren't going to install, and
-  // /start and /try have their own App Store button this banner would compete with.
-  if (
-    dismissed ||
-    isInstalledExperience() ||
-    MARKETING_PAGES.has(location) ||
-    location === "/try" ||
-    location.startsWith("/try/")
-  ) {
-    return null;
-  }
+  // Marketing pages: investors aren't going to install, and /start has its own
+  // App Store button that this banner would compete with.
+  if (dismissed || isInstalledExperience() || MARKETING_PAGES.has(location)) return null;
 
   const platform = detectPlatform();
 

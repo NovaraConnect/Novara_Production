@@ -1,273 +1,298 @@
-// The public demo's contact page, at /try/contacts/:id: the signed-in
-// ContactDetail's layout over sample data. Actions that would need an account
-// (contacting, calendar, reminders) explain themselves instead of failing.
-// The tour points at #demo-profile, #demo-news and #demo-mark-contacted.
 import { useState } from "react";
-import { Link, useRoute } from "wouter";
-import {
-  AlignLeft,
-  ArrowLeft,
-  Bell,
-  Briefcase,
-  CalendarDays,
-  CalendarPlus,
-  CheckCircle2,
-  Loader2,
-  MapPin,
-  Newspaper,
-  RefreshCw,
-  Send,
-  Tag,
-} from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { ContactAvatar } from "@/components/ContactAvatar";
+import { useRoute, useLocation } from "wouter";
+import { formatDate, computeStatus } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ImportanceBadge } from "@/components/ImportanceBadge";
-import { computeStatus, formatDate } from "@/lib/utils";
-import { formatCadenceLabel, isInMaintenanceMode } from "@/lib/cadence";
+import {
+  ArrowLeft,
+  Linkedin,
+  MapPin,
+  AlignLeft,
+  CalendarDays,
+  CheckCircle2,
+  ExternalLink,
+  Newspaper,
+  RefreshCw,
+  Loader2,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { DEMO_CONTACTS, DEMO_SETTINGS, TESLA_NEWS } from "@/demo/demoData";
-import { DemoBanner, DemoGetAppBar } from "@/demo/DemoBanner";
+import { DemoBanner } from "@/demo/DemoBanner";
 import { DemoWalkthrough } from "@/demo/DemoWalkthrough";
-
-function DetailRow({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof CalendarDays;
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-start gap-3">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary/80">
-        <Icon className="h-4 w-4 text-foreground/70" />
-      </div>
-      <div>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-sm font-medium text-foreground">{value}</p>
-      </div>
-    </div>
-  );
-}
-
-const inTheApp = (what: string) =>
-  toast(`${what} works in the app`, { description: "The demo doesn’t save anything or contact anyone." });
+import { isInMaintenanceMode, formatCadenceLabel } from "@/lib/cadence";
 
 export default function DemoContactDetail() {
-  const [, params] = useRoute("/try/contacts/:id");
-  const [contacting, setContacting] = useState(false);
+  const [, params] = useRoute("/demo/contacts/:id");
+  const [, setLocation] = useLocation();
   const [contacted, setContacted] = useState(false);
+  const [contacting, setContacting] = useState(false);
 
   const contact = DEMO_CONTACTS.find((c) => c.id === params?.id) ?? DEMO_CONTACTS[0];
-  const maintenance = isInMaintenanceMode(contact, DEMO_SETTINGS.autoDowngradeAfterMonths);
-  const cadenceLabel = formatCadenceLabel(contact, DEMO_SETTINGS);
-  const news = contact.id === "demo-sarah" ? TESLA_NEWS : [];
-  const hasProfile = Boolean(contact.industry || contact.function || contact.interests?.length);
+  const settings = DEMO_SETTINGS;
+
+  const maintenance = isInMaintenanceMode(contact, settings.autoDowngradeAfterMonths);
+  const cadenceLabel = formatCadenceLabel(contact, settings);
+
+  const isSarah = contact.id === "demo-sarah";
+  const news = isSarah ? TESLA_NEWS : [];
 
   const handleMarkContacted = async () => {
     setContacting(true);
-    await new Promise((r) => setTimeout(r, 600));
+    await new Promise((r) => setTimeout(r, 700));
     setContacting(false);
     setContacted(true);
-    toast.success(`Logged. Novara will remind you about ${contact.firstName} again later.`, {
-      description: "Demo only: nothing was saved.",
-    });
+    toast.success("Interaction recorded! (Demo — not saved to your account)");
   };
 
   return (
-    <div className="mobile-container pb-36">
+    <div className="mobile-container pb-12 flex flex-col min-h-[100dvh] bg-background">
       <DemoBanner />
 
-      <header className="flex items-center justify-between px-4 pb-2 pt-4">
-        <Link href="/try" aria-label="Back to the demo dashboard">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-        </Link>
-        <span className="text-xs font-medium text-muted-foreground">Sample contact</span>
+      <header className="sticky top-[42px] z-40 bg-background/95 backdrop-blur-md pt-4 pb-4 px-4 flex items-center justify-between border-b border-border/30">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setLocation("/demo")}
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <span className="text-xs text-muted-foreground font-medium">Demo contact</span>
         <div className="w-10" />
       </header>
 
-      <main className="px-4 py-2">
+      <main className="flex-1 px-4 py-4">
+        {/* Profile header */}
         <div id="demo-profile" className="mb-8">
-          <ContactAvatar firstName={contact.firstName} lastName={contact.lastName} size={88} className="mb-4" />
-          <h1 className="mb-1 font-serif text-3xl font-bold leading-tight tracking-tight text-foreground">
+          <h1 className="font-serif text-3xl font-bold tracking-tight text-foreground mb-1 leading-tight">
             {contact.firstName} {contact.lastName}
           </h1>
-          <p className="text-lg font-medium text-muted-foreground">
+          <p className="text-lg text-muted-foreground font-medium">
             {contact.role ? `${contact.role} @ ` : ""}
             {contact.company}
           </p>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 mt-4 flex-wrap">
             <StatusBadge status={computeStatus(contact)} />
-            <ImportanceBadge importance={contact.currentPriority ?? contact.importance} />
+            <ImportanceBadge importance={contact.importance} />
             {contact.connectionStatus === "pipeline" && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-priority-high/25 bg-priority-high-soft px-2.5 py-1 text-[10px] font-semibold text-priority-high">
+              <span className="inline-flex items-center gap-1 bg-priority-high-soft text-priority-high border border-priority-high/25 rounded-full text-[10px] font-semibold px-2.5 py-1">
                 Pipeline
               </span>
             )}
             {maintenance && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-cooling/25 bg-cooling-soft px-2.5 py-1 text-[10px] font-semibold text-cooling">
-                <RefreshCw className="h-2.5 w-2.5" />
+              <span className="inline-flex items-center gap-1 bg-cooling-soft text-cooling border border-cooling/25 rounded-full text-[10px] font-semibold px-2.5 py-1">
+                <RefreshCw className="w-2.5 h-2.5" />
                 Maintenance cadence
               </span>
             )}
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-3">
-          <Button
-            id="demo-mark-contacted"
-            onClick={contacted ? undefined : handleMarkContacted}
-            disabled={contacting}
-            className={`h-14 gap-1.5 rounded-xl text-sm font-semibold shadow-md transition-transform active:scale-[0.98] sm:text-base ${
-              contacted ? "border border-warm/30 bg-warm-soft text-warm hover:bg-warm-soft" : ""
-            }`}
-          >
-            {contacting ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="h-5 w-5" />}
-            {contacted ? "Contacted" : "Mark contacted"}
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => inTheApp("Contacting")}
-            className="h-14 gap-1.5 rounded-xl text-sm font-semibold sm:text-base"
-          >
-            <Send className="h-5 w-5" />
-            Contact now
-          </Button>
-        </div>
-        <div className="mb-8 grid grid-cols-2 gap-3">
-          <Button
-            variant="outline"
-            onClick={() => inTheApp("Adding to your calendar")}
-            className="h-12 w-full gap-2 rounded-xl font-semibold"
-          >
-            <CalendarPlus className="h-4 w-4" />
-            Add to Calendar
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => inTheApp("Reminders")}
-            className="h-12 w-full gap-2 rounded-xl font-semibold"
-          >
-            <Bell className="h-4 w-4" />
-            Set Reminder
-          </Button>
-        </div>
+        {/* Primary action */}
+        <Button
+          id="demo-mark-contacted"
+          onClick={contacted ? undefined : handleMarkContacted}
+          disabled={contacting}
+          className={`w-full h-14 rounded-xl text-base font-semibold shadow-md active:scale-[0.98] transition-all mb-4 ${
+            contacted
+              ? "bg-warm/20 text-warm border border-warm/30"
+              : ""
+          }`}
+        >
+          {contacting ? (
+            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+          ) : (
+            <CheckCircle2 className="w-5 h-5 mr-2" />
+          )}
+          {contacted ? "Contacted! ✓" : "Mark as Contacted Today"}
+        </Button>
 
         <div className="space-y-4">
-          <div className="space-y-4 rounded-2xl border border-border/50 bg-card p-5 shadow-sm">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Relationship Details</h3>
-            <DetailRow
-              icon={CalendarDays}
-              label="Next Follow Up"
-              value={<span className="font-semibold">{contacted ? "Reset by your check-in" : formatDate(contact.nextFollowUpDate)}</span>}
-            />
-            <DetailRow
-              icon={CalendarDays}
-              label="Last Interaction"
-              value={contacted ? "Today" : formatDate(contact.lastInteractionDate)}
-            />
-            {contact.firstContactDate && (
-              <DetailRow icon={CalendarDays} label="First contact date" value={formatDate(contact.firstContactDate)} />
-            )}
-            <div className="grid grid-cols-2 gap-3 border-t border-border/40 pt-3">
-              <div className="rounded-xl bg-background/60 p-3">
-                <p className="mb-1 text-xs text-muted-foreground">First reach-out</p>
-                <p className="text-sm font-semibold text-foreground">
-                  {contact.initialFollowUpDays === 1 ? "1 day" : `${contact.initialFollowUpDays} days`}
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">after meeting</p>
+          {/* Relationship details */}
+          <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              Relationship Details
+            </h3>
+
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-secondary/80 flex items-center justify-center shrink-0">
+                <CalendarDays className="w-4 h-4 text-foreground/70" />
               </div>
-              <div className="rounded-xl bg-background/60 p-3">
-                <p className="mb-1 text-xs text-muted-foreground">Current cadence</p>
-                <p className={`text-sm font-semibold ${maintenance ? "text-cooling" : "text-foreground"}`}>
-                  {cadenceLabel}
+              <div>
+                <p className="text-xs text-muted-foreground">Next Follow Up</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {formatDate(contact.nextFollowUpDate)}
+                  {contact.id === "demo-sarah" && (
+                    <span className="ml-2 text-xs text-cooling font-semibold">Due today</span>
+                  )}
                 </p>
-                {maintenance && <p className="mt-0.5 text-xs text-cooling/80">moved to maintenance</p>}
               </div>
             </div>
-            {contact.metAt && <DetailRow icon={MapPin} label="Met At" value={contact.metAt} />}
+
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-secondary/80 flex items-center justify-center shrink-0">
+                <CalendarDays className="w-4 h-4 text-foreground/70" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Last Interaction</p>
+                <p className="text-sm font-medium text-foreground">
+                  {formatDate(contact.lastInteractionDate)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-secondary/80 flex items-center justify-center shrink-0">
+                <CalendarDays className="w-4 h-4 text-foreground/70" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">First Contact</p>
+                <p className="text-sm font-medium text-foreground">
+                  {formatDate(contact.firstContactDate)}
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-border/40 pt-3 grid grid-cols-2 gap-3">
+              <div className="bg-background/60 rounded-xl p-3">
+                <p className="text-xs text-muted-foreground mb-1">First reach-out</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {contact.initialFollowUpDays === 1
+                    ? "1 day"
+                    : `${contact.initialFollowUpDays} days`}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">after meeting</p>
+              </div>
+              <div className="bg-background/60 rounded-xl p-3">
+                <p className="text-xs text-muted-foreground mb-1">Current cadence</p>
+                <p
+                  className={`text-sm font-semibold ${
+                    maintenance ? "text-cooling" : "text-foreground"
+                  }`}
+                >
+                  {cadenceLabel}
+                </p>
+                {maintenance && (
+                  <p className="text-xs text-cooling/80 mt-0.5">moved to maintenance</p>
+                )}
+              </div>
+            </div>
+
+            {contact.metAt && (
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-secondary/80 flex items-center justify-center shrink-0">
+                  <MapPin className="w-4 h-4 text-foreground/70" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Met At</p>
+                  <p className="text-sm font-medium text-foreground">{contact.metAt}</p>
+                </div>
+              </div>
+            )}
           </div>
 
-          {hasProfile && (
-            <div className="space-y-3 rounded-2xl border border-border/50 bg-card p-5 shadow-sm">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Profile</h3>
-              {contact.industry && <DetailRow icon={Briefcase} label="Industry" value={contact.industry} />}
-              {contact.function && <DetailRow icon={Briefcase} label="Function" value={contact.function} />}
-              {contact.interests && contact.interests.length > 0 && (
+          {/* Conversation Starters */}
+          <div id="demo-news" className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <Newspaper className="w-4 h-4 text-primary" />
+              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                Conversation Starters
+              </h3>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">
+              Use recent {contact.company} news to reconnect naturally.
+            </p>
+
+            {news.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">
+                No recent company news found.
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {news.map((h, i) => (
+                  <li key={i} className="group">
+                    <a
+                      href={h.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-start gap-3 rounded-xl p-3 bg-background/60 hover:bg-primary/5 border border-transparent hover:border-primary/15 transition-all"
+                    >
+                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                        <ExternalLink className="w-2.5 h-2.5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground leading-snug group-hover:text-primary transition-colors line-clamp-2">
+                          {h.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {h.source} ·{" "}
+                          {new Date(h.publishedAt).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </p>
+                      </div>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="text-[10px] text-muted-foreground mt-4">
+              Updated daily · News sources
+            </p>
+          </div>
+
+          {/* Notes & Links */}
+          {(contact.notes || contact.linkedinUrl) && (
+            <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm space-y-4">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                Notes & Links
+              </h3>
+              {contact.linkedinUrl && (
+                <a
+                  href={contact.linkedinUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 text-sm font-medium text-primary hover:underline"
+                >
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Linkedin className="w-4 h-4 text-primary" />
+                  </div>
+                  View LinkedIn Profile
+                </a>
+              )}
+              {contact.notes && (
                 <div className="flex items-start gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary/80">
-                    <Tag className="h-4 w-4 text-foreground/70" />
+                  <div className="w-8 h-8 rounded-full bg-secondary/80 flex items-center justify-center shrink-0 mt-0.5">
+                    <AlignLeft className="w-4 h-4 text-foreground/70" />
                   </div>
-                  <div>
-                    <p className="mb-1.5 text-xs text-muted-foreground">Interests</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {contact.interests.map((i) => (
-                        <span key={i} className="rounded-full bg-secondary/80 px-2 py-0.5 text-xs text-foreground/80">
-                          {i}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                  <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                    {contact.notes}
+                  </p>
                 </div>
               )}
             </div>
           )}
 
-          <div id="demo-news" className="rounded-2xl border border-border/50 bg-card p-5 shadow-sm">
-            <div className="mb-3 flex items-center gap-2">
-              <Newspaper className="h-4 w-4 text-primary" />
-              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Conversation Starters</h3>
-            </div>
-            <p className="mb-4 text-xs text-muted-foreground">
-              Use recent {contact.company} news to reconnect naturally.
+          {/* CTA to sign up */}
+          <div className="bg-primary/5 border border-primary/20 rounded-2xl p-5 text-center space-y-3">
+            <p className="text-sm font-semibold text-foreground">
+              Like what you see?
             </p>
-            {news.length === 0 ? (
-              <p className="text-sm italic text-muted-foreground">
-                In the app, the latest {contact.company} headlines appear here every day.
-              </p>
-            ) : (
-              <ul className="space-y-3">
-                {news.map((h) => (
-                  <li key={h.title} className="flex items-start gap-3 rounded-xl bg-background/60 p-3">
-                    <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                      <Newspaper className="h-2.5 w-2.5 text-primary" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium leading-snug text-foreground">{h.title}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {h.source} ·{" "}
-                        {new Date(h.publishedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className="mt-4 text-[10px] text-muted-foreground">
-              Sample headlines in the demo · real news, updated daily, in the app
+            <p className="text-xs text-muted-foreground">
+              Create a free account and add your real contacts in under 2 minutes.
             </p>
+            <a
+              href="/sign-up"
+              className="inline-flex items-center justify-center w-full h-11 bg-primary text-primary-foreground text-sm font-semibold rounded-xl hover:bg-primary/90 transition-colors"
+            >
+              Get started — it's free
+            </a>
           </div>
-
-          {contact.notes && (
-            <div className="space-y-4 rounded-2xl border border-border/50 bg-card p-5 shadow-sm">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Notes</h3>
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary/80">
-                  <AlignLeft className="h-4 w-4 text-foreground/70" />
-                </div>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{contact.notes}</p>
-              </div>
-            </div>
-          )}
         </div>
       </main>
 
-      <DemoWalkthrough page="contact" active={contact.id === "demo-sarah"} />
-      <DemoGetAppBar />
+      <DemoWalkthrough page="contact" />
     </div>
   );
 }
