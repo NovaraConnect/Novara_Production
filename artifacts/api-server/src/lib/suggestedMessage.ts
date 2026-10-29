@@ -10,7 +10,8 @@
 // upcoming birthday) plus the user's career goals.
 //
 // STAGE: the first reach-out after meeting someone may be very short. Once
-// you've been in touch since (an interaction logged after the day you met),
+// you've been in touch since ("Mark contacted" pressed, or an interaction
+// logged after the day you met),
 // every draft must use at least one real detail from their profile; the
 // validator rejects follow-ups that don't, and the template always has one.
 //
@@ -63,6 +64,8 @@ export interface SuggestionInput {
   headline?: string | null;
   careerStatement?: string | null;
   careerGoals?: string[] | null;
+  /** "Mark contacted" has been pressed for them at least once. */
+  hasReachedOut?: boolean;
 }
 
 export interface Draft {
@@ -192,10 +195,12 @@ function firstGoal(input: SuggestionInput): string {
   return goal ?? "";
 }
 
-/** True until an interaction is logged after the day you met: a new
- *  contact's "last spoke" starts equal to "first met", and Mark contacted
- *  moves it later. Exported for tests. */
+/** True until you've reached out: "Mark contacted" has never been pressed,
+ *  and no interaction is logged after the day you met (a new contact's "last
+ *  spoke" starts equal to "first met"). The flag covers meeting and
+ *  messaging someone on the same day. Exported for tests. */
 export function isFirstReachOut(input: SuggestionInput): boolean {
+  if (input.hasReachedOut) return false;
   const first = parseDay(input.firstContactDate);
   const last = parseDay(input.lastInteractionDate);
   return first === null || last === null || last <= first;

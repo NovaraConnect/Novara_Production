@@ -44,6 +44,7 @@ The core entity. One row per person the user is tracking.
 | `connection_status` | `text` NOT NULL | `'connected'` | `connected` or `pipeline` |
 | `first_contact_date` | `date` NOT NULL | `CURRENT_DATE` | |
 | `last_interaction_date` | `date` NOT NULL | `CURRENT_DATE` | Updated by `mark-contacted` |
+| `marked_contacted_at` | `timestamptz` | NULL | Set by `mark-contacted` (migration 0011). Tells suggested messages a reach-out happened even when it was the same day you met. Code tolerates the column being absent. |
 | `next_follow_up_date` | `date` NOT NULL | `CURRENT_DATE` | Drives "due today"/"overdue" logic and notifications |
 | `notes` | `text` | — | |
 | `email`, `phone` | `text` | — | Optional contact info, matches `db.ts`'s `Contact` type |

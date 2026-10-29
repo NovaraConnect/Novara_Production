@@ -1,0 +1,11 @@
+-- When the user last pressed "Mark contacted" for a contact.
+--
+-- Suggested messages treat the first reach-out after meeting someone
+-- differently (it may be short) from every later one (it must be
+-- personalized). Dates alone can't tell them apart when you meet someone and
+-- message them the same day: "last spoke" and "first met" stay equal. This
+-- records that a reach-out happened.
+--
+-- Additive and safe to apply while the app is running: the code checks for
+-- the column and falls back to comparing dates until it exists.
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS marked_contacted_at timestamptz;

@@ -32,6 +32,16 @@ describe("POST /api/contacts/:id/suggested-message", () => {
     expect(res.body.message).toContain("Northwind Labs opens a Denver office");
   });
 
+  it("treats the next draft as a follow-up after Mark contacted on the day you met", async () => {
+    const { body: created } = await request(app).post("/api/contacts").set(authHeaders(USER))
+      .send({ ...base, metAt: "the product meetup" });
+    await request(app).post(`/api/contacts/${created.id}/mark-contacted`).set(authHeaders(USER));
+    const res = await request(app).post(`/api/contacts/${created.id}/suggested-message`).set(authHeaders(USER)).send({});
+    expect(res.status).toBe(200);
+    expect(res.body.message).not.toMatch(/pleasure meeting you/);
+    expect(res.body.message).toContain("Head of Growth at Northwind Labs");
+  });
+
   it("is 404 for another user's contact", async () => {
     const { body: created } = await request(app).post("/api/contacts").set(authHeaders(USER)).send(base);
     const res = await request(app).post(`/api/contacts/${created.id}/suggested-message`).set(authHeaders("user_someone_else")).send({});

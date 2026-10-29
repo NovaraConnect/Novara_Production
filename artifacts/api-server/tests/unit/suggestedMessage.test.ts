@@ -172,6 +172,12 @@ describe("isFirstReachOut", () => {
     expect(isFirstReachOut(BASE)).toBe(false);
   });
 
+  it("counts Mark contacted even when you met and messaged them the same day", () => {
+    expect(isFirstReachOut({ ...FIRST, hasReachedOut: true })).toBe(false);
+    expect(buildPrompt({ ...FIRST, hasReachedOut: true }, TODAY)).toMatch(/^STAGE: FOLLOW-UP/);
+    expect(templateDraft({ ...FIRST, hasReachedOut: true }, TODAY).message).toContain("Northwind Labs");
+  });
+
   it("tells the model which stage it is drafting for", () => {
     expect(buildPrompt(FIRST, TODAY)).toMatch(/^STAGE: FIRST REACH-OUT/);
     expect(buildPrompt(BASE, TODAY)).toMatch(/^STAGE: FOLLOW-UP/);

@@ -75,6 +75,8 @@ router.post(
         headline,
         careerStatement: settings?.career_statement ?? null,
         careerGoals: settings?.career_goals ?? [],
+        // marked_contacted_at exists once migration 0011 is applied.
+        hasReachedOut: !!contact.marked_contacted_at,
       }, reason === null);
 
       // METADATA ONLY — never the notes, the prompt, or the draft.

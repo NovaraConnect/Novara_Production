@@ -74,7 +74,8 @@ supplied, that value is used verbatim; otherwise priority is recomputed.
 `404` if not found/not owned, else `{ success: true }`.
 
 ### `POST /api/contacts/:id/mark-contacted`
-No request body. Sets `last_interaction_date = CURRENT_DATE` and recomputes
+No request body. Sets `last_interaction_date = CURRENT_DATE` (and `marked_contacted_at = NOW()`
+once migration 0011 is applied) and recomputes
 `next_follow_up_date` — see `05-Business-Rules.md` for the exact auto-downgrade logic this
 implements.
 
@@ -83,8 +84,8 @@ implements.
   already showing (≤300 chars). No channel: one draft serves text, email and LinkedIn.
 - **Response `200`:** `{ subject, message, source: "ai" | "template" }`. `message` is never over
   500 characters; `subject` is used only when the user sends by email.
-- **Stage:** the first reach-out after meeting (no interaction logged after `first_contact_date`)
-  may be very short. Every later draft must use at least one real profile detail (role, company,
+- **Stage:** the first reach-out after meeting (`marked_contacted_at` unset and no interaction
+  logged after `first_contact_date`) may be very short. Every later draft must use at least one real profile detail (role, company,
   headline, notes, goals); an AI draft that doesn't is replaced by the template, which always does.
   Always a draft, never an error for AI trouble: the template is served when the AI is off,
   the user has no active subscription or trial, a daily cap is reached (5 AI drafts per
