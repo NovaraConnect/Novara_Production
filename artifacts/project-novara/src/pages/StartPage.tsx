@@ -277,7 +277,7 @@ export default function StartPage() {
           </div>
         </header>
 
-        <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 pb-20 pt-6 sm:px-6 lg:min-h-[calc(100dvh-4rem)] lg:grid-cols-[1.1fr_0.9fr] lg:pb-16 lg:pt-0">
+        <div className="mx-auto grid max-w-6xl items-center gap-8 px-4 pb-20 pt-6 lg:gap-12 sm:px-6 lg:min-h-[calc(100dvh-4rem)] lg:grid-cols-[1.1fr_0.9fr] lg:pb-16 lg:pt-0">
           <div>
             <p className="text-sm font-semibold text-[#8FA6FF]">Networking for students &amp; young professionals</p>
             <h1 className="mt-3 font-serif text-[2.6rem] font-bold leading-[1.04] sm:text-6xl lg:text-7xl">
