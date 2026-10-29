@@ -13,7 +13,7 @@
 //   • pricing and trial         docs/APPLE_IAP_SETUP.md, docs/BILLING_AND_UNIVERSITY_ACCESS_PLAN.md §4A
 //   • universities              same plan, §6: described only as a direction being explored
 //   • "nudges, never overrides" docs/Founder-Vision.md
-//   • screenshots               public/investors/, iOS app with fictional demo contacts
+//   • screenshots               public/screens/, iOS app with fictional demo contacts
 //
 // Anything that could not be verified is a <Placeholder>. Do not replace one
 // with a number (users, revenue, market size) unless it is real.
@@ -34,6 +34,7 @@ import {
   Users,
 } from "lucide-react";
 import { NovaraMark } from "@/components/NovaraMark";
+import { PhoneFrame } from "@/components/PhoneFrame";
 
 const NAVY = "#08111F";
 const BRAND = "#2941A3";
@@ -48,7 +49,7 @@ const INVESTOR_EMAIL: string | null = "novaraconnect@gmail.com";
 const FOUNDER_LINKEDIN_URL: string | null = "https://www.linkedin.com/in/cloecarmery/";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
-const shot = (name: string) => `${basePath}/investors/${name}.jpg`;
+const shot = (name: string) => `${basePath}/screens/${name}.jpg`;
 
 /** Anything Cloé still has to fill in. Styled so it cannot be missed. */
 function Placeholder({ children }: { children: React.ReactNode }) {
@@ -56,37 +57,6 @@ function Placeholder({ children }: { children: React.ReactNode }) {
     <span className="rounded-md border border-dashed border-amber-500/70 bg-amber-100/80 px-1.5 py-0.5 font-medium text-amber-900">
       [{children}]
     </span>
-  );
-}
-
-function PhoneFrame({
-  src,
-  alt,
-  className = "",
-  eager = false,
-}: {
-  src: string;
-  alt: string;
-  className?: string;
-  eager?: boolean;
-}) {
-  return (
-    <div
-      className={`relative rounded-[2.6rem] bg-[#0B0F17] p-[9px] shadow-[0_40px_80px_-24px_rgba(4,14,65,0.55),0_0_0_1px_rgba(255,255,255,0.08)_inset] ${className}`}
-    >
-      <div className="relative overflow-hidden rounded-[2.05rem] bg-white">
-        <img
-          src={src}
-          alt={alt}
-          width={720}
-          height={1558}
-          loading={eager ? "eager" : "lazy"}
-          className="block h-auto w-full"
-        />
-        {/* Dynamic Island: sits between the clock and the status icons. */}
-        <div className="absolute left-1/2 top-[1.6%] h-[3.1%] w-[30%] -translate-x-1/2 rounded-full bg-[#0B0F17]" />
-      </div>
-    </div>
   );
 }
 
