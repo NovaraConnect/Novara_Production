@@ -12,10 +12,9 @@
 // ProtectedRoute; InstallPrompt hides itself here because its "add to home
 // screen" banner would compete with the App Store button.
 //
-// The hero shows two store badges: the App Store, and an Android "coming
-// soon" badge that is not a link. Desktop also gets a QR code to scan; the
-// closing button tells Android visitors there is no Play Store build yet.
-// Every button reports to PostHog as `start_cta`.
+// The hero and the closing section show the same two store badges: the App
+// Store, and an Android "coming soon" badge that is not a link. Desktop also
+// gets a QR code to scan. Every button reports to PostHog as `start_cta`.
 //
 // The phone plays real app screenshots (public/screens/, fictional demo
 // contacts) rather than a screen recording: the existing recordings show a
@@ -65,27 +64,6 @@ function AppleLogo({ className = "" }: { className?: string }) {
   );
 }
 
-/** The one action. Android has no Play Store build yet, so it says so. */
-function DownloadButton({ platform, where }: { platform: Platform; where: string }) {
-  if (platform === "android") {
-    return (
-      <span className="inline-flex items-center justify-center rounded-full border border-white/25 px-6 py-3.5 text-base font-semibold text-white">
-        Coming soon to the Play Store
-      </span>
-    );
-  }
-  return (
-    <a
-      href={APP_STORE_URL}
-      onClick={() => track(`${where}:app_store`, platform)}
-      className="inline-flex items-center justify-center gap-2.5 rounded-full bg-white px-7 py-4 text-base font-semibold text-black shadow-[0_12px_32px_-10px_rgba(0,0,0,0.7)] transition-transform hover:-translate-y-0.5"
-    >
-      <AppleLogo className="h-5 w-5" />
-      Download on the App Store
-    </a>
-  );
-}
-
 function PlayLogo({ className = "" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
@@ -120,12 +98,20 @@ function BadgeText({ small, big }: { small: string; big: string }) {
   );
 }
 
-function StoreBadges({ platform }: { platform: Platform }) {
+function StoreBadges({
+  platform,
+  where,
+  className = "",
+}: {
+  platform: Platform;
+  where: string;
+  className?: string;
+}) {
   return (
-    <div className="flex items-center gap-3">
+    <div className={`flex items-center gap-3 ${className}`}>
       <a
         href={APP_STORE_URL}
-        onClick={() => track("hero:app_store", platform)}
+        onClick={() => track(`${where}:app_store`, platform)}
         className={`${BADGE} ${APP_STORE_SIZE} bg-[#3B5BFF] text-white shadow-[inset_0_0_0_1.5px_rgba(255,255,255,0.12)] transition-colors hover:bg-[#4A68FF]`}
       >
         <span className="flex h-7 w-7 shrink-0 items-center justify-center">
@@ -284,7 +270,7 @@ export default function StartPage() {
               Novara turns people you meet into contacts you keep.
             </p>
             <div ref={heroCtaRef} className="mt-8 flex flex-col items-start gap-3">
-              <StoreBadges platform={platform} />
+              <StoreBadges platform={platform} where="hero" />
               <FinePrint platform={platform} />
             </div>
           </div>
@@ -338,7 +324,7 @@ export default function StartPage() {
             Your next opportunity is probably someone you’ve already met.
           </h2>
           <div ref={finalCtaRef} className="mt-9 flex flex-col items-center gap-3">
-            <DownloadButton platform={platform} where="final" />
+            <StoreBadges platform={platform} where="final" className="justify-center" />
             <FinePrint platform={platform} />
           </div>
         </div>
