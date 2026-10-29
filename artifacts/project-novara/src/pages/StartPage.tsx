@@ -95,30 +95,41 @@ function PlayLogo({ className = "" }: { className?: string }) {
 }
 
 /** The hero's pair of store badges: the App Store, live, and Android, not
- *  yet. The Android one is deliberately not a link. */
+ *  yet. Both share BADGE so they are exactly the same size and line up; the
+ *  Android one is deliberately not a link. */
+const BADGE =
+  "box-border inline-flex h-14 w-[164px] shrink-0 items-center gap-2.5 rounded-2xl border px-3.5 sm:w-[176px]";
+
+function BadgeText({ small, big }: { small: string; big: string }) {
+  return (
+    <span className="flex min-w-0 flex-col leading-none">
+      <span className="text-[11px] font-medium">{small}</span>
+      <span className="mt-1 text-lg font-semibold tracking-tight sm:text-xl">{big}</span>
+    </span>
+  );
+}
+
 function StoreBadges({ platform }: { platform: Platform }) {
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex items-center gap-3">
       <a
         href={APP_STORE_URL}
         onClick={() => track("hero:app_store", platform)}
-        className="inline-flex h-14 items-center gap-2.5 rounded-2xl bg-white pl-4 pr-5 text-black shadow-[0_12px_32px_-10px_rgba(0,0,0,0.7)] transition-transform hover:-translate-y-0.5"
+        className={`${BADGE} border-white bg-white text-black shadow-[0_12px_32px_-10px_rgba(0,0,0,0.7)] transition-transform hover:-translate-y-0.5`}
       >
-        <AppleLogo className="h-7 w-7" />
-        <span className="flex flex-col leading-none">
-          <span className="text-[11px] font-medium">Download on the</span>
-          <span className="mt-0.5 text-xl font-semibold tracking-tight">App Store</span>
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center">
+          <AppleLogo className="h-7 w-7" />
         </span>
+        <BadgeText small="Download on the" big="App Store" />
       </a>
       <span
         aria-label="Android app coming soon"
-        className="inline-flex h-14 cursor-default select-none items-center gap-2.5 rounded-2xl border border-white/20 bg-white/[0.04] pl-4 pr-5 text-white/75"
+        className={`${BADGE} cursor-default select-none border-white/25 bg-white/[0.04] text-white/80`}
       >
-        <PlayLogo className="h-6 w-6" />
-        <span className="flex flex-col leading-none">
-          <span className="text-[11px] font-medium">Coming soon</span>
-          <span className="mt-0.5 text-xl font-semibold tracking-tight">Android</span>
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center">
+          <PlayLogo className="h-6 w-6" />
         </span>
+        <BadgeText small="Coming soon" big="Android" />
       </span>
     </div>
   );
@@ -244,14 +255,11 @@ export default function StartPage() {
           background: `radial-gradient(ellipse 70% 55% at 75% 45%, rgba(41,65,163,0.6), transparent 70%), ${NAVY}`,
         }}
       >
-        <header className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+        <header className="mx-auto flex h-16 max-w-6xl items-center px-4 sm:px-6">
           <div className="flex items-center gap-2.5">
             <NovaraMark size={30} />
             <span className="font-serif text-lg font-bold">Novara</span>
           </div>
-          <Link href="/sign-in" className="text-sm font-medium text-[#AAB7CA] hover:text-white">
-            Sign in
-          </Link>
         </header>
 
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 pb-20 pt-6 sm:px-6 lg:min-h-[calc(100dvh-4rem)] lg:grid-cols-[1.1fr_0.9fr] lg:pb-16 lg:pt-0">
