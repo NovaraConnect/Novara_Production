@@ -21,8 +21,6 @@ import InstallGuide from "@/pages/InstallGuide";
 import InstallLanding from "@/pages/InstallLanding";
 import Notifications from "@/pages/Notifications";
 import Feedback from "@/pages/Feedback";
-import DemoDashboard from "@/pages/DemoDashboard";
-import DemoContactDetail from "@/pages/DemoContactDetail";
 import LandingPage from "@/pages/LandingPage";
 import UxPreview from "@/pages/UxPreview";
 import PitchPage from "@/pages/PitchPage";
@@ -268,8 +266,9 @@ function Router() {
       <Route path="/support" component={Support} />
       <Route path="/notifications" component={() => <ProtectedRoute component={Notifications} />} />
       <Route path="/feedback" component={() => <ProtectedRoute component={Feedback} />} />
-      <Route path="/try/contacts/:id" component={DemoContactDetail} />
-      <Route path="/try" component={DemoDashboard} />
+      {/* The old no-account demo is retired: using Novara means downloading it.
+          Old /try links (and /try/contacts/…) land on the download page. */}
+      <Route path="/try/*?" component={() => <Redirect to="/start" replace />} />
       <Route path="/ux" component={UxPreview} />
       <Route path="/demo" component={LandingPage} />
       <Route path="/pitch" component={PitchPage} />

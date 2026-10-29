@@ -27,8 +27,8 @@ if signed out.
 | `/install` | `InstallGuide` | No |
 | `/notifications` | `Notifications` | Yes |
 | `/feedback` | `Feedback` | Yes |
-| `/try` | `DemoDashboard` | No (demo mode, fake data) |
-| `/try/contacts/:id` | `DemoContactDetail` | No |
+| `/try`, `/try/*` | Redirect to `/start` | No (the old demo is retired) |
+| `/start` | `StartPage` | No (download page for students and young professionals) |
 | `/demo` | `LandingPage` | No |
 | `/pitch` | `PitchPage` | No |
 | (anything else) | `NotFound` | — |
