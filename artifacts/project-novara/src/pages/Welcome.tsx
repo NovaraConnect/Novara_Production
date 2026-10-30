@@ -27,7 +27,7 @@
 import { useRef } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { OnboardingTour } from "@/components/OnboardingTour";
+import { OnboardingVideo } from "@/components/OnboardingVideo";
 import { useSettings } from "@/hooks/useSettings";
 
 export default function Welcome() {
@@ -36,7 +36,7 @@ export default function Welcome() {
   // Guards against a second Continue/Skip/Escape while the save is in flight.
   const finishing = useRef(false);
 
-  // Continue, Skip and Escape all reach this through OnboardingTour's onComplete.
+  // Get started, Skip and Escape all reach this through OnboardingVideo's onComplete.
   const finish = async () => {
     if (finishing.current) return;
     finishing.current = true;
@@ -56,5 +56,5 @@ export default function Welcome() {
     setLocation("/dashboard");
   };
 
-  return <OnboardingTour onComplete={finish} />;
+  return <OnboardingVideo onComplete={finish} />;
 }
