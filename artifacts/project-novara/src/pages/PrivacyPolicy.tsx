@@ -13,6 +13,7 @@
 //   • news lookups             api-server/src/routes/news.ts
 //   • feedback email            api-server/src/lib/email.ts
 //   • analytics                 index.html + App.tsx (PostHogIdentifier)
+//   • storage location          Neon project region aws-us-east-2; PostHog us.i.posthog.com
 //   • contacts picker           ios/App/App/Native/NovaraContactImport.swift
 //   • card scanning             ios/App/App/Native/NovaraCardScanner.swift
 //
@@ -22,7 +23,7 @@ import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
 
 /** The date the text below was last materially changed. */
-const LAST_UPDATED = "19 September 2026";
+const LAST_UPDATED = "30 October 2026";
 
 /** Where privacy questions go. Also Novara's VAPID subject address. */
 const CONTACT_EMAIL = "hello@novaraconnect.group";
@@ -317,6 +318,98 @@ export default function PrivacyPolicy() {
               {CONTACT_EMAIL}
             </a>{" "}
             and we will respond within the period the applicable law requires.
+          </p>
+        </Section>
+
+        <Section title="Where your data is stored">
+          <p>
+            Novara is operated from the United States, and your data is stored
+            there: the database is hosted in the United States, and the
+            providers listed above process data in the United States or under
+            their own international transfer safeguards. If you use Novara from
+            outside the United States, your data is transferred to and stored in
+            the United States, where privacy law may differ from yours.
+          </p>
+        </Section>
+
+        <Section title="United Kingdom users">
+          <p>
+            If you are in the United Kingdom, the UK General Data Protection
+            Regulation and the Data Protection Act 2018 apply, and Novara
+            Connect is the controller of your personal data. We rely on these
+            legal bases:
+          </p>
+          <Bullets
+            items={[
+              <>
+                <strong className="text-foreground">Contract</strong> — to
+                provide your account, store your contacts, send the reminders you
+                turn on, and process your subscription.
+              </>,
+              <>
+                <strong className="text-foreground">Legitimate interests</strong>{" "}
+                — to keep the service secure, to understand how it is used so it
+                can be improved, and to respond to feedback. You can object to
+                this at any time.
+              </>,
+              <>
+                <strong className="text-foreground">Consent</strong> — for
+                optional permissions such as notifications, contacts and camera,
+                which you can withdraw in Settings or in iOS at any time.
+              </>,
+            ]}
+          />
+          <p>
+            Transfers of your data to the United States rely on the UK
+            Extension to the EU–US Data Privacy Framework where a provider is
+            certified under it, and otherwise on the UK International Data
+            Transfer Addendum to standard contractual clauses.
+          </p>
+          <p>
+            You have the rights described under "Your rights", including the
+            right to data portability. If you are unhappy with how we handle
+            your data, please contact us first; you also have the right to
+            complain to the Information Commissioner's Office (ico.org.uk).
+          </p>
+        </Section>
+
+        <Section title="Canada users">
+          <p>
+            If you are in Canada, the Personal Information Protection and
+            Electronic Documents Act (PIPEDA) applies. We collect, use and
+            disclose your personal information only for the purposes described
+            in this policy, with your consent, which you give by creating an
+            account and can withdraw by deleting it.
+          </p>
+          <p>
+            Your information is stored and processed in the United States, as
+            described under "Where your data is stored", and may be accessible
+            to courts, law enforcement and national security authorities there
+            under United States law.
+          </p>
+          <p>
+            You may request access to, or correction of, the personal
+            information we hold about you by writing to{" "}
+            <a
+              href={`mailto:${CONTACT_EMAIL}`}
+              className="text-primary font-medium hover:underline"
+            >
+              {CONTACT_EMAIL}
+            </a>
+            . If you are not satisfied with our response, you may complain to
+            the Office of the Privacy Commissioner of Canada (priv.gc.ca).
+          </p>
+        </Section>
+
+        <Section title="People you add to Novara">
+          <p>
+            The contacts you save are information about other people. You add
+            them for your own networking, and you are responsible for having a
+            fair reason to keep them. We process that information only to
+            provide Novara to you, never contact the people in your network,
+            and delete it when you delete the contact or your account. If you
+            believe someone has stored your details in Novara, write to us and
+            we will help.
           </p>
         </Section>
 
