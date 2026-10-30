@@ -25,18 +25,30 @@
 //     user straight back into this tour.
 // ============================================================================
 import { useRef } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
+import { OnboardingTour } from "@/components/OnboardingTour";
 import { OnboardingVideo } from "@/components/OnboardingVideo";
 import { useSettings } from "@/hooks/useSettings";
 
+// VIDEO ROLLOUT
+// The onboarding video is being tried out before new accounts get it: for
+// now it plays only when someone taps Settings > Replay Tutorial (which adds
+// ?replay=1), and brand-new accounts still see the card tour. Set this to
+// true to give everyone the video; OnboardingTour/OnboardingScreens can then
+// be deleted.
+const VIDEO_FOR_NEW_USERS = false;
+
 export default function Welcome() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
+  const showVideo = VIDEO_FOR_NEW_USERS || new URLSearchParams(search).has("replay");
   const { settings, updateSettings } = useSettings();
   // Guards against a second Continue/Skip/Escape while the save is in flight.
   const finishing = useRef(false);
 
-  // Get started, Skip and Escape all reach this through OnboardingVideo's onComplete.
+  // Every way out of the tour or the video (Continue/Get started, Skip,
+  // Escape) reaches this through onComplete.
   const finish = async () => {
     if (finishing.current) return;
     finishing.current = true;
@@ -56,5 +68,5 @@ export default function Welcome() {
     setLocation("/dashboard");
   };
 
-  return <OnboardingVideo onComplete={finish} />;
+  return showVideo ? <OnboardingVideo onComplete={finish} /> : <OnboardingTour onComplete={finish} />;
 }
