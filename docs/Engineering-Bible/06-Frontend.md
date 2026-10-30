@@ -45,7 +45,7 @@ The app supports being served from a non-root base path (`BASE_URL`/`BASE_PATH`,
 - **`Dashboard.tsx`** — the main authenticated home screen. Computes a "health score"
   (`computeHealthScore` in `lib/utils.ts`) and a Warm/Cooling/Cold breakdown
   (`computeStatus(contact)`, from nextFollowUpDate) across the user's *connected* (non-pipeline) contacts,
-  shows an onboarding tour (`OnboardingTour.tsx`) and a dismissible health-score explainer banner
+  shows an onboarding tour (`OnboardingTour.tsx`, on `/welcome`) and a dismissible health-score explainer banner
   (state persisted in `localStorage["novara_hs_banner_v1"]`).
 - **`Contacts.tsx`** — full contact list with client-side search (name/company/role/`metAt`
   substring match) and two independent filters: connection status (`All`/`Connected`/`Pipeline`)
@@ -86,6 +86,7 @@ The app supports being served from a non-root base path (`BASE_URL`/`BASE_PATH`,
   warm/cooling/cold status.
 - **`InstallPrompt.tsx`** — the dismissible install banner; see `05-Business-Rules.md` rule 7.
 - **`OnboardingTour.tsx`** — first-run tutorial overlay, gated by `user_settings.has_seen_tutorial`.
+- **`OnboardingVideo.tsx`** — the tutorial as a video (`public/onboarding/`). For now it plays only from Settings → Replay Tutorial; `VIDEO_FOR_NEW_USERS` in `pages/Welcome.tsx` turns it on for new accounts.
 - **`BusinessCardScanner.tsx` / `QRScanner.tsx`** — camera-based contact-intake helpers (business
   card OCR / QR code scanning) as alternate paths into `AddContact`.
 - **`components/ui/*`** — the shadcn/Radix UI primitive library (accordion, dialog, dropdown, form,

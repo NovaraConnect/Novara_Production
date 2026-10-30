@@ -141,8 +141,9 @@ export default function Settings() {
     try {
       await updateSettings.mutateAsync({ hasSeenTutorial: false });
       // Straight to the introduction rather than via the Dashboard,
-      // which would only redirect here anyway.
-      setLocation("/welcome");
+      // which would only redirect here anyway. ?replay tells Welcome this was
+      // asked for (see the video rollout note there).
+      setLocation("/welcome?replay=1");
     } catch {
       toast.error("Failed to reset tutorial");
     }
