@@ -18,8 +18,9 @@
 // worker precache (vite.config.ts globPatterns has no mp4), so it is only
 // downloaded by people who open the tutorial.
 //
-// The frame around the video is the video's own navy (#08111F) in both
-// themes, so the letterbox above and below it never shows a seam.
+// The video fills its area (object-cover trims a sliver of plain navy at the
+// sides on tall phones), and the frame around it is the video's own navy in
+// both themes, so there is no visible box edge.
 //
 // DEGRADES, NEVER TRAPS
 //   • muted + playsInline, the only autoplay iOS allows; if autoplay is
@@ -129,7 +130,7 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
             >
               <video
                 ref={videoRef}
-                className="h-full w-full object-contain"
+                className="h-full w-full object-cover"
                 src={VIDEO_SRC}
                 poster={POSTER_SRC}
                 muted
