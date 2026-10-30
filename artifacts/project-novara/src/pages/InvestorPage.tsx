@@ -17,6 +17,10 @@
 //
 // Anything that could not be verified is a <Placeholder>. Do not replace one
 // with a number (users, revenue, market size) unless it is real.
+//
+// Also the Investors tab of /about (AudiencePage), rendered with `embedded`:
+// that page brings its own header, tabs and footer, so this one leaves out its
+// nav bar, footer and <head> changes.
 // ============================================================================
 import { useEffect } from "react";
 import { Link } from "wouter";
@@ -223,10 +227,11 @@ const PRO_FEATURES = [
   "Export your data at any time",
 ];
 
-export default function InvestorPage() {
+export default function InvestorPage({ embedded = false }: { embedded?: boolean }) {
   // Title and description for link previews and the browser tab, restored on
   // the way out so the rest of the app keeps its own.
   useEffect(() => {
+    if (embedded) return;
     const previousTitle = document.title;
     document.title = "Novara Connect · Investor overview";
 
@@ -251,7 +256,7 @@ export default function InvestorPage() {
       }
       robots.remove();
     };
-  }, []);
+  }, [embedded]);
 
   return (
     <div
@@ -259,32 +264,34 @@ export default function InvestorPage() {
       style={{ fontFamily: SANS, colorScheme: "light" }}
     >
       {/* ── Nav ─────────────────────────────────────────────────────────── */}
-      <header className="fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-[#08111F]/85 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <a href="#top" className="flex items-center gap-2.5">
-            <NovaraMark size={30} />
-            <span className="font-serif text-lg font-bold text-white">Novara Connect</span>
-          </a>
-          <nav className="hidden items-center gap-7 text-sm text-[#AAB7CA] lg:flex">
-            {NAV.map((item) => (
-              <a key={item.href} href={item.href} className="transition-colors hover:text-white">
-                {item.label}
-              </a>
-            ))}
-          </nav>
-          <a
-            href="#contact"
-            className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#08111F] transition-colors hover:bg-[#E3E8F7]"
-          >
-            Get in touch
-          </a>
-        </div>
-      </header>
+      {!embedded && (
+        <header className="fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-[#08111F]/85 backdrop-blur-md">
+          <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+            <a href="#top" className="flex items-center gap-2.5">
+              <NovaraMark size={30} />
+              <span className="font-serif text-lg font-bold text-white">Novara Connect</span>
+            </a>
+            <nav className="hidden items-center gap-7 text-sm text-[#AAB7CA] lg:flex">
+              {NAV.map((item) => (
+                <a key={item.href} href={item.href} className="transition-colors hover:text-white">
+                  {item.label}
+                </a>
+              ))}
+            </nav>
+            <a
+              href="#contact"
+              className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#08111F] transition-colors hover:bg-[#E3E8F7]"
+            >
+              Get in touch
+            </a>
+          </div>
+        </header>
+      )}
 
       <main id="top">
         {/* ── Hero ──────────────────────────────────────────────────────── */}
         <section
-          className="relative overflow-hidden pt-16"
+          className={`relative overflow-hidden ${embedded ? "" : "pt-16"}`}
           style={{
             background: `radial-gradient(ellipse 70% 60% at 78% 45%, rgba(41,65,163,0.55), transparent 70%), ${NAVY}`,
           }}
@@ -628,18 +635,20 @@ export default function InvestorPage() {
         </section>
       </main>
 
-      <footer className="border-t border-white/10 py-8 text-sm text-[#7D8BA3]" style={{ background: NAVY }}>
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6">
-          <div className="flex items-center gap-2">
-            <NovaraMark size={20} />
-            <span>© {new Date().getFullYear()} Novara Connect</span>
+      {!embedded && (
+        <footer className="border-t border-white/10 py-8 text-sm text-[#7D8BA3]" style={{ background: NAVY }}>
+          <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6">
+            <div className="flex items-center gap-2">
+              <NovaraMark size={20} />
+              <span>© {new Date().getFullYear()} Novara Connect</span>
+            </div>
+            <div className="flex items-center gap-6">
+              <Link href="/privacy" className="hover:text-white">Privacy</Link>
+              <Link href="/support" className="hover:text-white">Support</Link>
+            </div>
           </div>
-          <div className="flex items-center gap-6">
-            <Link href="/privacy" className="hover:text-white">Privacy</Link>
-            <Link href="/support" className="hover:text-white">Support</Link>
-          </div>
-        </div>
-      </footer>
+        </footer>
+      )}
     </div>
   );
 }

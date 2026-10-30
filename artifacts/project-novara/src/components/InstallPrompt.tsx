@@ -5,7 +5,7 @@ import { isInstalledExperience } from "@/lib/installPrompt";
 
 type Platform = "ios" | "android" | "other";
 
-const MARKETING_PAGES = new Set(["/investors", "/start"]);
+const MARKETING_PAGES = new Set(["/investors", "/start", "/about"]);
 
 function detectPlatform(): Platform {
   const ua = navigator.userAgent;
