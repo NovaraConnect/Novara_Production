@@ -19,6 +19,10 @@
 // The phone plays real app screenshots (public/screens/, fictional demo
 // contacts) rather than a screen recording: the existing recordings show a
 // real-looking contact and live headlines that cannot go on a public page.
+//
+// Also the Students tab of /about (AudiencePage), rendered with `embedded`:
+// that page brings its own header, tabs and footer, so this one leaves out its
+// logo row, footer and <head> changes. The sticky download bar stays.
 // ============================================================================
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
@@ -217,7 +221,7 @@ const PROOF = [
   { src: shot("add-card"), title: "Add someone in seconds", body: "Snap a business card or a LinkedIn screenshot." },
 ];
 
-export default function StartPage() {
+export default function StartPage({ embedded = false }: { embedded?: boolean }) {
   const [platform, setPlatform] = useState<Platform>("desktop");
   const [showSticky, setShowSticky] = useState(false);
   const heroCtaRef = useRef<HTMLDivElement>(null);
@@ -245,6 +249,7 @@ export default function StartPage() {
   }, []);
 
   useEffect(() => {
+    if (embedded) return;
     const previousTitle = document.title;
     document.title = "Novara: keep the people you meet";
     const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
@@ -257,7 +262,7 @@ export default function StartPage() {
       document.title = previousTitle;
       if (description && previousDescription !== undefined) description.content = previousDescription;
     };
-  }, []);
+  }, [embedded]);
 
   return (
     <div
@@ -271,14 +276,20 @@ export default function StartPage() {
           background: `radial-gradient(ellipse 70% 55% at 75% 45%, rgba(41,65,163,0.6), transparent 70%), ${NAVY}`,
         }}
       >
-        <header className="mx-auto flex h-16 max-w-6xl items-center px-4 sm:px-6">
-          <div className="flex items-center gap-2.5">
-            <NovaraMark size={30} />
-            <span className="font-serif text-lg font-bold">Novara</span>
-          </div>
-        </header>
+        {!embedded && (
+          <header className="mx-auto flex h-16 max-w-6xl items-center px-4 sm:px-6">
+            <div className="flex items-center gap-2.5">
+              <NovaraMark size={30} />
+              <span className="font-serif text-lg font-bold">Novara</span>
+            </div>
+          </header>
+        )}
 
-        <div className="mx-auto grid max-w-6xl items-center gap-8 px-4 pb-20 pt-6 lg:gap-12 sm:px-6 lg:min-h-[calc(100dvh-4rem)] lg:grid-cols-[1.1fr_0.9fr] lg:pb-16 lg:pt-0">
+        <div
+          className={`mx-auto grid max-w-6xl items-center gap-8 px-4 pb-20 lg:gap-12 sm:px-6 lg:min-h-[calc(100dvh-4rem)] lg:grid-cols-[1.1fr_0.9fr] lg:pb-16 lg:pt-0 ${
+            embedded ? "pt-12" : "pt-6"
+          }`}
+        >
           <div>
             <p className="text-sm font-semibold text-[#8FA6FF]">Networking for students &amp; young professionals</p>
             <h1 className="mt-3 font-serif text-[2.6rem] font-bold leading-[1.04] sm:text-6xl lg:text-7xl">
@@ -349,18 +360,20 @@ export default function StartPage() {
         </div>
       </section>
 
-      <footer className="border-t border-white/10 py-8 text-sm text-[#7D8BA3]">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 pb-20 sm:flex-row sm:px-6 sm:pb-0">
-          <div className="flex items-center gap-2">
-            <NovaraMark size={20} />
-            <span>© {new Date().getFullYear()} Novara Connect</span>
+      {!embedded && (
+        <footer className="border-t border-white/10 py-8 text-sm text-[#7D8BA3]">
+          <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 pb-20 sm:flex-row sm:px-6 sm:pb-0">
+            <div className="flex items-center gap-2">
+              <NovaraMark size={20} />
+              <span>© {new Date().getFullYear()} Novara Connect</span>
+            </div>
+            <div className="flex items-center gap-6">
+              <Link href="/privacy" className="hover:text-white">Privacy</Link>
+              <Link href="/support" className="hover:text-white">Support</Link>
+            </div>
           </div>
-          <div className="flex items-center gap-6">
-            <Link href="/privacy" className="hover:text-white">Privacy</Link>
-            <Link href="/support" className="hover:text-white">Support</Link>
-          </div>
-        </div>
-      </footer>
+        </footer>
+      )}
 
       {/* ── Sticky download bar (phones) ────────────────────────────────── */}
       {platform !== "android" && (
