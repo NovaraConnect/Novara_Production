@@ -660,9 +660,9 @@ export default function InvestorPage({ embedded = false }: { embedded?: boolean 
               </p>
               <blockquote className="border-l-4 py-1 pl-5" style={{ borderColor: BRAND }}>
                 <p className="font-serif text-xl italic leading-snug text-[#08111F] sm:text-2xl">
-                  “As an MBA student and a peer mentor, I saw firsthand how hard it is to keep
-                  up with the network you work so hard to build. I built Novara to close the gap
-                  between building a network and maintaining it.”
+                  “As an MBA student and peer mentor, I watched talented people work hard to
+                  build their networks, then quietly lose them. I built Novara so the
+                  relationships you build are the ones you keep.”
                 </p>
                 <footer className="mt-2 text-sm font-medium not-italic text-[#5B6272]">
                   Cloé Carmery, Founder
