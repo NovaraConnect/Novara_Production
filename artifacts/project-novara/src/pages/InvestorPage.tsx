@@ -658,23 +658,11 @@ export default function InvestorPage({ embedded = false }: { embedded?: boolean 
                 the easy part. Keeping those relationships alive is where most of them are lost.
                 Novara exists to close that gap.
               </p>
-              <dl className="grid gap-3 pt-1 text-base sm:grid-cols-2">
-                {[
-                  ["NextEra Analytics", "Technology & AI product strategy"],
-                  ["L’Oréal USA", "Assistant Brand Manager"],
-                  ["University of Florida", "MBA, Data Analytics"],
-                  ["Career mentor", "50+ graduate students coached"],
-                ].map(([k, v]) => (
-                  <div key={k} className="rounded-xl border border-[#E4E2DA] bg-[#F7F6F2] px-4 py-3">
-                    <dt className="font-semibold text-[#08111F]">{k}</dt>
-                    <dd className="text-sm text-[#5B6272]">{v}</dd>
-                  </div>
-                ))}
-              </dl>
               <blockquote className="border-l-4 py-1 pl-5" style={{ borderColor: BRAND }}>
                 <p className="font-serif text-xl italic leading-snug text-[#08111F] sm:text-2xl">
-                  “I built Novara Connect to close that gap, from the iOS app to the
-                  subscription business behind it.”
+                  “As an MBA student and a peer mentor, I saw firsthand how hard it is to keep
+                  up with the network you work so hard to build. I built Novara to close the gap
+                  between building a network and maintaining it.”
                 </p>
                 <footer className="mt-2 text-sm font-medium not-italic text-[#5B6272]">
                   Cloé Carmery, Founder
