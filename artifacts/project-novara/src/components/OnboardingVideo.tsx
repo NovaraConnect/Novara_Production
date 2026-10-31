@@ -1,5 +1,5 @@
 // ============================================================================
-// The first-run introduction: a short, silent video of someone setting up
+// The first-run introduction: a short narrated video of someone setting up
 // Novara, with a banner over each step.
 //
 // WHAT DRIVES IT
@@ -7,37 +7,52 @@
 // Rendered by pages/Welcome.tsx, which owns completion (hasSeenTutorial):
 //   • pages/Dashboard.tsx sends new accounts to /welcome
 //   • pages/Settings.tsx "Replay Tutorial" sends people back here
-//   • onComplete fires on Skip, Escape and "Get started"
+//   • onComplete fires on Escape and on the bottom button
 //
 // THE VIDEO
 // ---------
 // public/onboarding/novara-onboarding.mp4 is a screen recording of the real
-// app with sample data, edited in demo/onboarding-tutorial (Remotion). To
-// change it, re-render there and re-encode with -movflags +faststart so it
-// starts playing before it has fully downloaded. It is not in the service
-// worker precache (vite.config.ts globPatterns has no mp4), so it is only
-// downloaded by people who open the tutorial.
+// app with sample data and a voiceover, edited in demo/onboarding-tutorial
+// (Remotion). To change it, re-render there and re-encode with
+// -movflags +faststart and BT.709 colour tags (untagged, browsers show its
+// navy as near black). It is not in the service worker precache
+// (vite.config.ts globPatterns has no mp4), so it is only downloaded by
+// people who open the tutorial.
 //
 // The video fills its area (object-cover trims a sliver of plain navy at the
 // sides on tall phones), and the frame around it is the video's own navy in
 // both themes, so there is no visible box edge.
 //
+// NOT AN INVITATION TO SKIP
+// -------------------------
+// A button at the bottom from the first frame read as "tap here to begin" and
+// people skipped the demo by accident. So it appears only after a second of
+// playback, and says what it does: "Skip the demo. Get Started". Only once
+// the video has ended does it become a plain "Get started".
+//
 // DEGRADES, NEVER TRAPS
-//   • muted + playsInline, the only autoplay iOS allows; if autoplay is
-//     refused anyway, it waits on a play button
-//   • prefers-reduced-motion: nothing plays until the person taps play
+//   • Tries to play with sound. Where autoplay with sound is refused (Safari,
+//     and possibly the iOS web view), it plays muted with a "Tap for sound"
+//     button; the speaker button switches sound at any time
+//   • prefers-reduced-motion: nothing plays until the person taps play, and
+//     the button is there from the start
 //   • if the video cannot load (offline), "Get started" is right there
-//   • Skip at every moment; Escape also closes
+//   • Escape closes at any moment
 // ============================================================================
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowRight, Pause, Play, RotateCcw } from "lucide-react";
+import { ArrowRight, Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const VIDEO_BG = "#08111F";
+// The navy the encoded video actually renders as (its source is #08111F;
+// BT.709 rounding lands it here), so the bars above and below it match.
+const VIDEO_BG = "#06101D";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const VIDEO_SRC = `${base}/onboarding/novara-onboarding.mp4`;
 const POSTER_SRC = `${base}/onboarding/novara-onboarding-poster.jpg`;
+
+/** Seconds of playback before the skip button shows. */
+const SKIP_AFTER_SEC = 1;
 
 function prefersReducedMotion(): boolean {
   try {
@@ -57,7 +72,9 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
   const [playing, setPlaying] = useState(false);
   const [ended, setEnded] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [muted, setMuted] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [playedSec, setPlayedSec] = useState(0);
 
   const close = useCallback(() => onComplete(), [onComplete]);
 
@@ -69,11 +86,24 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [close]);
 
-  // Autoplay where allowed. A refusal just leaves the play button showing.
+  // Start with sound if the browser allows it, otherwise muted.
+  const start = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = false;
+    try {
+      await video.play();
+      setMuted(false);
+    } catch {
+      video.muted = true;
+      setMuted(true);
+      await video.play().catch(() => setPlaying(false));
+    }
+  }, []);
+
   useEffect(() => {
-    if (reducedMotion) return;
-    videoRef.current?.play().catch(() => setPlaying(false));
-  }, [reducedMotion]);
+    if (!reducedMotion) void start();
+  }, [reducedMotion, start]);
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -87,6 +117,14 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
     }
   };
 
+  const toggleSound = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = !video.muted;
+    setMuted(video.muted);
+    if (video.paused && !ended) video.play().catch(() => setPlaying(false));
+  };
+
   const replay = () => {
     const video = videoRef.current;
     if (!video) return;
@@ -94,6 +132,8 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
     setEnded(false);
     video.play().catch(() => setPlaying(false));
   };
+
+  const showButton = failed || ended || playedSec >= SKIP_AFTER_SEC || (reducedMotion && !playing && playedSec === 0);
 
   const overlay = (
     <div
@@ -104,13 +144,18 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
       aria-label="Welcome to Novara"
     >
       <div className="mx-auto flex h-full w-full max-w-md flex-col pt-safe pb-safe">
-        <div className="flex shrink-0 items-center justify-end px-5 py-2">
-          <button
-            onClick={close}
-            className="rounded-lg px-2 py-1 text-sm font-semibold text-white/70 transition-colors hover:text-white"
-          >
-            Skip
-          </button>
+        <div className="flex h-11 shrink-0 items-center px-4">
+          {!failed && (
+            <button
+              type="button"
+              onClick={toggleSound}
+              className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+              aria-label={muted ? "Turn sound on" : "Turn sound off"}
+            >
+              {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              {muted && "Tap for sound"}
+            </button>
+          )}
         </div>
 
         <div className="relative min-h-0 flex-1">
@@ -133,7 +178,6 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
                 className="h-full w-full object-cover"
                 src={VIDEO_SRC}
                 poster={POSTER_SRC}
-                muted
                 playsInline
                 preload="auto"
                 onPlay={() => setPlaying(true)}
@@ -145,6 +189,7 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
                 onTimeUpdate={(e) => {
                   const v = e.currentTarget;
                   if (v.duration) setProgress(v.currentTime / v.duration);
+                  setPlayedSec((s) => Math.max(s, v.currentTime));
                 }}
                 onError={() => setFailed(true)}
               />
@@ -162,31 +207,45 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
           )}
         </div>
 
-        <div className="shrink-0 px-6 pb-1 pt-3">
+        {/* Fixed height, so the video doesn't jump when the button appears. */}
+        <div className="h-[92px] shrink-0 px-6 pb-1 pt-3">
           {!failed && (
             <div className="mb-4 h-1 overflow-hidden rounded-full bg-white/15" aria-hidden="true">
               <div className="h-full rounded-full bg-white/70" style={{ width: `${progress * 100}%` }} />
             </div>
           )}
-          <div className="flex gap-3">
-            {ended && (
-              <Button
-                variant="outline"
-                onClick={replay}
-                className="h-auto flex-1 gap-2 rounded-2xl border-white/25 bg-transparent px-4 py-3.5 text-[15px] font-semibold text-white hover:bg-white/10 hover:text-white"
-              >
-                <RotateCcw className="h-4 w-4" />
-                Watch again
-              </Button>
-            )}
-            <Button
-              onClick={close}
-              className="h-auto flex-1 gap-2 rounded-2xl px-4 py-3.5 text-[15px] font-semibold transition-transform duration-150 active:scale-[0.985]"
-            >
-              Get started
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
+          {showButton && (
+            <div className="flex gap-3 animate-in fade-in duration-500">
+              {ended && (
+                <Button
+                  variant="outline"
+                  onClick={replay}
+                  className="h-auto flex-1 gap-2 rounded-2xl border-white/25 bg-transparent px-4 py-3.5 text-[15px] font-semibold text-white hover:bg-white/10 hover:text-white"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Watch again
+                </Button>
+              )}
+              {ended || failed ? (
+                <Button
+                  onClick={close}
+                  className="h-auto flex-1 gap-2 rounded-2xl px-4 py-3.5 text-[15px] font-semibold transition-transform duration-150 active:scale-[0.985]"
+                >
+                  Get started
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={close}
+                  className="h-auto flex-1 gap-2 rounded-2xl border-white/25 bg-white/5 px-4 py-3.5 text-[15px] font-semibold text-white/85 hover:bg-white/10 hover:text-white"
+                >
+                  Skip the demo. Get Started
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
