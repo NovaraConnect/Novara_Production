@@ -31,7 +31,8 @@
 // MOVING THROUGH IT, LIKE A REEL OR YOUTUBE
 // -----------------------------------------
 //   • tap the right side for the next step, the left side for the previous
-//     one (or back to the start of this one); the middle pauses
+//     one (or back to the start of this one); the middle pauses. The video's
+//     own banners say which step you're on, so there's no extra label
 //   • drag or tap the bar at the bottom to jump anywhere; its ticks mark
 //     where each step starts
 //   • on a keyboard: arrow keys for steps, space to pause
@@ -55,7 +56,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
-import { ArrowRight, ChevronLeft, ChevronRight, Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
+import { ArrowRight, Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import timeline from "./onboarding-chapters.json";
 
@@ -84,10 +85,6 @@ function prefersReducedMotion(): boolean {
   }
 }
 
-function stepAt(sec: number) {
-  return [...timeline.chapters].reverse().find((c) => sec >= c.start - 0.05) ?? null;
-}
-
 interface OnboardingVideoProps {
   onComplete: () => void;
 }
@@ -101,12 +98,10 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
   const [muted, setMuted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [playedSec, setPlayedSec] = useState(0);
-  // A short "Step 3 of 8" note after a jump, so people know where they landed.
-  const [jump, setJump] = useState<{ text: string; dir: "back" | "next"; id: number } | null>(null);
 
   const close = useCallback(() => onComplete(), [onComplete]);
 
-  const seekTo = useCallback((sec: number, dir?: "back" | "next") => {
+  const seekTo = useCallback((sec: number) => {
     const video = videoRef.current;
     if (!video) return;
     const duration = video.duration || timeline.duration;
@@ -114,11 +109,6 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
     video.currentTime = target;
     setProgress(target / duration);
     if (target < duration - 0.3) setEnded(false);
-    if (dir) {
-      const step = stepAt(target);
-      const text = target >= timeline.outro ? "The end" : step ? `Step ${step.step} of ${timeline.chapters.length}` : "Start";
-      setJump({ text, dir, id: Date.now() });
-    }
     if (video.paused && !reducedMotion) video.play().catch(() => setPlaying(false));
   }, [reducedMotion]);
 
@@ -127,23 +117,17 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
     // A small margin so a tap just after landing on a step moves on from it,
     // without skipping a step that is about to start.
     const stop = STOPS.find((s) => s > now + 0.1);
-    if (stop !== undefined) seekTo(stop, "next");
+    if (stop !== undefined) seekTo(stop);
   }, [seekTo]);
 
   const prevStep = useCallback(() => {
     const now = videoRef.current?.currentTime ?? 0;
     const passed = STOPS.filter((s) => s <= now + 0.05);
     const current = passed[passed.length - 1];
-    if (current === undefined) return seekTo(0, "back");
-    if (now - current > RESTART_GRACE_SEC) return seekTo(current, "back");
-    seekTo(passed[passed.length - 2] ?? 0, "back");
+    if (current === undefined) return seekTo(0);
+    if (now - current > RESTART_GRACE_SEC) return seekTo(current);
+    seekTo(passed[passed.length - 2] ?? 0);
   }, [seekTo]);
-
-  useEffect(() => {
-    if (!jump) return;
-    const t = window.setTimeout(() => setJump(null), 1200);
-    return () => window.clearTimeout(t);
-  }, [jump]);
 
   // Start with sound if the browser allows it, otherwise muted.
   const start = useCallback(async () => {
@@ -280,16 +264,6 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
                 </span>
               )}
 
-              {jump && (
-                <span
-                  key={jump.id}
-                  className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full bg-black/55 px-4 py-2 text-sm font-semibold text-white shadow-lg backdrop-blur animate-in fade-in zoom-in-95 duration-200"
-                >
-                  {jump.dir === "back" && <ChevronLeft className="h-4 w-4" />}
-                  {jump.text}
-                  {jump.dir === "next" && <ChevronRight className="h-4 w-4" />}
-                </span>
-              )}
             </>
           )}
         </div>
