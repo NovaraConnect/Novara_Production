@@ -25,7 +25,7 @@ import { ArrowLeft } from "lucide-react";
 const LAST_UPDATED = "29 October 2026";
 
 /** Where privacy questions go. Also Novara's VAPID subject address. */
-const CONTACT_EMAIL = "hello@novaraconnect.group";
+const CONTACT_EMAIL = "contact@novaraconnect.group";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
