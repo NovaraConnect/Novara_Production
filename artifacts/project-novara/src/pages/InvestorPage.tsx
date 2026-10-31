@@ -641,12 +641,12 @@ export default function InvestorPage({ embedded = false }: { embedded?: boolean 
             <div className="space-y-5 text-lg leading-relaxed text-[#4B5363]">
               <p className="text-xl leading-relaxed text-[#08111F]">
                 Cloé Carmery is a technology and product strategist who designed and built
-                Novara Connect end to end, from the iOS app to the subscription business
-                behind it.
+                Novara Connect end to end.
               </p>
               <p>
                 A first-generation immigrant, Cloé moved from France to the US alone at 18 and
-                went on to earn an MBA in Data Analytics from the University of Florida. Today
+                went on to earn three degrees from the University of Florida: a BSBA, a Master
+                of International Business and an MBA in Data Analytics. Today
                 Cloé works in technology and product strategy at NextEra Analytics, NextEra
                 Energy’s AI product arm, building AI cost models and investment recommendations
                 for leadership. Before that, Cloé was an Assistant Brand Manager for
