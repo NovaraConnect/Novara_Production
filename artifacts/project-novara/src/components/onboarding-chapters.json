@@ -1,0 +1,46 @@
+{
+  "duration": 89.85,
+  "outro": 84.51,
+  "chapters": [
+    {
+      "step": 1,
+      "title": "This is your Network Health",
+      "start": 4.13
+    },
+    {
+      "step": 2,
+      "title": "Tell Novara your career goals",
+      "start": 9.73
+    },
+    {
+      "step": 3,
+      "title": "Add people as you meet them",
+      "start": 23.18
+    },
+    {
+      "step": 4,
+      "title": "Check your Network Health",
+      "start": 47.08
+    },
+    {
+      "step": 5,
+      "title": "See who is due for a follow-up",
+      "start": 50.88
+    },
+    {
+      "step": 6,
+      "title": "Find a reason to reach out",
+      "start": 55.88
+    },
+    {
+      "step": 7,
+      "title": "Let AI draft your message",
+      "start": 61.43
+    },
+    {
+      "step": 8,
+      "title": "Then mark them as contacted",
+      "start": 77.94
+    }
+  ]
+}
