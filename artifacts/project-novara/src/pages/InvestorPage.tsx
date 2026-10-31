@@ -620,8 +620,8 @@ export default function InvestorPage({ embedded = false }: { embedded?: boolean 
 
         {/* ── Founder ───────────────────────────────────────────────────── */}
         <section id="founder" className="scroll-mt-16 bg-white py-20 sm:py-28">
-          <div className="mx-auto grid max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
-            <div>
+          <div className="mx-auto grid max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+            <div className="lg:sticky lg:top-28">
               <Eyebrow>Founder</Eyebrow>
               <div className="mt-6 flex items-center gap-5">
                 <div
@@ -633,25 +633,46 @@ export default function InvestorPage({ embedded = false }: { embedded?: boolean 
                 </div>
                 <div>
                   <p className="font-serif text-3xl font-bold">Cloé Carmery</p>
-                  <p className="mt-1 text-[#5B6272]">Founder · University of Florida alum</p>
+                  <p className="mt-1 text-[#5B6272]">Founder · University of Florida MBA</p>
                   <p className="mt-0.5 text-sm text-[#7A8191]">Formerly L’Oréal · Current NextEra</p>
                 </div>
               </div>
             </div>
-            <div className="space-y-4 text-lg leading-relaxed text-[#4B5363]">
-              <p>
-                Cloé founded and built Novara Connect, from the iOS app to the
-                subscription business behind it.
+            <div className="space-y-5 text-lg leading-relaxed text-[#4B5363]">
+              <p className="text-xl leading-relaxed text-[#08111F]">
+                Cloé Carmery is a technology and product strategist who designed and built
+                Novara Connect end to end, from the iOS app to the subscription business
+                behind it.
               </p>
               <p>
-                A first-generation immigrant who moved from France to the US alone at 18, a
-                University of Florida alum, and a career that has run from L’Oréal to NextEra:
-                Cloé has spent years building a network from scratch and meeting people worth
-                knowing. Along the way
-                came a simple realization. Networking is the easy part. The gap is in what
-                comes after: actually maintaining the network you’ve built. Novara exists to
-                close that gap.
+                A first-generation immigrant, Cloé moved from France to the US alone at 18 and
+                went on to earn three degrees
+                from the University of Florida: a BSBA, a Master of International Business and
+                an MBA in Data Analytics. Today Cloé works in technology and product strategy at
+                NextEra Analytics, NextEra Energy’s AI product arm, building AI cost models and
+                investment recommendations for leadership. Before that, at L’Oréal, Cloé ran
+                data-driven digital campaigns for eight multimillion-dollar brands and product
+                marketing for YSL, Armani and Lancôme.
               </p>
+              <p>
+                Building a network from scratch, and mentoring more than 50 UF graduate students
+                through resumes and interviews, Cloé kept seeing the same gap. Meeting people is
+                the easy part. Keeping those relationships alive is where most of them are lost.
+                Novara exists to close that gap.
+              </p>
+              <dl className="grid gap-3 pt-1 text-base sm:grid-cols-2">
+                {[
+                  ["NextEra Analytics", "Technology & AI product strategy"],
+                  ["L’Oréal", "Brand and product marketing, 8 brands"],
+                  ["University of Florida", "MBA · MIB · BSBA"],
+                  ["Career mentor", "50+ graduate students coached"],
+                ].map(([k, v]) => (
+                  <div key={k} className="rounded-xl border border-[#E4E2DA] bg-[#F7F6F2] px-4 py-3">
+                    <dt className="font-semibold text-[#08111F]">{k}</dt>
+                    <dd className="text-sm text-[#5B6272]">{v}</dd>
+                  </div>
+                ))}
+              </dl>
               <blockquote className="border-l-4 py-1 pl-5" style={{ borderColor: BRAND }}>
                 <p className="font-serif text-xl italic leading-snug text-[#08111F] sm:text-2xl">
                   “I built Novara Connect to close that gap, from the iOS app to the
