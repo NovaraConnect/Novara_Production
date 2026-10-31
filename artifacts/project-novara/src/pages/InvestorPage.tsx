@@ -51,7 +51,7 @@ const PAPER = "#F7F6F2";
 const SANS = "'Plus Jakarta Sans', 'Inter', system-ui, sans-serif";
 
 /** Where investors write to. Until it is set, the button shows a placeholder. */
-const INVESTOR_EMAIL: string | null = "novaraconnect@gmail.com";
+const INVESTOR_EMAIL: string | null = "contact@novaraconnect.group";
 
 /** The founder's LinkedIn profile. Until it is set, a placeholder shows. */
 const FOUNDER_LINKEDIN_URL: string | null = "https://www.linkedin.com/in/cloecarmery/";

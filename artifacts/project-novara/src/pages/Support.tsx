@@ -12,7 +12,7 @@
 import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
 
-const CONTACT_EMAIL = "hello@novaraconnect.group";
+const CONTACT_EMAIL = "contact@novaraconnect.group";
 
 function QA({ q, children }: { q: string; children: React.ReactNode }) {
   return (
