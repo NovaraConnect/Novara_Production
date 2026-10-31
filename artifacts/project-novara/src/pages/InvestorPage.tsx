@@ -646,13 +646,11 @@ export default function InvestorPage({ embedded = false }: { embedded?: boolean 
               </p>
               <p>
                 A first-generation immigrant, Cloé moved from France to the US alone at 18 and
-                went on to earn three degrees
-                from the University of Florida: a BSBA, a Master of International Business and
-                an MBA in Data Analytics. Today Cloé works in technology and product strategy at
-                NextEra Analytics, NextEra Energy’s AI product arm, building AI cost models and
-                investment recommendations for leadership. Before that, at L’Oréal, Cloé ran
-                data-driven digital campaigns for eight multimillion-dollar brands and product
-                marketing for YSL, Armani and Lancôme.
+                went on to earn an MBA in Data Analytics from the University of Florida. Today
+                Cloé works in technology and product strategy at NextEra Analytics, NextEra
+                Energy’s AI product arm, building AI cost models and investment recommendations
+                for leadership. Before that, Cloé was an Assistant Brand Manager for
+                Data-Driven Experience and Digital Marketing at L’Oréal USA.
               </p>
               <p>
                 Building a network from scratch, and mentoring more than 50 UF graduate students
@@ -663,8 +661,8 @@ export default function InvestorPage({ embedded = false }: { embedded?: boolean 
               <dl className="grid gap-3 pt-1 text-base sm:grid-cols-2">
                 {[
                   ["NextEra Analytics", "Technology & AI product strategy"],
-                  ["L’Oréal", "Brand and product marketing, 8 brands"],
-                  ["University of Florida", "MBA · MIB · BSBA"],
+                  ["L’Oréal USA", "Assistant Brand Manager"],
+                  ["University of Florida", "MBA, Data Analytics"],
                   ["Career mentor", "50+ graduate students coached"],
                 ].map(([k, v]) => (
                   <div key={k} className="rounded-xl border border-[#E4E2DA] bg-[#F7F6F2] px-4 py-3">
