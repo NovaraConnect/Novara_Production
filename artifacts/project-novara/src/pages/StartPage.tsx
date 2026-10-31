@@ -291,7 +291,7 @@ export default function StartPage({ embedded = false }: { embedded?: boolean }) 
           }`}
         >
           <div>
-            <p className="text-sm font-semibold text-[#8FA6FF]">Networking for students &amp; young professionals</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8FA6FF]">Networking for students &amp; young professionals</p>
             <h1 className="mt-3 font-serif text-[2.6rem] font-bold leading-[1.04] sm:text-6xl lg:text-7xl">
               Great chat.{" "}
               <span className="text-[#8FA6FF]">Now what?</span>
@@ -365,7 +365,7 @@ export default function StartPage({ embedded = false }: { embedded?: boolean }) 
           <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 pb-20 sm:flex-row sm:px-6 sm:pb-0">
             <div className="flex items-center gap-2">
               <NovaraMark size={20} />
-              <span>© {new Date().getFullYear()} Novara Connect</span>
+              <span>© {new Date().getFullYear()} Novara Connect LLC</span>
             </div>
             <div className="flex items-center gap-6">
               <Link href="/privacy" className="hover:text-white">Privacy</Link>

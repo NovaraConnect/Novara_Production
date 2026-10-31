@@ -33,8 +33,9 @@ const TABS = [
     cta: { label: "Get in touch", href: "#contact" },
   },
   {
+    // Shown as "Users"; the id stays "students" so shared ?tab=students links work.
     id: "students",
-    label: "Students",
+    label: "Users",
     Content: StartPage,
     cta: { label: "Get the app", href: APP_STORE_URL },
   },
@@ -166,7 +167,7 @@ export default function AudiencePage() {
         >
           <div className="flex items-center gap-2">
             <NovaraMark size={20} />
-            <span>© {new Date().getFullYear()} Novara Connect</span>
+            <span>© {new Date().getFullYear()} Novara Connect LLC</span>
           </div>
           <div className="flex items-center gap-6">
             <Link href="/privacy" className="hover:text-white">Privacy</Link>
