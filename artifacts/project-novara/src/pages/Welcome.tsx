@@ -32,12 +32,11 @@ import { OnboardingVideo } from "@/components/OnboardingVideo";
 import { useSettings } from "@/hooks/useSettings";
 
 // VIDEO ROLLOUT
-// The onboarding video is being tried out before new accounts get it: for
-// now it plays only when someone taps Settings > Replay Tutorial (which adds
-// ?replay=1), and brand-new accounts still see the card tour. Set this to
-// true to give everyone the video; OnboardingTour/OnboardingScreens can then
-// be deleted.
-const VIDEO_FOR_NEW_USERS = false;
+// Everyone gets the onboarding video: new accounts and Settings > Replay
+// Tutorial (?replay=1). Set this to false to give new accounts the card tour
+// again (Replay keeps the video). Once the video has settled in,
+// OnboardingTour/OnboardingScreens and this switch can be deleted.
+const VIDEO_FOR_NEW_USERS = true;
 
 export default function Welcome() {
   const [, setLocation] = useLocation();

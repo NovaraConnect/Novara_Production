@@ -86,7 +86,7 @@ The app supports being served from a non-root base path (`BASE_URL`/`BASE_PATH`,
   warm/cooling/cold status.
 - **`InstallPrompt.tsx`** — the dismissible install banner; see `05-Business-Rules.md` rule 7.
 - **`OnboardingTour.tsx`** — first-run tutorial overlay, gated by `user_settings.has_seen_tutorial`.
-- **`OnboardingVideo.tsx`** — the tutorial as a video (`public/onboarding/`). For now it plays only from Settings → Replay Tutorial; `VIDEO_FOR_NEW_USERS` in `pages/Welcome.tsx` turns it on for new accounts.
+- **`OnboardingVideo.tsx`** — the tutorial as a video (`public/onboarding/`). Shown to new accounts and from Settings → Replay Tutorial; `VIDEO_FOR_NEW_USERS` in `pages/Welcome.tsx` switches new accounts back to `OnboardingTour.tsx`.
 - **`BusinessCardScanner.tsx` / `QRScanner.tsx`** — camera-based contact-intake helpers (business
   card OCR / QR code scanning) as alternate paths into `AddContact`.
 - **`components/ui/*`** — the shadcn/Radix UI primitive library (accordion, dialog, dropdown, form,
