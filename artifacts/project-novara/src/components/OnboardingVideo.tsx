@@ -24,9 +24,11 @@
 // timeline the video is rendered from: re-export it whenever the video is
 // re-rendered, or step skipping lands mid-step.
 //
-// The video fills its area (object-cover trims a sliver of plain navy at the
-// sides on tall phones), and the frame around it is the video's own navy in
-// both themes, so there is no visible box edge.
+// The whole video always shows (object-contain). With object-cover, iPhones
+// whose video area is wider than 9:16 (the safe areas, the sound row and the
+// button row all take height) cropped the top and bottom, and the bottom of
+// the phone mockup ended up behind the bar. Any space left at the sides is
+// the video's own navy, so there is no visible box edge.
 //
 // MOVING THROUGH IT, LIKE A REEL OR YOUTUBE
 // -----------------------------------------
@@ -221,7 +223,7 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
             <>
               <video
                 ref={videoRef}
-                className="h-full w-full object-cover"
+                className="h-full w-full object-contain"
                 src={VIDEO_SRC}
                 poster={POSTER_SRC}
                 playsInline
