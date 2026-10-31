@@ -19,9 +19,23 @@
 // (vite.config.ts globPatterns has no mp4), so it is only downloaded by
 // people who open the tutorial.
 //
+// onboarding-chapters.json says where each of the 8 steps starts. It is
+// written by demo/onboarding-tutorial/remotion/chapters.mjs from the same
+// timeline the video is rendered from: re-export it whenever the video is
+// re-rendered, or step skipping lands mid-step.
+//
 // The video fills its area (object-cover trims a sliver of plain navy at the
 // sides on tall phones), and the frame around it is the video's own navy in
 // both themes, so there is no visible box edge.
+//
+// MOVING THROUGH IT, LIKE A REEL OR YOUTUBE
+// -----------------------------------------
+//   • tap the right side for the next step, the left side for the previous
+//     one (or back to the start of this one); the middle pauses. The video's
+//     own banners say which step you're on, so there's no extra label
+//   • drag or tap the bar at the bottom to jump anywhere; its ticks mark
+//     where each step starts
+//   • on a keyboard: arrow keys for steps, space to pause
 //
 // NOT AN INVITATION TO SKIP
 // -------------------------
@@ -40,9 +54,11 @@
 //   • Escape closes at any moment
 // ============================================================================
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { ArrowRight, Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import timeline from "./onboarding-chapters.json";
 
 // The navy the encoded video actually renders as (its source is #08111F;
 // BT.709 rounding lands it here), so the bars above and below it match.
@@ -53,6 +69,13 @@ const POSTER_SRC = `${base}/onboarding/novara-onboarding-poster.jpg`;
 
 /** Seconds of playback before the skip button shows. */
 const SKIP_AFTER_SEC = 1;
+
+/** Within this many seconds of a step's start, "back" goes to the step before
+ *  it rather than restarting this one (how Stories and most players behave). */
+const RESTART_GRACE_SEC = 1.5;
+
+/** Step starts, then the closing card, so "next" from step 8 reaches the end. */
+const STOPS = [...timeline.chapters.map((c) => c.start), timeline.outro];
 
 function prefersReducedMotion(): boolean {
   try {
@@ -78,13 +101,33 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
 
   const close = useCallback(() => onComplete(), [onComplete]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [close]);
+  const seekTo = useCallback((sec: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    const duration = video.duration || timeline.duration;
+    const target = Math.max(0, Math.min(sec, duration - 0.05));
+    video.currentTime = target;
+    setProgress(target / duration);
+    if (target < duration - 0.3) setEnded(false);
+    if (video.paused && !reducedMotion) video.play().catch(() => setPlaying(false));
+  }, [reducedMotion]);
+
+  const nextStep = useCallback(() => {
+    const now = videoRef.current?.currentTime ?? 0;
+    // A small margin so a tap just after landing on a step moves on from it,
+    // without skipping a step that is about to start.
+    const stop = STOPS.find((s) => s > now + 0.1);
+    if (stop !== undefined) seekTo(stop);
+  }, [seekTo]);
+
+  const prevStep = useCallback(() => {
+    const now = videoRef.current?.currentTime ?? 0;
+    const passed = STOPS.filter((s) => s <= now + 0.05);
+    const current = passed[passed.length - 1];
+    if (current === undefined) return seekTo(0);
+    if (now - current > RESTART_GRACE_SEC) return seekTo(current);
+    seekTo(passed[passed.length - 2] ?? 0);
+  }, [seekTo]);
 
   // Start with sound if the browser allows it, otherwise muted.
   const start = useCallback(async () => {
@@ -105,7 +148,7 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
     if (!reducedMotion) void start();
   }, [reducedMotion, start]);
 
-  const togglePlay = () => {
+  const togglePlay = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) {
@@ -115,7 +158,21 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
     } else {
       video.pause();
     }
-  };
+  }, [ended]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+      else if (e.key === "ArrowRight") nextStep();
+      else if (e.key === "ArrowLeft") prevStep();
+      else if (e.key === " " && e.target === document.body) {
+        e.preventDefault();
+        togglePlay();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [close, nextStep, prevStep, togglePlay]);
 
   const toggleSound = () => {
     const video = videoRef.current;
@@ -125,13 +182,7 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
     if (video.paused && !ended) video.play().catch(() => setPlaying(false));
   };
 
-  const replay = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.currentTime = 0;
-    setEnded(false);
-    video.play().catch(() => setPlaying(false));
-  };
+  const replay = () => seekTo(0);
 
   const showButton = failed || ended || playedSec >= SKIP_AFTER_SEC || (reducedMotion && !playing && playedSec === 0);
 
@@ -167,12 +218,7 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
               </p>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={togglePlay}
-              className="group absolute inset-0 block h-full w-full"
-              aria-label={playing ? "Pause video" : "Play video"}
-            >
+            <>
               <video
                 ref={videoRef}
                 className="h-full w-full object-cover"
@@ -193,27 +239,38 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
                 }}
                 onError={() => setFailed(true)}
               />
+
+              {/* Reel-style tap zones: back, pause, next. */}
+              <div className="absolute inset-0 flex">
+                <button type="button" onClick={prevStep} className="h-full w-[30%]" aria-label="Previous step" />
+                <button
+                  type="button"
+                  onClick={togglePlay}
+                  className="group relative h-full flex-1"
+                  aria-label={playing ? "Pause video" : "Play video"}
+                >
+                  {playing && (
+                    <span className="absolute left-1/2 top-3 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full bg-black/30 text-white opacity-0 transition-opacity group-hover:opacity-100">
+                      <Pause className="h-4 w-4 fill-current" />
+                    </span>
+                  )}
+                </button>
+                <button type="button" onClick={nextStep} className="h-full w-[30%]" aria-label="Next step" />
+              </div>
+
               {!playing && !ended && (
-                <span className="absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#08111F] shadow-lg">
+                <span className="pointer-events-none absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#08111F] shadow-lg">
                   <Play className="ml-1 h-7 w-7 fill-current" />
                 </span>
               )}
-              {playing && (
-                <span className="absolute right-4 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/30 text-white opacity-0 transition-opacity group-hover:opacity-100">
-                  <Pause className="h-4 w-4 fill-current" />
-                </span>
-              )}
-            </button>
+
+            </>
           )}
         </div>
 
         {/* Fixed height, so the video doesn't jump when the button appears. */}
-        <div className="h-[92px] shrink-0 px-6 pb-1 pt-3">
-          {!failed && (
-            <div className="mb-4 h-1 overflow-hidden rounded-full bg-white/15" aria-hidden="true">
-              <div className="h-full rounded-full bg-white/70" style={{ width: `${progress * 100}%` }} />
-            </div>
-          )}
+        <div className="h-[100px] shrink-0 px-6 pb-1 pt-2">
+          {!failed && <Scrubber progress={progress} onSeek={(f) => seekTo(f * (videoRef.current?.duration || timeline.duration))} />}
           {showButton && (
             <div className="flex gap-3 animate-in fade-in duration-500">
               {ended && (
@@ -253,4 +310,53 @@ export function OnboardingVideo({ onComplete }: OnboardingVideoProps) {
 
   // Portalled so no ancestor stacking context can put the bottom nav over it.
   return typeof document === "undefined" ? overlay : createPortal(overlay, document.body);
+}
+
+/** The progress bar, draggable like a video player's, with a tick at each step. */
+function Scrubber({ progress, onSeek }: { progress: number; onSeek: (fraction: number) => void }) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
+
+  const seekFrom = (e: ReactPointerEvent) => {
+    const track = trackRef.current;
+    if (!track) return;
+    const box = track.getBoundingClientRect();
+    onSeek(Math.max(0, Math.min(1, (e.clientX - box.left) / box.width)));
+  };
+
+  return (
+    <div
+      className="relative mb-3 flex h-6 cursor-pointer touch-none items-center"
+      role="slider"
+      aria-label="Video position"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(progress * 100)}
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        setDragging(true);
+        seekFrom(e);
+      }}
+      onPointerMove={(e) => dragging && seekFrom(e)}
+      onPointerUp={() => setDragging(false)}
+      onPointerCancel={() => setDragging(false)}
+    >
+      <div ref={trackRef} className={`relative w-full overflow-visible rounded-full bg-white/15 transition-[height] ${dragging ? "h-1.5" : "h-1"}`}>
+        <div className="absolute inset-y-0 left-0 rounded-full bg-white/80" style={{ width: `${progress * 100}%` }} />
+        {timeline.chapters.slice(1).map((c) => (
+          <span
+            key={c.step}
+            className="absolute top-1/2 h-2 w-0.5 -translate-y-1/2 rounded-full bg-white/45"
+            style={{ left: `${(c.start / timeline.duration) * 100}%` }}
+            aria-hidden="true"
+          />
+        ))}
+        <span
+          className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow transition-[width,height] ${dragging ? "h-4 w-4" : "h-3 w-3"}`}
+          style={{ left: `${progress * 100}%` }}
+          aria-hidden="true"
+        />
+      </div>
+    </div>
+  );
 }
