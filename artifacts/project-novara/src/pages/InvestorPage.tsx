@@ -15,6 +15,10 @@
 //   • "nudges, never overrides" docs/Founder-Vision.md
 //   • screenshots               public/screens/, iOS app with fictional demo contacts
 //
+// The one exception is MARKET_STATS: third-party research, each figure checked
+// against its linked source on 2026-10-30 and published within two years of
+// that date. Replace a figure when it ages past two years rather than keep it.
+//
 // Anything that could not be verified is a <Placeholder>. Do not replace one
 // with a number (users, revenue, market size) unless it is real.
 //
@@ -114,6 +118,7 @@ const NAV = [
   { href: "#problem", label: "Problem" },
   { href: "#product", label: "Product" },
   { href: "#how", label: "How it works" },
+  { href: "#market", label: "Market" },
   { href: "#model", label: "Business model" },
   { href: "#founder", label: "Founder" },
 ];
@@ -214,6 +219,51 @@ const AUDIENCES = [
     icon: Users,
     title: "Early-career professionals",
     body: "First jobs, first mentors, first industry network. The relationships that shape the next move.",
+  },
+];
+
+const MARKET_STATS = [
+  {
+    figure: "40% vs 3%",
+    label: "of referred candidates reach an interview, against 3% of people who apply on their own.",
+    source: "Ashby, 38M applications, 2021–2024",
+    date: "May 2025",
+    url: "https://www.ashbyhq.com/talent-trends-report/reports/referrals",
+  },
+  {
+    figure: "16% vs 6%",
+    label: "of interviewed referrals reach an offer, against 6% of other interviewed applicants.",
+    source: "Ashby, 38M applications, 2021–2024",
+    date: "May 2025",
+    url: "https://www.ashbyhq.com/talent-trends-report/reports/referrals",
+  },
+  {
+    figure: "38%",
+    label: "of U.S. Gen Z workers say networking makes them anxious. Another 37% avoid it because they don’t know how to start.",
+    source: "LinkedIn survey by Strand Partners, 2,000 U.S. workers, via Fortune",
+    date: "June 2025",
+    url: "https://fortune.com/2025/06/02/3-best-ways-new-college-graduates-can-expand-their-professional-networks-linkedin-career-expert/",
+  },
+  {
+    figure: "6.4 months",
+    label: "before graduation, on average, the Class of 2025 started its job search, earlier than the class before.",
+    source: "NACE 2025 Student Survey, 13,684 students",
+    date: "Oct 2025",
+    url: "https://naceweb.org/about-us/press/class-of-2025-college-grads-responded-to-challenges-of-a-tough-job-market",
+  },
+  {
+    figure: "16.2M",
+    label: "U.S. undergraduates in fall 2025, up 1.2% on the year before.",
+    source: "National Student Clearinghouse Research Center",
+    date: "Jan 2026",
+    url: "https://nscresearchcenter.org/final-fall-enrollment-trends/",
+  },
+  {
+    figure: "$504K",
+    label: "median U.S. career center budget, up 21% in two years: the budget a campus license would come from.",
+    source: "NACE benchmarks, 2024–25",
+    date: "Mar 2025",
+    url: "https://naceweb.org/career-development/trends-and-predictions/career-center-budgets-climb-21-percent-in-last-two-years",
   },
 ];
 
@@ -468,6 +518,41 @@ export default function InvestorPage({ embedded = false }: { embedded?: boolean 
                 </p>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* ── Market ────────────────────────────────────────────────────── */}
+        <section id="market" className="scroll-mt-16 bg-white py-20 sm:py-28">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <SectionHeading
+              eyebrow="The market"
+              title="Relationships move careers, and staying in touch is hard."
+              intro="Referrals open doors that applications don’t, and young people start looking for work months before graduation. Many of them find networking hard to begin, let alone keep up."
+            />
+            <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {MARKET_STATS.map((s) => (
+                <div
+                  key={s.figure}
+                  className="flex flex-col rounded-2xl border border-[#E4E2DA] bg-[#F7F6F2] p-7"
+                >
+                  <p className="font-serif text-4xl font-bold tabular-nums" style={{ color: BRAND }}>
+                    {s.figure}
+                  </p>
+                  <p className="mt-3 leading-relaxed text-[#2A3146]">{s.label}</p>
+                  <a
+                    href={s.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-auto pt-5 text-xs leading-snug text-[#7A8191] underline decoration-[#C9CDD8] underline-offset-2 hover:text-[#08111F]"
+                  >
+                    {s.source} · {s.date}
+                  </a>
+                </div>
+              ))}
+            </div>
+            <p className="mt-8 text-xs text-[#8A909C]">
+              Independent research published in the last two years, not Novara data.
+            </p>
           </div>
         </section>
 
