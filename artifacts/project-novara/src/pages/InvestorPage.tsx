@@ -733,7 +733,7 @@ export default function InvestorPage({ embedded = false }: { embedded?: boolean 
           <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6">
             <div className="flex items-center gap-2">
               <NovaraMark size={20} />
-              <span>© {new Date().getFullYear()} Novara Connect</span>
+              <span>© {new Date().getFullYear()} Novara Connect LLC</span>
             </div>
             <div className="flex items-center gap-6">
               <Link href="/privacy" className="hover:text-white">Privacy</Link>
