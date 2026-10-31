@@ -12,6 +12,7 @@ import {
 } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { allowedOrigins, frontendOrigins } from "./lib/frontendOrigins";
 import { startScheduler } from "./lib/scheduler";
 import { startHealthSnapshotScheduler } from "./lib/networkHealth";
 
@@ -49,14 +50,10 @@ app.use(helmet({ contentSecurityPolicy: false }));
 
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
-const FRONTEND_URL = process.env.FRONTEND_URL ?? "https://novara-mobile2-frontend.onrender.com";
-const ALLOWED_ORIGINS = new Set([
-  FRONTEND_URL,
-  "http://localhost:3000",
-  "http://localhost:5173",
-  "http://127.0.0.1:3000",
-  "http://127.0.0.1:5173",
-  ]);
+// The main web app, plus the Android app's own copy when ANDROID_FRONTEND_URL
+// is set. See lib/frontendOrigins.ts.
+const FRONTEND_ORIGINS = frontendOrigins(process.env);
+const ALLOWED_ORIGINS = allowedOrigins(process.env);
 
 app.use(
   cors({
@@ -95,7 +92,7 @@ app.use("/api", apiLimiter);
 app.use(
   clerkMiddleware({
     publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
-    authorizedParties: [FRONTEND_URL],
+    authorizedParties: FRONTEND_ORIGINS,
   }),
   );
 
