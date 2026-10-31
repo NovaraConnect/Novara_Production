@@ -316,7 +316,7 @@ export default function StartPage({ embedded = false }: { embedded?: boolean }) 
                   className="mx-auto h-24 w-24"
                 />
                 <p className="mt-2 text-[11px] font-semibold leading-snug text-[#08111F]">
-                  Scan with your iPhone to download
+                  Scan with your phone
                 </p>
               </div>
             )}
