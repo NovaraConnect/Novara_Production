@@ -47,6 +47,13 @@ const mode = process.env["NOVARA_IOS_MODE"] === "bundled" ? "bundled" : "remote"
 
 const PRODUCTION_WEB_URL = "https://app.novaraconnect.group";
 
+// ANDROID loads its own copy of the web app, deployed only from the
+// feat/android branch, so Android work can never change what iPhones load.
+// The Capacitor CLI has no per-platform server.url, so the platform comes from
+// the command line: `cap sync android` / `cap run android`.
+const ANDROID_WEB_URL = "https://android.novaraconnect.group";
+const isAndroidCommand = process.argv.includes("android");
+
 // Clerk's Frontend API host. It MUST be allowed to load inside the web view.
 //
 // Signing in is not a single-origin flow: once Clerk has authenticated, it
@@ -78,6 +85,11 @@ const config = {
     // the first render runs. The web app's isNativeShell() checks both.
     appendUserAgent: "NovaraApp",
   },
+  android: {
+    backgroundColor: "#08111F",
+    // Same marker as iOS; the web app tells them apart with isAndroidShell().
+    appendUserAgent: "NovaraApp",
+  },
   plugins: {
     PushNotifications: {
       // Show a banner, badge and sound even when Novara is in the foreground.
@@ -90,7 +102,7 @@ const config = {
   ...(mode === "remote"
     ? {
         server: {
-          url: PRODUCTION_WEB_URL,
+          url: isAndroidCommand ? ANDROID_WEB_URL : PRODUCTION_WEB_URL,
           // No cleartext: production is HTTPS only.
           cleartext: false,
           // Keep the Clerk sign-in handshake inside the app. See above.

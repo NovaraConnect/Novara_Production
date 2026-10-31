@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
+  isAndroidShell,
   isNativeShell,
   isStandaloneDisplayMode,
   isInstalledExperience,
@@ -7,6 +8,8 @@ import {
 
 const SAFARI_IOS =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+const ANDROID_WEBVIEW =
+  "Mozilla/5.0 (Linux; Android 15; Pixel 9; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/140.0.0.0 Mobile Safari/537.36";
 const CHROME_DESKTOP =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
 
@@ -89,6 +92,23 @@ describe("isNativeShell", () => {
   it("is false when there is no window at all (SSR / node)", () => {
     vi.stubGlobal("window", undefined);
     expect(isNativeShell()).toBe(false);
+  });
+});
+
+describe("isAndroidShell", () => {
+  it("detects the Android app by its User-Agent marker", () => {
+    setEnv({ userAgent: `${ANDROID_WEBVIEW} NovaraApp` });
+    expect(isAndroidShell()).toBe(true);
+  });
+
+  it("is false in the iOS app, so iOS behaviour is unchanged", () => {
+    setEnv({ userAgent: `${SAFARI_IOS} NovaraApp`, capacitor: { isNativePlatform: () => true } });
+    expect(isAndroidShell()).toBe(false);
+  });
+
+  it("is false in an Android browser outside the app", () => {
+    setEnv({ userAgent: ANDROID_WEBVIEW });
+    expect(isAndroidShell()).toBe(false);
   });
 });
 

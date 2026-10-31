@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Users, PlusCircle, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { isNativeShell } from "@/lib/installPrompt";
+import { isAndroidShell, isNativeShell } from "@/lib/installPrompt";
 
 export function BottomNav() {
   const [location] = useLocation();
@@ -10,7 +10,8 @@ export function BottomNav() {
   // web view (ios/App/App/Native/NovaraRootViewController.swift). Rendering it
   // here too would give Novara two bottom navigations stacked on each other.
   // The four destinations are identical in both, by design — see NovaraSection.
-  if (isNativeShell()) return null;
+  // The Android shell has no native tab bar, so it keeps this one.
+  if (isNativeShell() && !isAndroidShell()) return null;
 
   const navItems = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },

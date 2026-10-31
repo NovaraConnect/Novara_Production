@@ -11,7 +11,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { useAuth, useClerk, useUser } from "@clerk/react";
 import { UserSettings } from "@/types/contact";
 import { NovaraMark } from "@/components/NovaraMark";
-import { isNativeShell } from "@/lib/installPrompt";
+import { isAndroidShell, isNativeShell } from "@/lib/installPrompt";
 import { openAppStoreReview } from "@/lib/reviewPrompt";
 import { APP_VERSION } from "@/lib/appVersion";
 import { deleteAccount } from "@/lib/api";
@@ -112,6 +112,8 @@ export default function Settings() {
   // already in the installed app — and pointing at a non-App-Store install
   // route is exactly the kind of thing App Review objects to.
   const nativeApp = isNativeShell();
+  // Rate Novara opens Google Play instead of the App Store on Android.
+  const androidApp = isAndroidShell();
 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -434,9 +436,9 @@ export default function Settings() {
           <div className="surface-card overflow-hidden divide-y divide-border/60">
             <SettingsRow icon={Bug} label="Report a bug" detail="Let us know when something isn't working" onClick={() => setLocation("/feedback?type=bug")} testId="nav-report-bug" />
             <SettingsRow icon={Lightbulb} label="Suggest a feature" detail="Tell us what would make Novara better" onClick={() => setLocation("/feedback?type=feature")} testId="nav-suggest-feature" />
-            {/* In the iPhone app only: it opens Novara's App Store page. */}
+            {/* In the app only: it opens Novara's App Store or Google Play page. */}
             {nativeApp && (
-              <SettingsRow icon={Star} label="Rate Novara" detail="Leave a review on the App Store" onClick={openAppStoreReview} testId="button-rate-novara" />
+              <SettingsRow icon={Star} label="Rate Novara" detail={androidApp ? "Leave a review on Google Play" : "Leave a review on the App Store"} onClick={openAppStoreReview} testId="button-rate-novara" />
             )}
           </div>
         </section>

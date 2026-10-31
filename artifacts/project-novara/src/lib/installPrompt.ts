@@ -37,6 +37,18 @@ export function isNativeShell(): boolean {
   return typeof navigator !== "undefined" && navigator.userAgent.includes("NovaraApp");
 }
 
+/**
+ * True inside the Capacitor Android shell. This copy of the web app is served
+ * only to Android (android.novaraconnect.group, from the feat/android branch),
+ * but it checks anyway so a browser visit behaves like the normal site.
+ *
+ * Android has none of the iOS shell's native parts: no native tab bar, no
+ * injected window.NovaraNative bridge, and no push until Firebase is set up.
+ */
+export function isAndroidShell(): boolean {
+  return isNativeShell() && typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+}
+
 /** True only for a real PWA install: standalone display mode, or iOS Safari's
  *  non-standard navigator.standalone. Deliberately narrow — see
  *  isInstalledExperience() for the "don't nag about installing" predicate. */

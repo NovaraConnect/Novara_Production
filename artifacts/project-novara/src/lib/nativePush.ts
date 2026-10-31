@@ -11,7 +11,7 @@
 // bundled into the production web build for every browser user, where it can
 // do nothing useful.
 // ============================================================================
-import { isNativeShell } from "./installPrompt";
+import { isAndroidShell, isNativeShell } from "./installPrompt";
 
 /** Which APNs host minted the token. See api-server/src/lib/apns.ts. */
 export type ApnsEnvironment = "production" | "sandbox";
@@ -70,6 +70,10 @@ const REGISTRATION_TIMEOUT_MS = 15_000;
 export async function registerForNativePush(): Promise<NativePushRegistration> {
   if (!isNativeShell()) {
     throw new Error("Native push is only available inside the Novara iOS app");
+  }
+  // Without Firebase configured, registering on Android crashes the app.
+  if (isAndroidShell()) {
+    throw new Error("Notifications aren't available in the Android app yet");
   }
 
   const { PushNotifications } = await import("@capacitor/push-notifications");
@@ -130,7 +134,7 @@ export async function registerForNativePush(): Promise<NativePushRegistration> {
  * registerForNativePush() now cleans up its own listeners instead.
  */
 export async function unregisterNativePush(): Promise<void> {
-  if (!isNativeShell()) return;
+  if (!isNativeShell() || isAndroidShell()) return;
   try {
     const { PushNotifications } = await import("@capacitor/push-notifications");
     await PushNotifications.unregister();

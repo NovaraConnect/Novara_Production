@@ -15,11 +15,15 @@
 // browser or an app version without the prompt nothing is ever requested.
 // ============================================================================
 import { canRequestNativeReview, requestNativeReview } from "./nativeBridge";
+import { isAndroidShell } from "./installPrompt";
 
 export const REVIEW_STORAGE_KEY = "novara.reviewPrompt";
 
 /** Novara Connect on the App Store, opened on the "Write a Review" form. */
 export const APP_STORE_REVIEW_URL = "https://apps.apple.com/app/id6811249861?action=write-review";
+
+/** Novara on Google Play. Android opens this link in the Play Store app. */
+export const PLAY_STORE_REVIEW_URL = "https://play.google.com/store/apps/details?id=group.novaraconnect.app";
 
 export type PositiveMoment = "contacted" | "added" | "scoreUp";
 
@@ -116,8 +120,9 @@ export function recordPositiveMoment(kind: PositiveMoment, accountCreatedAt: Dat
   }, PROMPT_DELAY_MS);
 }
 
-/** Opens the App Store's review form, for the "Rate Novara" row in Settings.
- *  In the app, the shell hands the link to iOS, which opens the App Store. */
+/** Opens the store's review page, for the "Rate Novara" row in Settings.
+ *  In the iOS app, the shell hands the link to iOS, which opens the App Store;
+ *  in the Android app it goes to Novara's Google Play page. */
 export function openAppStoreReview(): void {
-  window.open(APP_STORE_REVIEW_URL, "_blank", "noopener");
+  window.open(isAndroidShell() ? PLAY_STORE_REVIEW_URL : APP_STORE_REVIEW_URL, "_blank", "noopener");
 }

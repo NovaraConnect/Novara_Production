@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@clerk/react";
 import { API_BASE } from "@/lib/apiBase";
 import { apiFetch } from "@/lib/api";
-import { isInstalledExperience, isNativeShell } from "@/lib/installPrompt";
+import { isAndroidShell, isInstalledExperience, isNativeShell } from "@/lib/installPrompt";
 import { registerForNativePush, unregisterNativePush } from "@/lib/nativePush";
 
 export interface NotificationSettings {
@@ -61,10 +61,14 @@ export function useNotifications() {
 
   // The native iOS shell has none of the Web Push APIs — it goes through APNs
   // instead — so it is "supported" despite failing every browser feature test.
-  const isNative = isNativeShell();
+  // The Android shell has neither Web Push nor (until Firebase is set up)
+  // native push, so it reports unsupported instead of failing on tap.
+  const androidShell = isAndroidShell();
+  const isNative = isNativeShell() && !androidShell;
   const isSupported =
     isNative ||
-    (typeof window !== "undefined" &&
+    (!androidShell &&
+      typeof window !== "undefined" &&
       "Notification" in window &&
       "serviceWorker" in navigator &&
       "PushManager" in window);
