@@ -1,7 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   addContactBlock,
   annualSavingLabel,
+  cancelBeforeDeleting,
   cancelledNotice,
   cancelledUntil,
   formatAccessDate,
@@ -11,6 +12,9 @@ import {
   subscriptionGate,
   subscriptionLabel,
   subscriptionPlanFor,
+  addContactWall,
+  howToCancel,
+  storeAccount,
   subscriptionTerms,
   SUBSCRIPTION_ROUTE,
   waitForPro,
@@ -164,6 +168,39 @@ describe("subscriptionTerms", () => {
     const text = subscriptionTerms({ priceString: "$49.99", period: "annual", trialDays: 0 });
     expect(text).not.toContain("Free for");
     expect(text).toContain("$49.99 per year, charged to your Apple Account when you confirm");
+  });
+});
+
+describe("store wording on Android", () => {
+  const ANDROID_APP =
+    "Mozilla/5.0 (Linux; Android 15; Pixel 9; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/140.0.0.0 Mobile Safari/537.36 NovaraApp";
+  const IPHONE_APP =
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 NovaraApp";
+  const inApp = (userAgent: string) => {
+    vi.stubGlobal("window", {});
+    vi.stubGlobal("navigator", { userAgent });
+  };
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("bills and cancels through Google Play in the Android app", () => {
+    inApp(ANDROID_APP);
+    const text = subscriptionTerms({ priceString: "$4.99", period: "monthly", trialDays: 7 });
+    expect(text).toContain("Your Google account is charged when the trial ends");
+    expect(text).toContain("open the Play Store app");
+    expect(text).not.toMatch(/Apple|iPhone/);
+    expect(storeAccount()).toBe("Google account");
+    expect(cancelBeforeDeleting()).toContain("doesn't stop Google Play from billing you");
+    expect(addContactWall("subscription", "none", "update-app").message).toContain("Update Novara from Google Play");
+  });
+
+  it("keeps the iPhone app's Apple wording word for word", () => {
+    inApp(IPHONE_APP);
+    expect(howToCancel()).toBe(
+      "To cancel, open Settings on your iPhone, tap your name, then Subscriptions. Or tap Manage Subscription on this screen.",
+    );
+    expect(storeAccount()).toBe("Apple Account");
+    expect(cancelBeforeDeleting()).toContain("doesn't stop Apple from billing you");
+    expect(addContactWall("subscription", "none", "update-app").message).toContain("Update Novara from the App Store");
   });
 });
 

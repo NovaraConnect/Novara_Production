@@ -3,7 +3,27 @@
 // rule here can be tested directly.
 // ============================================================================
 import type { ProStatus } from "./api";
+import { isAndroidShell } from "./installPrompt";
 import type { ProPeriod } from "./nativeBridge";
+
+/**
+ * Which store sells Novara Pro on this device. The Android app sells it through
+ * Google Play, so every Apple-specific sentence below has a Google Play twin.
+ * Everywhere else (the iPhone app, a browser) the Apple wording is unchanged.
+ */
+export function onGooglePlay(): boolean {
+  return isAndroidShell();
+}
+
+/** "Apple Account" or "Google account", for sentences about who is billed. */
+export function storeAccount(): string {
+  return onGooglePlay() ? "Google account" : "Apple Account";
+}
+
+/** "the App Store" or "Google Play", for "update Novara from …". */
+export function storeName(): string {
+  return onGooglePlay() ? "Google Play" : "the App Store";
+}
 
 /** The Novara Pro subscription screen (pages/Paywall.tsx). Settings and Add
  *  Contact link here. Keep this path stable: other screens depend on it. */
@@ -40,6 +60,22 @@ export function annualSavingLabel(monthlyPrice: number | undefined, annualPrice:
 export const HOW_TO_CANCEL =
   "To cancel, open Settings on your iPhone, tap your name, then Subscriptions. Or tap Manage Subscription on this screen.";
 
+/** How to cancel on Android, in the words the Play Store app uses. */
+export const HOW_TO_CANCEL_GOOGLE_PLAY =
+  "To cancel, open the Play Store app, tap your profile picture, then Payments & subscriptions, then Subscriptions. Or tap Manage Subscription on this screen.";
+
+/** Where the user cancels on this device: Apple's Settings or the Play Store. */
+export function howToCancel(): string {
+  return onGooglePlay() ? HOW_TO_CANCEL_GOOGLE_PLAY : HOW_TO_CANCEL;
+}
+
+/** Where account deletion tells a subscriber to cancel first. */
+export function cancelBeforeDeleting(): string {
+  return onGooglePlay()
+    ? "If you subscribe to Novara Pro, cancel it first in the Play Store app → your profile picture → Payments & subscriptions → Subscriptions: deleting your account doesn't stop Google Play from billing you."
+    : "If you subscribe to Novara Pro, cancel it first in your iPhone's Settings → your name → Subscriptions: deleting your account doesn't stop Apple from billing you.";
+}
+
 /**
  * The full terms shown under the plans before purchase: price per period,
  * trial length and what happens after it, auto-renewal, and how to cancel.
@@ -50,11 +86,12 @@ export const HOW_TO_CANCEL =
 export function subscriptionTerms(input: { priceString: string; period: ProPeriod; trialDays: number }): string {
   const unit = input.period === "annual" ? "year" : "month";
   const price = `${input.priceString} per ${unit}`;
+  const account = storeAccount();
   const charge =
     input.trialDays > 0
-      ? `Free for ${input.trialDays} days, then ${price}. Your Apple Account is charged when the trial ends unless you cancel at least 24 hours before it ends.`
-      : `${price}, charged to your Apple Account when you confirm.`;
-  return `${charge} The subscription renews automatically every ${unit} at the same price unless auto-renew is turned off at least 24 hours before the end of the current period. ${HOW_TO_CANCEL}`;
+      ? `Free for ${input.trialDays} days, then ${price}. Your ${account} is charged when the trial ends unless you cancel at least 24 hours before it ends.`
+      : `${price}, charged to your ${account} when you confirm.`;
+  return `${charge} The subscription renews automatically every ${unit} at the same price unless auto-renew is turned off at least 24 hours before the end of the current period. ${howToCancel()}`;
 }
 
 /** What happens to someone's contacts when a subscription ends. */
@@ -133,7 +170,7 @@ export function addContactWall(
   route: SubscribeRoute,
 ): { title: string; message: string; action: string } {
   const how =
-    route === "update-app" ? " Update Novara from the App Store to subscribe."
+    route === "update-app" ? ` Update Novara from ${storeName()} to subscribe.`
     : route === "iphone-app" ? " You can subscribe in the Novara app on iPhone."
     : "";
   if (block === "limit") {

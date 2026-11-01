@@ -43,6 +43,9 @@ import {
 import {
   annualSavingLabel,
   cancelledNotice,
+  onGooglePlay,
+  storeAccount,
+  storeName,
   formatAccessDate,
   KEEP_YOUR_CONTACTS_NOTE,
   PRO_BILLED_LABEL,
@@ -58,8 +61,15 @@ type Busy = null | "purchase" | "restore" | "manage";
 function LegalLinks({ showAccount }: { showAccount: boolean }) {
   return (
     <p className="text-xs text-muted-foreground text-center space-x-1">
-      <a className="underline" href={TERMS_OF_USE_URL} target="_blank" rel="noopener noreferrer">Terms of Use (EULA)</a>
-      <span>·</span>
+      {/* Apple's EULA is the iPhone app's Terms of Use. Google Play has no
+          equivalent standard licence, so the Android app shows the privacy
+          policy and account links only. */}
+      {!onGooglePlay() && (
+        <>
+          <a className="underline" href={TERMS_OF_USE_URL} target="_blank" rel="noopener noreferrer">Terms of Use (EULA)</a>
+          <span>·</span>
+        </>
+      )}
       <a className="underline" href="/privacy">Privacy Policy</a>
       {showAccount && (
         <>
@@ -121,7 +131,7 @@ export default function Paywall() {
           </p>
           <p className="text-sm text-muted-foreground">
             {hasNativeBridge()
-              ? "Update Novara from the App Store to choose a plan."
+              ? `Update Novara from ${storeName()} to choose a plan.`
               : "Choose a plan in the Novara app on iPhone, then sign in here with the same account."}
           </p>
           <p className="text-xs text-muted-foreground">{KEEP_YOUR_CONTACTS_NOTE}</p>
@@ -166,7 +176,7 @@ export default function Paywall() {
           ? trialDays > 0
             ? `Your ${trialDays}-day free trial has started. Enjoy Novara Pro.`
             : "Novara Pro is active. Thank you."
-          : "Apple has your purchase. It can take a minute to appear here. Use Restore Purchases if it doesn't.",
+          : `${onGooglePlay() ? "Google Play" : "Apple"} has your purchase. It can take a minute to appear here. Use Restore Purchases if it doesn't.`,
       );
     } catch (err) {
       setMessage(
@@ -196,7 +206,7 @@ export default function Paywall() {
         }
         setMessage(confirmed ? "Novara Pro is restored." : "Your subscription was found. It can take a minute to appear.");
       } else {
-        setMessage("No active Novara Pro subscription was found for this Apple Account.");
+        setMessage(`No active Novara Pro subscription was found for this ${storeAccount()}.`);
       }
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Restore didn't complete. Try again.");
@@ -242,7 +252,7 @@ export default function Paywall() {
           <p className="text-base font-semibold text-foreground">{headline}</p>
           <ul className="space-y-2 text-sm text-foreground">
             <li className="flex gap-2"><Check className="w-4 h-4 mt-0.5 shrink-0 text-primary" /> Unlimited contacts</li>
-            <li className="flex gap-2"><Check className="w-4 h-4 mt-0.5 shrink-0 text-primary" /> Import as many as you like from LinkedIn, business cards, QR codes and your iPhone contacts</li>
+            <li className="flex gap-2"><Check className="w-4 h-4 mt-0.5 shrink-0 text-primary" /> Import as many as you like from LinkedIn, business cards, QR codes and your {onGooglePlay() ? "phone" : "iPhone"} contacts</li>
           </ul>
           <p className="text-xs text-muted-foreground">{KEEP_YOUR_CONTACTS_NOTE}</p>
         </section>
@@ -256,7 +266,7 @@ export default function Paywall() {
                     untilLong: formatAccessDate(subscription.accessUntil, "long"),
                   })
                 : subscription.plan === "trial"
-                ? `You're on the Novara Pro free trial${subscription.daysLeft === null ? "" : ` (${trialTimeLeft(subscription.daysLeft)})`}. Your subscription starts when it ends unless you cancel in your Apple Account settings.`
+                ? `You're on the Novara Pro free trial${subscription.daysLeft === null ? "" : ` (${trialTimeLeft(subscription.daysLeft)})`}. Your subscription starts when it ends unless you cancel in ${onGooglePlay() ? "the Play Store app" : "your Apple Account settings"}.`
                 : `You're on ${subscription.label}.`}
             </p>
             <Button variant="outline" className="w-full rounded-xl" onClick={manage} disabled={busy !== null}>

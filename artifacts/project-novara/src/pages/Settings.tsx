@@ -20,7 +20,7 @@ import { canExportContacts, exportContacts } from "@/lib/exportContacts";
 import { cn } from "@/lib/utils";
 import { useSubscriptionState } from "@/hooks/useSubscriptionState";
 import { usePaywallAvailable } from "@/hooks/usePaywallAvailable";
-import { SUBSCRIPTION_ROUTE } from "@/lib/purchases";
+import { cancelBeforeDeleting, SUBSCRIPTION_ROUTE } from "@/lib/purchases";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -301,9 +301,7 @@ export default function Settings() {
               <AlertDialogDescription>
                 This permanently deletes your contacts, your career profile, your notification
                 settings and your Novara login. It cannot be undone, and there is no way to
-                recover the data afterwards. If you subscribe to Novara Pro, cancel it first in
-                your iPhone's Settings → your name → Subscriptions: deleting your account
-                doesn't stop Apple from billing you.
+                recover the data afterwards. {cancelBeforeDeleting()}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

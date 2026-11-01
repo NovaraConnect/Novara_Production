@@ -19,7 +19,8 @@
 // inside the app at all", which is deliberately independent of this bridge so
 // it keeps working before the injected script has run.
 // ============================================================================
-import { isNativeShell } from "./installPrompt";
+import { Capacitor, registerPlugin } from "@capacitor/core";
+import { isAndroidShell, isNativeShell } from "./installPrompt";
 
 /** Fields the native layer can prefill. Intentionally the same shape as
  *  `ScannedContact` so the Add Contact form has ONE prefill path, not three. */
@@ -118,7 +119,49 @@ export const NATIVE_PURCHASE_BRIDGE_VERSION = 3;
 function bridge(): NovaraNativeBridge | null {
   if (typeof window === "undefined") return null;
   const candidate = (window as Window & { NovaraNative?: NovaraNativeBridge }).NovaraNative;
-  return candidate && typeof candidate.version === "number" ? candidate : null;
+  if (candidate && typeof candidate.version === "number") return candidate;
+  return isAndroidShell() ? androidBridge() : null;
+}
+
+/** The Android app's purchase plugin (android/…/NovaraPurchasesPlugin.java). */
+interface NovaraPurchasesPlugin {
+  getProducts(): Promise<{ products: NativeProProduct[] }>;
+  identify(options: { userId: string }): Promise<{ ok: boolean }>;
+  purchase(options: { productId: string }): Promise<{ outcome: NativePurchaseOutcome }>;
+  restorePurchases(): Promise<NativeRestoreResult>;
+  manageSubscriptions(): Promise<void>;
+}
+
+let android: NovaraNativeBridge | null | undefined;
+
+/**
+ * The Android app has no injected window.NovaraNative. Its native features are
+ * Capacitor plugins instead, so this builds the same bridge shape from them and
+ * the rest of the web app treats both apps alike. Built once; null when the
+ * running app has no purchase plugin (an older Android build).
+ */
+function androidBridge(): NovaraNativeBridge | null {
+  if (android !== undefined) return android;
+  if (!Capacitor.isPluginAvailable("NovaraPurchases")) {
+    android = null;
+    return android;
+  }
+  const purchases = registerPlugin<NovaraPurchasesPlugin>("NovaraPurchases");
+  android = {
+    version: NATIVE_PURCHASE_BRIDGE_VERSION,
+    platform: "android",
+    // Navigation and haptics are iOS-shell features; Android keeps the web's own.
+    navigate: () => undefined,
+    replace: () => undefined,
+    back: () => undefined,
+    haptic: () => undefined,
+    getProducts: () => purchases.getProducts(),
+    identifyPurchases: (userId) => purchases.identify({ userId }),
+    purchase: (productId) => purchases.purchase({ productId }),
+    restorePurchases: () => purchases.restorePurchases(),
+    manageSubscriptions: () => purchases.manageSubscriptions(),
+  };
+  return android;
 }
 
 /** True when the injected native bridge is present and usable. */

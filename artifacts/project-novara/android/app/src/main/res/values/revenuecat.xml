@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- RevenueCat's public Google Play SDK key (starts with "goog_"). Public and
+         safe to commit. While it is the placeholder, subscriptions report as
+         unavailable instead of failing. -->
+    <string name="revenuecat_public_sdk_key" translatable="false">goog_REPLACE_WITH_PUBLIC_SDK_KEY</string>
+</resources>
