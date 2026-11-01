@@ -16,8 +16,26 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Release builds are signed with the Play upload key, which lives outside
+    // the repository (~/.novara-android/keystore.properties; never commit it).
+    // Google re-signs for users with the app signing key it holds (Play App
+    // Signing), so a lost upload key can be reset in Play Console.
+    def uploadKeyFile = new File(System.getProperty("user.home"), ".novara-android/keystore.properties")
+    signingConfigs {
+        if (uploadKeyFile.exists()) {
+            def uploadKey = new Properties()
+            uploadKeyFile.withInputStream { uploadKey.load(it) }
+            release {
+                storeFile file(uploadKey["storeFile"])
+                storePassword uploadKey["storePassword"]
+                keyAlias uploadKey["keyAlias"]
+                keyPassword uploadKey["keyPassword"]
+            }
+        }
+    }
     buildTypes {
         release {
+            if (uploadKeyFile.exists()) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
