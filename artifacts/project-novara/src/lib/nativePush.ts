@@ -1,16 +1,18 @@
 // ============================================================================
-// Native iOS push registration, via APNs.
+// Native push registration: APNs on iOS, Firebase Cloud Messaging on Android.
 //
 // Web Push does not exist inside a WKWebView — no Notification, no service
-// worker, no PushManager — so the native app cannot use the VAPID path in
-// hooks/useNotifications.ts. It registers with APNs instead and hands the
-// device token to the backend, which stores it in apns_tokens.
+// worker, no PushManager — so the native apps cannot use the VAPID path in
+// hooks/useNotifications.ts. They register with their platform's service
+// instead and hand the device token to the backend, which stores it in
+// apns_tokens or fcm_tokens.
 //
 // @capacitor/push-notifications is imported DYNAMICALLY and only ever behind
 // isNativeShell(). The package ships JavaScript that would otherwise be
 // bundled into the production web build for every browser user, where it can
 // do nothing useful.
 // ============================================================================
+import { Capacitor } from "@capacitor/core";
 import { isAndroidShell, isNativeShell } from "./installPrompt";
 
 /** Which APNs host minted the token. See api-server/src/lib/apns.ts. */
@@ -61,19 +63,44 @@ export function resolveApnsEnvironment(
 
 const REGISTRATION_TIMEOUT_MS = 15_000;
 
+/** The Android notification channel. Must match default_notification_channel_id
+ *  in AndroidManifest.xml. */
+const ANDROID_CHANNEL_ID = "follow_up_reminders";
+
 /**
- * Requests permission and returns the APNs device token.
+ * True on an Android build that has Firebase configured. The site is loaded
+ * remotely, so older builds run this code too, and registering without Firebase
+ * crashes the app. See NovaraPushPlugin.java.
+ */
+export function isAndroidPushAvailable(): boolean {
+  return isAndroidShell() && Capacitor.isPluginAvailable("NovaraPush");
+}
+
+/** Where this platform's device token is registered with the backend. */
+export function pushTokenEndpoint(android: boolean = isAndroidShell()): string {
+  return android ? "/api/notifications/fcm-token" : "/api/notifications/apns-token";
+}
+
+/** What to tell someone who has turned notifications off for Novara. */
+export function deniedPermissionMessage(android: boolean = isAndroidShell()): string {
+  return android
+    ? "Notifications are turned off for Novara. Enable them in your phone's Settings → Apps → Novara → Notifications."
+    : "Notifications are turned off for Novara. Enable them in iOS Settings → Novara → Notifications.";
+}
+
+/**
+ * Requests permission and returns the device token.
  *
  * Throws with a readable message rather than resolving to null, so the caller
  * can surface the reason instead of a generic failure.
  */
 export async function registerForNativePush(): Promise<NativePushRegistration> {
   if (!isNativeShell()) {
-    throw new Error("Native push is only available inside the Novara iOS app");
+    throw new Error("Native push is only available inside the Novara app");
   }
   // Without Firebase configured, registering on Android crashes the app.
-  if (isAndroidShell()) {
-    throw new Error("Notifications aren't available in the Android app yet");
+  if (isAndroidShell() && !isAndroidPushAvailable()) {
+    throw new Error("Update Novara from Google Play to turn on notifications");
   }
 
   const { PushNotifications } = await import("@capacitor/push-notifications");
@@ -82,9 +109,28 @@ export async function registerForNativePush(): Promise<NativePushRegistration> {
   if (permission !== "granted") {
     throw new Error(
       permission === "denied"
-        ? "Notifications are turned off for Novara. Enable them in iOS Settings → Novara → Notifications."
+        ? deniedPermissionMessage()
         : "Notification permission was not granted",
     );
+  }
+
+  return {
+    token: await obtainDeviceToken(),
+    environment: resolveApnsEnvironment(import.meta.env["VITE_APNS_ENVIRONMENT"]),
+  };
+}
+
+/** Asks the platform for the token, once permission has been granted. */
+async function obtainDeviceToken(): Promise<string> {
+  const { PushNotifications } = await import("@capacitor/push-notifications");
+
+  if (isAndroidShell()) {
+    await PushNotifications.createChannel({
+      id: ANDROID_CHANNEL_ID,
+      name: "Follow-up reminders",
+      description: "Reminders about the people you want to stay in touch with",
+      importance: 4,
+    });
   }
 
   // The two listeners below are removed once the token has arrived. They used
@@ -96,32 +142,40 @@ export async function registerForNativePush(): Promise<NativePushRegistration> {
   const handles: { remove: () => Promise<void> }[] = [];
 
   try {
-    return {
-      token: await new Promise<string>((resolve, reject) => {
-        const timer = setTimeout(
-          () => reject(new Error("Timed out waiting for an APNs device token")),
-          REGISTRATION_TIMEOUT_MS,
-        );
+    return await new Promise<string>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("Timed out waiting for a device token")),
+        REGISTRATION_TIMEOUT_MS,
+      );
 
-        void PushNotifications.addListener("registration", (t: { value: string }) => {
-          clearTimeout(timer);
-          resolve(t.value);
-        }).then((handle) => handles.push(handle));
+      void PushNotifications.addListener("registration", (t: { value: string }) => {
+        clearTimeout(timer);
+        resolve(t.value);
+      }).then((handle) => handles.push(handle));
 
-        void PushNotifications.addListener("registrationError", (err: unknown) => {
-          clearTimeout(timer);
-          reject(new Error(`APNs registration failed: ${JSON.stringify(err)}`));
-        }).then((handle) => handles.push(handle));
+      void PushNotifications.addListener("registrationError", (err: unknown) => {
+        clearTimeout(timer);
+        reject(new Error(`Push registration failed: ${JSON.stringify(err)}`));
+      }).then((handle) => handles.push(handle));
 
-        void PushNotifications.register();
-      }),
-      environment: resolveApnsEnvironment(import.meta.env["VITE_APNS_ENVIRONMENT"]),
-    };
+      void PushNotifications.register();
+    });
   } finally {
     await Promise.allSettled(handles.map((handle) => handle.remove()));
   }
 }
 
+/**
+ * The current token on an Android build, if this phone already allows
+ * notifications. Firebase can replace a token at any time, so it is re-sent on
+ * launch. Never prompts: returns null when permission hasn't been granted.
+ */
+export async function currentAndroidPushToken(): Promise<string | null> {
+  if (!isAndroidPushAvailable()) return null;
+  const { PushNotifications } = await import("@capacitor/push-notifications");
+  if (interpretNativePermission(await PushNotifications.checkPermissions()) !== "granted") return null;
+  return obtainDeviceToken();
+}
 
 /**
  * Stops this device receiving pushes. Best-effort.
@@ -134,7 +188,7 @@ export async function registerForNativePush(): Promise<NativePushRegistration> {
  * registerForNativePush() now cleans up its own listeners instead.
  */
 export async function unregisterNativePush(): Promise<void> {
-  if (!isNativeShell() || isAndroidShell()) return;
+  if (!isNativeShell() || (isAndroidShell() && !isAndroidPushAvailable())) return;
   try {
     const { PushNotifications } = await import("@capacitor/push-notifications");
     await PushNotifications.unregister();

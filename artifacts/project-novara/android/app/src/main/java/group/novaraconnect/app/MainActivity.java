@@ -11,6 +11,10 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(NovaraPurchasesPlugin.class);
+        // google-services.json becomes this resource at build time.
+        if (getResources().getIdentifier("google_app_id", "string", getPackageName()) != 0) {
+            registerPlugin(NovaraPushPlugin.class);
+        }
         super.onCreate(savedInstanceState);
     }
 

@@ -3,7 +3,13 @@ import { useAuth } from "@clerk/react";
 import { API_BASE } from "@/lib/apiBase";
 import { apiFetch } from "@/lib/api";
 import { isAndroidShell, isInstalledExperience, isNativeShell } from "@/lib/installPrompt";
-import { registerForNativePush, unregisterNativePush } from "@/lib/nativePush";
+import {
+  currentAndroidPushToken,
+  isAndroidPushAvailable,
+  pushTokenEndpoint,
+  registerForNativePush,
+  unregisterNativePush,
+} from "@/lib/nativePush";
 
 export interface NotificationSettings {
   pushEnabled: boolean;
@@ -59,12 +65,12 @@ export function useNotifications() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // The native iOS shell has none of the Web Push APIs — it goes through APNs
-  // instead — so it is "supported" despite failing every browser feature test.
-  // The Android shell has neither Web Push nor (until Firebase is set up)
-  // native push, so it reports unsupported instead of failing on tap.
+  // The native shells have none of the Web Push APIs — they go through APNs or
+  // Firebase instead — so they are "supported" despite failing every browser
+  // feature test. An Android build without Firebase has neither, so it reports
+  // unsupported instead of failing on tap.
   const androidShell = isAndroidShell();
-  const isNative = isNativeShell() && !androidShell;
+  const isNative = isNativeShell() && (!androidShell || isAndroidPushAvailable());
   const isSupported =
     isNative ||
     (!androidShell &&
@@ -106,8 +112,16 @@ export function useNotifications() {
 
         if (isNative) {
           // There is no local subscription object to inspect; the server's
-          // record of a registered APNs token is the source of truth.
+          // record of a registered device token is the source of truth.
           setIsSubscribed(serverPushEnabled);
+          // Firebase can replace a token at any time, so keep the server's copy current.
+          if (androidShell && serverPushEnabled) {
+            const token = await currentAndroidPushToken();
+            setIsSubscribed(token !== null);
+            if (token) {
+              await apiFetch(getToken, pushTokenEndpoint(true), { method: "POST", json: { token } });
+            }
+          }
         } else {
           const reg = await navigator.serviceWorker.ready;
           const sub = await reg.pushManager.getSubscription();
@@ -121,7 +135,7 @@ export function useNotifications() {
     }
 
     void init();
-  }, [getToken, isLoaded, isSignedIn, isSupported, isNative]);
+  }, [getToken, isLoaded, isSignedIn, isSupported, isNative, androidShell]);
 
   const requestAndSubscribe = useCallback(async (): Promise<boolean> => {
     setError(null);
@@ -136,7 +150,7 @@ export function useNotifications() {
     if (isNative) {
       try {
         const { token, environment } = await registerForNativePush();
-        const res = await apiFetch(getToken, "/api/notifications/apns-token", {
+        const res = await apiFetch(getToken, pushTokenEndpoint(androidShell), {
           method: "POST",
           json: { token, environment },
         });
@@ -198,14 +212,14 @@ export function useNotifications() {
       setError(err instanceof Error ? err.message : "Failed to enable notifications");
       return false;
     }
-  }, [getToken, isSupported, isNative]);
+  }, [getToken, isSupported, isNative, androidShell]);
 
   const unsubscribe = useCallback(async (): Promise<void> => {
     setError(null);
 
     if (isNative) {
       try {
-        await apiFetch(getToken, "/api/notifications/apns-token", { method: "DELETE", json: {} });
+        await apiFetch(getToken, pushTokenEndpoint(androidShell), { method: "DELETE", json: {} });
         await unregisterNativePush();
         setIsSubscribed(false);
         setSettings((prev) => ({ ...prev, pushEnabled: false }));
@@ -231,7 +245,7 @@ export function useNotifications() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to disable notifications");
     }
-  }, [getToken, isNative]);
+  }, [getToken, isNative, androidShell]);
 
   const updateSettings = useCallback(
     async (partial: Partial<NotificationSettings>): Promise<void> => {

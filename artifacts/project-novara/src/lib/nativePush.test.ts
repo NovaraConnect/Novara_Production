@@ -1,5 +1,27 @@
 import { describe, it, expect } from "vitest";
-import { interpretNativePermission, resolveApnsEnvironment } from "./nativePush";
+import {
+  deniedPermissionMessage,
+  interpretNativePermission,
+  isAndroidPushAvailable,
+  pushTokenEndpoint,
+  resolveApnsEnvironment,
+} from "./nativePush";
+
+describe("Android push", () => {
+  it("registers each platform's token with its own endpoint", () => {
+    expect(pushTokenEndpoint(true)).toBe("/api/notifications/fcm-token");
+    expect(pushTokenEndpoint(false)).toBe("/api/notifications/apns-token");
+  });
+
+  it("is not available outside the Android app", () => {
+    expect(isAndroidPushAvailable()).toBe(false);
+  });
+
+  it("points each platform to its own settings", () => {
+    expect(deniedPermissionMessage(true)).toContain("Settings → Apps → Novara");
+    expect(deniedPermissionMessage(false)).toContain("iOS Settings → Novara");
+  });
+});
 
 describe("interpretNativePermission", () => {
   it("maps granted", () => {
