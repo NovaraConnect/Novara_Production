@@ -32,6 +32,20 @@ describe("chooseTransports — native wins, so nobody is notified twice", () => 
   });
 });
 
+describe("chooseTransports — the Android app", () => {
+  it("prefers FCM over web push on the same phone", () => {
+    expect(chooseTransports({ apnsTokenCount: 0, fcmTokenCount: 1, webSubscriptionCount: 1 })).toEqual(["fcm"]);
+  });
+
+  it("reaches both an iPhone and an Android phone", () => {
+    expect(chooseTransports({ apnsTokenCount: 1, fcmTokenCount: 1, webSubscriptionCount: 1 })).toEqual(["apns", "fcm"]);
+  });
+
+  it("leaves an iPhone user unchanged when they have no Android token", () => {
+    expect(chooseTransports({ apnsTokenCount: 2, fcmTokenCount: 0, webSubscriptionCount: 1 })).toEqual(["apns"]);
+  });
+});
+
 describe("hasNoReachableDevice", () => {
   it("is true only when the user has neither transport", () => {
     expect(hasNoReachableDevice({ apnsTokenCount: 0, webSubscriptionCount: 0 })).toBe(true);

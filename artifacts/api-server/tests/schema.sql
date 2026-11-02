@@ -68,6 +68,15 @@ created_at timestamptz NOT NULL DEFAULT now(),
 UNIQUE (user_id, device_token)
 );
 
+-- Mirrors migrations/0013_fcm_tokens.sql.
+CREATE TABLE IF NOT EXISTS fcm_tokens (
+id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+user_id text NOT NULL,
+device_token text NOT NULL,
+created_at timestamptz NOT NULL DEFAULT now(),
+UNIQUE (user_id, device_token)
+);
+
 CREATE TABLE IF NOT EXISTS push_subscriptions (
 id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 user_id text NOT NULL,
