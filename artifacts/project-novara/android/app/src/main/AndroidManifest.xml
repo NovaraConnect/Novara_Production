@@ -43,6 +43,10 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="follow_up_reminders" />
+        <!-- Downloads text recognition at install, so the first scan isn't kept waiting. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr" />
     </application>
 
     <!-- Permissions -->

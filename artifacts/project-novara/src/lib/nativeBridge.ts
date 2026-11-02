@@ -132,6 +132,11 @@ interface NovaraPurchasesPlugin {
   manageSubscriptions(): Promise<void>;
 }
 
+/** The Android app's scanner (android/…/NovaraCardScannerPlugin.java). */
+interface NovaraCardScannerPlugin {
+  scanCard(): Promise<NativeCardScan>;
+}
+
 let android: NovaraNativeBridge | null | undefined;
 
 /**
@@ -147,6 +152,10 @@ function androidBridge(): NovaraNativeBridge | null {
     return android;
   }
   const purchases = registerPlugin<NovaraPurchasesPlugin>("NovaraPurchases");
+  // Newer than the purchase plugin, so older Android builds won't have it.
+  const scanner = Capacitor.isPluginAvailable("NovaraCardScanner")
+    ? registerPlugin<NovaraCardScannerPlugin>("NovaraCardScanner")
+    : null;
   android = {
     version: NATIVE_PURCHASE_BRIDGE_VERSION,
     platform: "android",
@@ -160,6 +169,7 @@ function androidBridge(): NovaraNativeBridge | null {
     purchase: (productId) => purchases.purchase({ productId }),
     restorePurchases: () => purchases.restorePurchases(),
     manageSubscriptions: () => purchases.manageSubscriptions(),
+    ...(scanner ? { scanCard: () => scanner.scanCard() } : {}),
   };
   return android;
 }

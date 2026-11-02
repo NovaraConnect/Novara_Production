@@ -60,7 +60,7 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
   const libraryRef = useRef<HTMLInputElement>(null);
   const { cardAiParse } = useFeatures();
   const { getToken } = useAuth();
-  // Feature-detected, not just "is this iOS": an older TestFlight build has the
+  // Feature-detected, not just "is this the app": an older build has the
   // web view but not the native scanner, and must keep the camera-roll path.
   const hasNativeScanner = canScanNativeCard();
 
@@ -121,7 +121,8 @@ export function BusinessCardScanner({ onExtracted }: BusinessCardScannerProps) {
     toast.success("Card scanned — review and edit the pre-filled fields below");
   };
 
-  // Native iOS capture: VisionKit's document scanner plus on-device Vision OCR.
+  // Native capture: on iOS VisionKit's document scanner plus on-device Vision OCR,
+  // on Android Google's document scanner and text recognition.
   // Replaces the capture and the OCR engine only — the parsed result goes
   // through applyRecognizedText() exactly as a browser scan does.
   const handleNativeScan = async () => {
