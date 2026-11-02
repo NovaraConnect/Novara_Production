@@ -107,7 +107,7 @@ PRIMARY KEY (user_id, snapshot_date)
 CREATE TABLE IF NOT EXISTS entitlements (
 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 user_id text NOT NULL,
-source text NOT NULL CHECK (source IN ('apple_iap', 'university', 'stripe')),
+source text NOT NULL CHECK (source IN ('apple_iap', 'google_play', 'university', 'stripe')),
 provider_ref text NULL,
 product_id text NULL,
 status text NOT NULL CHECK (status IN ('active', 'inactive')),
@@ -122,6 +122,9 @@ updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS entitlements_apple_one_row
 ON entitlements (user_id) WHERE source = 'apple_iap';
+-- From migrations/0012_entitlements_google_play.sql.
+CREATE UNIQUE INDEX IF NOT EXISTS entitlements_google_play_one_row
+ON entitlements (user_id) WHERE source = 'google_play';
 CREATE INDEX IF NOT EXISTS entitlements_user_idx ON entitlements (user_id);
 
 CREATE TABLE IF NOT EXISTS revenuecat_events (

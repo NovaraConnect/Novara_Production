@@ -3,7 +3,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import request from "supertest";
 import { app, authHeaders } from "./testApp";
-import { isAuthorised, entitlementChangeFor } from "../src/routes/revenuecat";
+import { isAuthorised, entitlementChangeFor, storeSourceFor } from "../src/routes/revenuecat";
 import { pool } from "../src/db";
 
 const WEBHOOK = "/api/webhooks/revenuecat";
@@ -237,6 +237,74 @@ describe("RevenueCat webhook", () => {
     expect(res.body.outcome).toBe("ignored");
   });
 
+  describe("Google Play purchases", () => {
+    const PLAY = { store: "PLAY_STORE", product_id: "group.novaraconnect.app.pro:monthly" };
+    const sourceRows = async (user = USER) =>
+      (await pool.query(
+        "SELECT source, status FROM entitlements WHERE user_id = $1 ORDER BY source",
+        [user],
+      )).rows;
+
+    it("a Play purchase grants Pro, labelled google_play", async () => {
+      expect((await deliver(makeEvent(PLAY))).body.outcome).toBe("applied");
+      const me = await request(app).get("/api/entitlements/me").set(authHeaders(USER));
+      expect(me.body.pro).toBe(true);
+      expect(me.body.source).toBe("google_play");
+      expect(me.body.billingPeriod).toBe("monthly");
+      expect(await sourceRows()).toEqual([{ source: "google_play", status: "active" }]);
+    });
+
+    it("an App Store purchase is still labelled apple_iap", async () => {
+      await deliver(makeEvent({ store: "APP_STORE" }));
+      const me = await request(app).get("/api/entitlements/me").set(authHeaders(USER));
+      expect(me.body.source).toBe("apple_iap");
+      expect(await sourceRows()).toEqual([{ source: "apple_iap", status: "active" }]);
+    });
+
+    it("the two stores keep separate rows, and expiring one leaves the other's access", async () => {
+      const now = Date.now();
+      await deliver(makeEvent({ store: "APP_STORE", event_timestamp_ms: now }));
+      await deliver(makeEvent({ ...PLAY, event_timestamp_ms: now }));
+      expect(await sourceRows()).toEqual([
+        { source: "apple_iap", status: "active" },
+        { source: "google_play", status: "active" },
+      ]);
+
+      await deliver(makeEvent({ ...PLAY, type: "EXPIRATION", event_timestamp_ms: now + 1000 }));
+      const me = await request(app).get("/api/entitlements/me").set(authHeaders(USER));
+      expect(me.body.pro).toBe(true);
+      expect(me.body.source).toBe("apple_iap");
+    });
+
+    it("an expired Apple row does not hide an active Play subscription", async () => {
+      const now = Date.now();
+      await deliver(makeEvent({ store: "APP_STORE", event_timestamp_ms: now }));
+      await deliver(makeEvent({ store: "APP_STORE", type: "EXPIRATION", event_timestamp_ms: now + 1000 }));
+      await deliver(makeEvent({ ...PLAY, event_timestamp_ms: now + 2000 }));
+      const me = await request(app).get("/api/entitlements/me").set(authHeaders(USER));
+      expect(me.body.pro).toBe(true);
+      expect(me.body.source).toBe("google_play");
+    });
+
+    it("TRANSFER moves a Play subscription and keeps its label", async () => {
+      const OTHER = "user_rc_play_other";
+      await deliver(makeEvent(PLAY));
+      const res = await deliver({
+        id: `evt_play_transfer_${Date.now()}`,
+        type: "TRANSFER",
+        event_timestamp_ms: Date.now() + 1000,
+        transferred_from: [USER],
+        transferred_to: [OTHER],
+      });
+      expect(res.body.outcome).toBe("applied");
+      const newOwner = await request(app).get("/api/entitlements/me").set(authHeaders(OTHER));
+      expect(newOwner.body.pro).toBe(true);
+      expect(newOwner.body.source).toBe("google_play");
+      const oldOwner = await request(app).get("/api/entitlements/me").set(authHeaders(USER));
+      expect(oldOwner.body.pro).toBe(false);
+    });
+  });
+
   it("contact creation still works as Free if migration 0004 was not applied", async () => {
     const original = pool.query.bind(pool);
     const spy = vi.spyOn(pool, "query").mockImplementation(((text: unknown, ...rest: unknown[]) => {
@@ -262,6 +330,13 @@ describe("RevenueCat webhook", () => {
 });
 
 describe("pure helpers", () => {
+  it("storeSourceFor only gives Google Play its own label", () => {
+    expect(storeSourceFor({ store: "PLAY_STORE" })).toBe("google_play");
+    expect(storeSourceFor({ store: "APP_STORE" })).toBe("apple_iap");
+    expect(storeSourceFor({ store: "PROMOTIONAL" })).toBe("apple_iap");
+    expect(storeSourceFor({})).toBe("apple_iap");
+  });
+
   it("isAuthorised compares exactly", () => {
     expect(isAuthorised(SECRET, SECRET)).toBe(true);
     expect(isAuthorised(SECRET + " ", SECRET)).toBe(false);
