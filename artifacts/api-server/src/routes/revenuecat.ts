@@ -1,5 +1,5 @@
 // ============================================================================
-// RevenueCat webhook — the ONLY writer of Apple-sourced entitlements.
+// RevenueCat webhook — the ONLY writer of App Store and Google Play entitlements.
 //
 // VERIFICATION. RevenueCat sends the Authorization header value you configure
 // in its dashboard on every delivery. We compare it to REVENUECAT_WEBHOOK_AUTH
@@ -37,7 +37,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import type { PoolClient } from "pg";
 import { pool } from "../db";
 import { logger } from "../lib/logger";
-import { NOVARA_PRO_ENTITLEMENT } from "../lib/entitlements";
+import { NOVARA_PRO_ENTITLEMENT, type StoreSource } from "../lib/entitlements";
 
 export const REVENUECAT_WEBHOOK_PATH = "/webhooks/revenuecat";
 
@@ -57,6 +57,16 @@ export interface RevenueCatEvent {
   event_timestamp_ms: number;
   environment?: string | null;
   original_transaction_id?: string | null;
+  /** APP_STORE, PLAY_STORE, PROMOTIONAL and so on. */
+  store?: string | null;
+}
+
+/**
+ * Which entitlements row an event belongs to. Only Google Play has its own;
+ * everything else stays 'apple_iap', as it was before Play existed.
+ */
+export function storeSourceFor(event: Pick<RevenueCatEvent, "store">): StoreSource {
+  return event.store === "PLAY_STORE" ? "google_play" : "apple_iap";
 }
 
 /** Clerk user IDs. RevenueCat anonymous IDs ("$RCAnonymousID:…") never match,
@@ -152,6 +162,22 @@ async function applyTransfer(client: PoolClient, event: RevenueCatEvent): Promis
   const to = transferTarget(event);
   const from = clerkIds(event.transferred_from).filter((id) => id !== to);
   if (!to || from.length === 0) return "ignored";
+  // A transfer moves whatever the old account holds, from either store.
+  const outcomes = [
+    await transferSource(client, "apple_iap", to, from, event),
+    await transferSource(client, "google_play", to, from, event),
+  ];
+  return outcomes.includes("applied") ? "applied" : "ignored";
+}
+
+/** `source` is a StoreSource constant: Postgres can only match ON CONFLICT to a partial index on a literal. */
+async function transferSource(
+  client: PoolClient,
+  source: StoreSource,
+  to: string,
+  from: string[],
+  event: RevenueCatEvent,
+): Promise<Outcome> {
   const eventAt = new Date(event.event_timestamp_ms).toISOString();
 
   const { rows } = await client.query<{
@@ -164,7 +190,7 @@ async function applyTransfer(client: PoolClient, event: RevenueCatEvent): Promis
   }>(
     `SELECT provider_ref, product_id, status, expires_at, period_type, will_renew
        FROM entitlements
-      WHERE source = 'apple_iap' AND user_id = ANY($1)
+      WHERE source = '${source}' AND user_id = ANY($1)
         AND (last_event_at IS NULL OR last_event_at <= $2)
       ORDER BY (status = 'active') DESC, expires_at DESC NULLS LAST
       LIMIT 1
@@ -177,15 +203,15 @@ async function applyTransfer(client: PoolClient, event: RevenueCatEvent): Promis
   await client.query(
     `UPDATE entitlements
         SET status = 'inactive', last_event_at = $2, updated_at = now()
-      WHERE source = 'apple_iap' AND user_id = ANY($1)
+      WHERE source = '${source}' AND user_id = ANY($1)
         AND (last_event_at IS NULL OR last_event_at <= $2)`,
     [from, eventAt],
   );
   await client.query(
     `INSERT INTO entitlements
        (user_id, source, provider_ref, product_id, status, expires_at, period_type, will_renew, last_event_at, updated_at)
-     VALUES ($1, 'apple_iap', $2, $3, $4, $5, $6, $7, $8, now())
-     ON CONFLICT (user_id) WHERE source = 'apple_iap'
+     VALUES ($1, '${source}', $2, $3, $4, $5, $6, $7, $8, now())
+     ON CONFLICT (user_id) WHERE source = '${source}'
      DO UPDATE SET
        provider_ref  = EXCLUDED.provider_ref,
        product_id    = EXCLUDED.product_id,
@@ -236,11 +262,12 @@ async function applyEvent(event: RevenueCatEvent): Promise<Outcome> {
     }
 
     const eventAt = new Date(event.event_timestamp_ms).toISOString();
+    const source = storeSourceFor(event);
     const upsert = await client.query(
       `INSERT INTO entitlements
          (user_id, source, provider_ref, product_id, status, expires_at, period_type, will_renew, last_event_at, updated_at)
-       VALUES ($1, 'apple_iap', $2, $3, $4, $5, $6, $7, $8, now())
-       ON CONFLICT (user_id) WHERE source = 'apple_iap'
+       VALUES ($1, '${source}', $2, $3, $4, $5, $6, $7, $8, now())
+       ON CONFLICT (user_id) WHERE source = '${source}'
        DO UPDATE SET
          provider_ref  = EXCLUDED.provider_ref,
          product_id    = EXCLUDED.product_id,

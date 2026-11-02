@@ -44,11 +44,14 @@ export type SubscriptionState = "trial" | "active" | "expired" | "none";
 
 export type BillingPeriod = "monthly" | "annual";
 
+/** The store a subscription was bought through. */
+export type StoreSource = "apple_iap" | "google_play";
+
 export interface ProStatus {
   /** True during a trial or a paid period. This is what unlocks adding contacts. */
   pro: boolean;
   /** Where the access comes from. Null when not Pro. */
-  source: "apple_iap" | null;
+  source: StoreSource | null;
   /** ISO timestamp of the current period end (the trial end during a trial), or null when not Pro. */
   expiresAt: string | null;
   state: SubscriptionState;
@@ -105,6 +108,7 @@ export function billingPeriodFor(productId: string | null): BillingPeriod | null
 /** The user's Novara Pro status right now. */
 export async function proStatusFor(userId: string): Promise<ProStatus> {
   let rows: {
+    source: StoreSource;
     status: string;
     expires_at: Date | null;
     product_id: string | null;
@@ -113,10 +117,13 @@ export async function proStatusFor(userId: string): Promise<ProStatus> {
   }[];
   try {
     ({ rows } = await pool.query(
-      `SELECT status, expires_at, product_id, period_type, will_renew
+      // Someone subscribed through both stores has two rows: the one that
+      // currently grants access wins, then the one that expires last.
+      `SELECT source, status, expires_at, product_id, period_type, will_renew
          FROM entitlements
         WHERE user_id = $1
-          AND source = 'apple_iap'
+          AND source IN ('apple_iap', 'google_play')
+        ORDER BY (status = 'active' AND expires_at > now()) DESC, expires_at DESC NULLS LAST
         LIMIT 1`,
       [userId],
     ));
@@ -142,7 +149,7 @@ export async function proStatusFor(userId: string): Promise<ProStatus> {
   }
   return {
     pro: true,
-    source: "apple_iap",
+    source: row.source,
     expiresAt: expiresAt.toISOString(),
     state: row.period_type === "TRIAL" ? "trial" : "active",
     billingPeriod,
