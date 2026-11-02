@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { isInstalledExperience, isNativeShell } from "@/lib/installPrompt";
+import { isAndroidShell, isInstalledExperience, isNativeShell } from "@/lib/installPrompt";
 import {
   Bell,
   BellOff,
@@ -91,9 +91,10 @@ export default function Notifications() {
     !(window as unknown as { MSStream?: unknown }).MSStream;
 
   const isStandalone = isInstalledExperience();
-  // Inside the iOS app the notification switch lives in iOS Settings, not in
-  // any browser, so several strings below have to say something different.
+  // Inside the apps the notification switch lives in the phone's settings, not
+  // in any browser, so several strings below have to say something different.
   const nativeApp = isNativeShell();
+  const androidApp = isAndroidShell();
 
   async function handleToggle(enabled: boolean) {
     if (enabled) {
@@ -102,7 +103,9 @@ export default function Notifications() {
       setEnabling(false);
       if (!ok && permission === "denied")
         toast.error(
-          nativeApp
+          androidApp
+            ? "Notifications are blocked. Allow them in your phone's Settings → Apps → Novara → Notifications."
+            : nativeApp
             ? "Notifications are blocked. Allow them in iOS Settings → Novara → Notifications."
             : "Notifications are blocked. Allow them in browser settings.",
         );
@@ -197,7 +200,9 @@ export default function Notifications() {
                   {isSubscribed
                     ? "Active on this device"
                     : permission === "denied"
-                    ? nativeApp
+                    ? androidApp
+                      ? "Blocked — allow in your phone's Settings → Apps → Novara"
+                      : nativeApp
                       ? "Blocked — allow in iOS Settings → Novara"
                       : "Blocked — update in browser settings"
                     : "Get reminded when contacts need attention"}
@@ -311,17 +316,23 @@ export default function Notifications() {
             {[
               {
                 icon: <Bell size={14} className="text-primary" />,
-                text: "Notifications are sent by the Novara server — no third-party service.",
+                text: androidApp
+                  ? "Notifications are sent by the Novara server."
+                  : "Notifications are sent by the Novara server — no third-party service.",
               },
               {
                 icon: <Smartphone size={14} className="text-primary" />,
-                text: nativeApp
+                text: androidApp
+                  ? "Delivered to this phone through Google's push service."
+                  : nativeApp
                   ? "Delivered to this iPhone through Apple's push service."
                   : "Works on Android Chrome and iPhone (installed PWA, iOS 16.4+).",
               },
               {
                 icon: <Check size={14} className="text-primary" />,
-                text: nativeApp
+                text: androidApp
+                  ? "Turn them off any time here, or in your phone's Settings → Apps → Novara → Notifications."
+                  : nativeApp
                   ? "Turn them off any time here, or in iOS Settings → Novara → Notifications."
                   : "Turn them off any time here, or in your browser's site settings.",
               },
