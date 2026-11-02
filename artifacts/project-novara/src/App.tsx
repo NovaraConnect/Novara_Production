@@ -227,6 +227,15 @@ function HomeRedirect() {
   return <InstallLanding />;
 }
 
+/** The QR code's page is a static file at /get/. Without the slash the host
+ *  serves the app instead, so hand over to the static page. */
+function GetPageRedirect() {
+  useEffect(() => {
+    window.location.replace(`${basePath}/get/`);
+  }, []);
+  return null;
+}
+
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   return (
     <>
@@ -277,6 +286,8 @@ function Router() {
       <Route path="/investors" component={() => <InvestorPage />} />
       {/* Public: the download page shared with students and young professionals. */}
       <Route path="/start" component={() => <StartPage />} />
+      {/* Public: routes a scan of the download QR code by device. */}
+      <Route path="/get" component={GetPageRedirect} />
       {/* Public: one page with a tab per audience (investors, students). */}
       <Route path="/about" component={AudiencePage} />
       <Route component={NotFound} />
