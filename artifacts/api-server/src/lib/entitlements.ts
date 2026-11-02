@@ -88,11 +88,17 @@ export function isSubscriptionRequired(): boolean {
   return isPaywallEnabled() && flagOn(process.env["IAP_SUBSCRIPTION_REQUIRED"]);
 }
 
-/** Monthly or annual, from the App Store product ID (…pro.monthly / …pro.annual). */
+/**
+ * Monthly or annual, from the store's product ID. The App Store's end in the
+ * plan (…pro.monthly / …pro.annual). Google Play's, as RevenueCat reports them,
+ * are the subscription and its base plan joined by a colon (…pro:monthly /
+ * …pro:annual): the Android app sells the same two plans through the same
+ * RevenueCat project and novara_pro entitlement.
+ */
 export function billingPeriodFor(productId: string | null): BillingPeriod | null {
   if (!productId) return null;
-  if (productId.endsWith(".annual")) return "annual";
-  if (productId.endsWith(".monthly")) return "monthly";
+  if (productId.endsWith(".annual") || productId.endsWith(":annual")) return "annual";
+  if (productId.endsWith(".monthly") || productId.endsWith(":monthly")) return "monthly";
   return null;
 }
 
@@ -160,7 +166,7 @@ export function limitReachedBody(): { error: string; message: string; code: stri
   if (isSubscriptionRequired()) {
     return {
       error: "Subscription required",
-      message: "Novara needs an active subscription. Start the 7-day free trial in the Novara iPhone app. Your existing contacts are kept.",
+      message: "Novara needs an active subscription. Start the 7-day free trial in the Novara app. Your existing contacts are kept.",
       code: "SUBSCRIPTION_REQUIRED",
     };
   }
