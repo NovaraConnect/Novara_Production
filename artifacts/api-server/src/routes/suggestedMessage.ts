@@ -4,12 +4,14 @@ import { pool, toDateStr } from "../db";
 import { requireAuth, type AuthedRequest } from "../middlewares/auth";
 import { requireSubscription } from "../middlewares/subscription";
 import { proStatusFor } from "../lib/entitlements";
+import { withAiBudget } from "../lib/aiBudget";
 import {
   DraftBudget,
   activeMessageProvider,
   isSuggestedMessageAiEnabled,
   suggestMessage,
   suggestedMessageLogFields,
+  type SuggestionInput,
   type TemplateReason,
 } from "../lib/suggestedMessage";
 
@@ -63,9 +65,7 @@ router.post(
       else if (!(await proStatusFor(userId)).pro) reason = "not_subscribed";
       else if (!budget.take(userId, id)) reason = "daily_cap";
 
-      const provider = reason ? null : activeMessageProvider();
-      const t0 = Date.now();
-      const result = await suggestMessage({
+      const input: SuggestionInput = {
         firstName: contact.first_name,
         company: contact.company,
         role: contact.role,
@@ -79,7 +79,17 @@ router.post(
         careerGoals: settings?.career_goals ?? [],
         // marked_contacted_at exists once migration 0011 is applied.
         hasReachedOut: !!contact.marked_contacted_at,
-      }, reason === null);
+      };
+
+      const t0 = Date.now();
+      // The monthly cap covers every AI feature; DraftBudget above stops one
+      // user's Regenerate burst from using it all up in an afternoon.
+      const budgeted = reason === null
+        ? await withAiBudget(userId, () => suggestMessage(input, true))
+        : ({ allowed: false } as const);
+      if (reason === null && !budgeted.allowed) reason = "monthly_cap";
+      const result = budgeted.allowed ? budgeted.value : await suggestMessage(input, false);
+      const provider = reason ? null : activeMessageProvider();
 
       // METADATA ONLY — never the notes, the prompt, or the draft.
       console.log(

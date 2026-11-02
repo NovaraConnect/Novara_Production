@@ -12,7 +12,7 @@ import {
   type PriorityLevel,
 } from "../lib/priority";
 import { recalculateContactsForUser } from "../lib/recalculate";
-import { analyzeContactWithAI } from "../lib/enrich";
+import { analyzeContactForUser } from "../lib/enrich";
 import { logger } from "../lib/logger";
 import { computeNextFollowUp, downgradeMonthsFrom, resolveContactDates, utcDateString } from "../lib/followUpDates";
 import { contactLimitFor, limitReachedBody } from "../lib/entitlements";
@@ -239,7 +239,8 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
 
     // AI-judged semantic match when a provider key is set; the deterministic
     // keyword matcher is the fallback. Never blocks or fails contact creation.
-    const analysis = await analyzeContactWithAI(
+    const analysis = await analyzeContactForUser(
+      userId,
       { careerStatement: profile.careerStatement, careerGoals: profile.careerGoals, goalTags: profile.goalTags },
       { company, role, industry, function: contactFunction, notes, interests: interestsArr },
       (detail) => logger.warn({ detail, company }, "AI match (create) failed; using deterministic score"),
@@ -414,7 +415,8 @@ router.put("/contacts/:id", requireAuth, requireSubscription, async (req: Reques
     const finalBasePriority = normalizePriority(importance ?? existing.base_priority, "Medium");
 
     // AI-judged semantic match when enabled; deterministic fallback.
-    const analysisEdit = await analyzeContactWithAI(
+    const analysisEdit = await analyzeContactForUser(
+      userId,
       { careerStatement: profile.careerStatement, careerGoals: profile.careerGoals, goalTags: profile.goalTags },
       {
         company: finalCompany,

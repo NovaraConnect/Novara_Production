@@ -69,6 +69,7 @@ template draft, so the feature always works.
 
 | Variable | Value | Notes |
 |---|---|---|
+| `AI_USER_MONTHLY_CAP_USD` | `0.25` | Optional. Per-user monthly AI spend cap across all AI features (default 0.25). Apply migration 0014 first. |
 | `SUGGESTED_MESSAGE_AI` | `off` | Optional kill switch for the AI draft (template only). |
 | `SUGGESTED_MESSAGE_PROVIDER` | `anthropic` \| `gemini` | Optional override of the inherited provider. |
 | `SUGGESTED_MESSAGE_ANTHROPIC_MODEL` | `claude-haiku-4-5` | Optional model override. |
