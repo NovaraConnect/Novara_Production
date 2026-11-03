@@ -93,7 +93,34 @@ async function scoreContact(
   return { priority, industry: industry0, function: function0 };
 }
 
-export async function recalculateContactsForUser(userId: string): Promise<RecalcReport> {
+/**
+ * How many career-profile saves per user per hour may re-score with AI. In
+ * memory, like DraftBudget: it resets on a restart. Past it the goals still
+ * save and contacts get the deterministic score.
+ */
+export class RecalcAiBudget {
+  private hour = -1;
+  private used = new Map<string, number>();
+
+  constructor(readonly maxPerHour = 5) {}
+
+  take(userId: string, now: number = Date.now()): boolean {
+    const hour = Math.floor(now / 3_600_000);
+    if (hour !== this.hour) {
+      this.hour = hour;
+      this.used.clear();
+    }
+    const n = this.used.get(userId) ?? 0;
+    if (n >= this.maxPerHour) return false;
+    this.used.set(userId, n + 1);
+    return true;
+  }
+}
+
+export async function recalculateContactsForUser(
+  userId: string,
+  { allowAi = true }: { allowAi?: boolean } = {},
+): Promise<RecalcReport> {
   const report: RecalcReport = {
     examined: 0,
     updated: 0,
@@ -112,7 +139,7 @@ export async function recalculateContactsForUser(userId: string): Promise<Recalc
     careerGoals: profile.careerGoals,
     goalTags: profile.goalTags,
   };
-  const aiOn = isAiEnrichEnabled();
+  const aiOn = allowAi && isAiEnrichEnabled();
 
   const { rows: contacts } = await pool.query<ContactRow>(
     `SELECT id, company, role, function, industry, interests, goal_tags, notes, met_at,

@@ -28,6 +28,7 @@ vi.mock("../../src/lib/news/provider", async () => {
 });
 
 const { getCompanyArticles, __resetNewsCacheState } = await import("../../src/lib/news/cache");
+const { NewsProviderError } = await import("../../src/lib/news/provider");
 
 const ARTICLE = { title: "Revolut expands", url: "https://example.com/a" };
 
@@ -191,5 +192,47 @@ describe("a database that is broken rather than absent", () => {
     const out = await getCompanyArticles("revolut", "Revolut");
 
     expect(out.kind).toBe("hit");
+  });
+});
+
+describe("provider pacing", () => {
+  it("spaces calls for different companies apart", async () => {
+    tableExists(true);
+    process.env["GNEWS_MIN_INTERVAL_MS"] = "40";
+    const times: number[] = [];
+    searchCompanyNews.mockImplementation(async () => {
+      times.push(Date.now());
+      return [ARTICLE];
+    });
+
+    await Promise.all([getCompanyArticles("a", "A"), getCompanyArticles("b", "B"), getCompanyArticles("c", "C")]);
+
+    expect(times).toHaveLength(3);
+    expect(times[2]! - times[0]!).toBeGreaterThanOrEqual(70);
+    delete process.env["GNEWS_MIN_INTERVAL_MS"];
+  });
+
+  it("stops asking after a 429 and still serves empty, not an error", async () => {
+    tableExists(true);
+    process.env["GNEWS_MIN_INTERVAL_MS"] = "0";
+    searchCompanyNews.mockRejectedValue(new NewsProviderError("GNews HTTP 429", true, 429));
+
+    expect((await getCompanyArticles("a", "A")).kind).toBe("empty");
+    expect((await getCompanyArticles("b", "B")).kind).toBe("empty");
+
+    expect(searchCompanyNews).toHaveBeenCalledTimes(1);
+    delete process.env["GNEWS_MIN_INTERVAL_MS"];
+  });
+
+  it("does not wait out a failure that is not a refusal", async () => {
+    tableExists(true);
+    process.env["GNEWS_MIN_INTERVAL_MS"] = "0";
+    searchCompanyNews.mockRejectedValue(new NewsProviderError("GNews HTTP 500", false, 500));
+
+    await getCompanyArticles("a", "A");
+    await getCompanyArticles("b", "B");
+
+    expect(searchCompanyNews).toHaveBeenCalledTimes(2);
+    delete process.env["GNEWS_MIN_INTERVAL_MS"];
   });
 });

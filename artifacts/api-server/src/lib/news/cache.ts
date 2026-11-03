@@ -31,6 +31,7 @@ import { logger } from "../logger";
 import type { RankableArticle } from "../newsRanking";
 import {
   activeNewsProvider,
+  providerMinIntervalMs,
   providerTimeoutMs,
   NewsProviderError,
 } from "./provider";
@@ -209,23 +210,70 @@ async function writeRow(
 // ---------------------------------------------------------------------------
 const inFlight = new Map<string, Promise<RankableArticle[]>>();
 
+// ---------------------------------------------------------------------------
+// Pacing
+//
+// One contact list can ask for many companies at once, and GNews answers a
+// burst with 429. Calls therefore take turns, and when GNews refuses us we stop
+// asking for a while, since retrying on every screen view only prolongs it.
+// Callers fall back to stale or empty results. Process-local, like inFlight.
+// ---------------------------------------------------------------------------
+
+/** Past this wait the caller gets stale or empty news rather than a slow screen. */
+const MAX_QUEUE_WAIT_MS = 20_000;
+const RATE_LIMIT_COOLDOWN_MS = 60_000;
+const BAD_KEY_COOLDOWN_MS = 5 * 60_000;
+
+let nextSlotAt = 0;
+let cooldownUntil = 0;
+
+/** When to try again after this refusal, or 0 if it is not one to wait out. */
+function cooldownEnd(status: number | undefined, now: number): number {
+  if (status === 429) return now + RATE_LIMIT_COOLDOWN_MS;
+  if (status === 401) return now + BAD_KEY_COOLDOWN_MS;
+  // GNews's daily quota: 403 until the counter resets at 00:00 UTC.
+  if (status === 403) return new Date(now).setUTCHours(24, 0, 0, 0);
+  return 0;
+}
+
 function fetchOnce(companyKey: string, displayName: string): Promise<RankableArticle[]> {
   const existing = inFlight.get(companyKey);
   if (existing) return existing;
 
-  const provider = activeNewsProvider();
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), providerTimeoutMs());
+  const now = Date.now();
+  if (now < cooldownUntil) {
+    return Promise.reject(new NewsProviderError("waiting out a news provider refusal", true));
+  }
+  const wait = Math.max(0, nextSlotAt - now);
+  if (wait > MAX_QUEUE_WAIT_MS) {
+    return Promise.reject(new NewsProviderError("news request queue is full", false));
+  }
+  nextSlotAt = now + wait + providerMinIntervalMs();
 
-  const run = provider
-    .searchCompanyNews(displayName, controller.signal)
+  const provider = activeNewsProvider();
+
+  const run = new Promise<void>((resolve) => setTimeout(resolve, wait))
+    .then(() => {
+      // A call ahead of this one may have been refused while it waited.
+      if (Date.now() < cooldownUntil) {
+        throw new NewsProviderError("waiting out a news provider refusal", true);
+      }
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), providerTimeoutMs());
+      return provider.searchCompanyNews(displayName, controller.signal).finally(() => clearTimeout(timer));
+    })
     .then(async (articles) => {
       l1Set(companyKey, articles, Date.now());
       await writeRow(companyKey, displayName, provider.name, articles);
       return articles;
     })
+    .catch((err: unknown) => {
+      if (err instanceof NewsProviderError) {
+        cooldownUntil = Math.max(cooldownUntil, cooldownEnd(err.status, Date.now()));
+      }
+      throw err;
+    })
     .finally(() => {
-      clearTimeout(timer);
       inFlight.delete(companyKey);
     });
 
@@ -319,6 +367,8 @@ export async function getCompanyArticles(
 export function __resetNewsCacheState(): void {
   inFlight.clear();
   l1.clear();
+  nextSlotAt = 0;
+  cooldownUntil = 0;
   tableExists = null;
   tableCheckedAt = 0;
 }

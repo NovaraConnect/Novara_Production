@@ -16,6 +16,7 @@ here are placeholders — real values live only in Render.
 | `FRONTEND_URL` | `https://app.novaraconnect.group` | No | Exact origin, no trailing slash. Drives CORS + Clerk authorizedParties. |
 | `ANDROID_FRONTEND_URL` | `https://android.novaraconnect.group` | No | Optional. The Android app's own copy of the web app (static site `novara-android-web`, from `feat/android`). Added to CORS + Clerk authorizedParties; unset leaves both exactly as `FRONTEND_URL` alone. |
 | `GNEWS_API_KEY` | production key | **Yes** | Consider a separate/paid key (100/day free cap). |
+| `GNEWS_MIN_INTERVAL_MS` | (unset) | No | Optional. Least time between GNews calls; defaults to 1100. Lower it only if the plan allows more per second. |
 | `VAPID_PUBLIC_KEY` | new prod key | No | Generate a NEW keypair. |
 | `VAPID_PRIVATE_KEY` | new prod key | **Yes** | |
 | `VAPID_SUBJECT` | `mailto:hello@novaraconnect.group` | No | |

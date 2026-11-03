@@ -53,6 +53,10 @@ export const PROVIDER_ARTICLE_LIMIT = 10;
 
 const GNEWS_TIMEOUT_MS = 8000;
 
+/** GNews answers 429 to bursts, so requests are spaced out. A little over a
+ *  second, the rate its free plan allows. Override with GNEWS_MIN_INTERVAL_MS. */
+const GNEWS_MIN_INTERVAL_MS = 1100;
+
 class GNewsProvider implements NewsProvider {
   readonly name = "gnews";
 
@@ -96,6 +100,12 @@ const gnews = new GNewsProvider();
 /** The provider in use. GNews until a replacement is approved. */
 export function activeNewsProvider(): NewsProvider {
   return gnews;
+}
+
+/** The least time to leave between provider calls. */
+export function providerMinIntervalMs(): number {
+  const raw = Number(process.env["GNEWS_MIN_INTERVAL_MS"]);
+  return Number.isFinite(raw) && raw >= 0 && process.env["GNEWS_MIN_INTERVAL_MS"] ? raw : GNEWS_MIN_INTERVAL_MS;
 }
 
 /** Timeout budget for one provider call. */

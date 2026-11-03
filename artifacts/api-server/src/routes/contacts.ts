@@ -242,7 +242,7 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
     const analysis = await analyzeContactWithAI(
       { careerStatement: profile.careerStatement, careerGoals: profile.careerGoals, goalTags: profile.goalTags },
       { company, role, industry, function: contactFunction, notes, interests: interestsArr },
-      (detail) => logger.warn({ detail, company }, "AI match (create) failed; using deterministic score"),
+      (detail) => logger.warn({ detail }, "AI match (create) failed; using deterministic score"),
     );
 
     let industryVal: string | null;
@@ -254,7 +254,7 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
       industryVal = String(industry ?? "").trim() ? industry : analysis.industry;
       functionVal = String(contactFunction ?? "").trim() ? contactFunction : analysis.function;
       logger.info(
-        { company, priority: analysis.priority, reason: analysis.reason, industry: analysis.industry },
+        { priority: analysis.priority },
         "AI match (create) applied",
       );
     } else {
@@ -424,7 +424,7 @@ router.put("/contacts/:id", requireAuth, requireSubscription, async (req: Reques
         notes: notes !== undefined ? notes : existing.notes,
         interests: finalInterests,
       },
-      (detail) => logger.warn({ detail, company: finalCompany }, "AI match (edit) failed; using deterministic score"),
+      (detail) => logger.warn({ detail }, "AI match (edit) failed; using deterministic score"),
     );
 
     // ── Priority: manual override wins, otherwise the AI/deterministic suggestion ──
@@ -439,7 +439,7 @@ router.put("/contacts/:id", requireAuth, requireSubscription, async (req: Reques
       if (!String(finalIndustry ?? "").trim() && analysisEdit.industry) finalIndustry = analysisEdit.industry;
       if (!String(finalFunction ?? "").trim() && analysisEdit.function) finalFunction = analysisEdit.function;
       logger.info(
-        { company: finalCompany, priority: analysisEdit.priority, reason: analysisEdit.reason, industry: analysisEdit.industry },
+        { priority: analysisEdit.priority },
         "AI match (edit) applied",
       );
     } else {

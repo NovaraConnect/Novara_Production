@@ -37,6 +37,7 @@ const router: IRouter = Router();
  */
 const USER_TABLES = [
   "contacts",
+  "network_health_snapshots",
   "push_subscriptions",
   "apns_tokens",
   "fcm_tokens",

@@ -66,6 +66,9 @@ app.use(
       // No CORS headers, so the browser blocks it; not a server error.
       callback(null, false);
     },
+    // Let browsers reuse a preflight for two hours (Chromium's ceiling), so a
+    // cross-origin API call doesn't mean two round trips each time.
+    maxAge: 7200,
   }),
   );
 

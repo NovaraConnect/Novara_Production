@@ -41,6 +41,8 @@ created_at timestamptz NOT NULL DEFAULT now(),
 updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE INDEX IF NOT EXISTS contacts_user_id_idx ON contacts (user_id);
+
 CREATE TABLE IF NOT EXISTS user_settings (
 user_id text PRIMARY KEY,
 auto_downgrade_after_months integer NULL DEFAULT NULL,
