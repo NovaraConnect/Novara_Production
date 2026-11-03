@@ -76,8 +76,8 @@ template draft, so the feature always works.
 | `SUGGESTED_MESSAGE_PROVIDER` | `anthropic` \| `gemini` | Optional override of the inherited provider. |
 | `SUGGESTED_MESSAGE_ANTHROPIC_MODEL` | `claude-haiku-4-5` | Optional model override. |
 
-> **Cost:** AI drafts only for active subscriptions/trials, capped at 5 per contact and 40 per
-> user per day (then the template). At Haiku pricing a draft is about $0.002.
+> **Cost:** AI drafts only for active subscriptions/trials, capped at 3 per contact and 10 per
+> account per day (then the template). At Haiku pricing a draft is about $0.002.
 >
 > ⚠️ **Privacy:** the prompt includes the user's notes about the contact (first name only — never
 > last name, email or phone). The same rule applies: **no Gemini free tier**.
