@@ -4,7 +4,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import request from "supertest";
 import { app, authHeaders } from "./testApp";
 import { pool } from "../src/db";
-import { RESERVE_MICROS, monthKey, monthlyCapMicros, withAiBudget } from "../src/lib/aiBudget";
+import { RESERVE_MICROS, monthKey, monthlyCapMicros, totalMonthlyCapMicros, withAiBudget } from "../src/lib/aiBudget";
 import { reportAnthropicUsage } from "../src/lib/aiUsage";
 import { analyzeContactForUser } from "../src/lib/enrich";
 
@@ -24,6 +24,15 @@ async function setSpent(micros: number, userId = USER, month = monthKey()): Prom
     "INSERT INTO ai_usage_monthly (user_id, month, spent_micros, calls) VALUES ($1, $2::date, $3, 1)",
     [userId, month, micros],
   );
+}
+
+async function totalSpent(month = monthKey()): Promise<number | null> {
+  const { rows } = await pool.query("SELECT spent_micros FROM ai_usage_total_monthly WHERE month = $1::date", [month]);
+  return rows[0] ? Number(rows[0].spent_micros) : null;
+}
+
+async function setTotalSpent(micros: number, month = monthKey()): Promise<void> {
+  await pool.query("INSERT INTO ai_usage_total_monthly (month, spent_micros, calls) VALUES ($1::date, $2, 1)", [month, micros]);
 }
 
 afterEach(() => {
@@ -127,6 +136,107 @@ describe("withAiBudget", () => {
   it("uses month boundaries in UTC", () => {
     expect(monthKey(new Date("2026-11-30T23:59:59Z"))).toBe("2026-11-01");
     expect(monthKey(new Date("2026-12-01T00:00:00Z"))).toBe("2026-12-01");
+  });
+});
+
+describe("total cap across all users", () => {
+  it("defaults to $40, reads AI_TOTAL_MONTHLY_CAP_USD and ignores junk", () => {
+    expect(totalMonthlyCapMicros()).toBe(40_000_000);
+    vi.stubEnv("AI_TOTAL_MONTHLY_CAP_USD", "10");
+    expect(totalMonthlyCapMicros()).toBe(10_000_000);
+    vi.stubEnv("AI_TOTAL_MONTHLY_CAP_USD", "lots");
+    expect(totalMonthlyCapMicros()).toBe(40_000_000);
+    vi.stubEnv("AI_TOTAL_MONTHLY_CAP_USD", "-1");
+    expect(totalMonthlyCapMicros()).toBe(40_000_000);
+  });
+
+  it("adds what each user's calls really cost", async () => {
+    const call = async () => {
+      reportAnthropicUsage("claude-haiku-4-5", { input_tokens: 1000, output_tokens: 200 });
+    };
+    await withAiBudget(USER, call);
+    await withAiBudget(OTHER, call);
+    expect(await totalSpent()).toBe(4000);
+    expect(await spent(USER)).toBe(2000);
+    expect(await spent(OTHER)).toBe(2000);
+  });
+
+  it("releases the total when the call throws or gets no response", async () => {
+    await expect(withAiBudget(USER, async () => { throw new Error("boom"); })).rejects.toThrow("boom");
+    await withAiBudget(USER, async () => null);
+    expect(await totalSpent()).toBe(0);
+  });
+
+  it("refuses a user with budget left once the total is reached, and gives their reservation back", async () => {
+    await setTotalSpent(totalMonthlyCapMicros() - RESERVE_MICROS + 1);
+    await setSpent(1000);
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const fn = vi.fn(async () => "draft");
+
+    expect(await withAiBudget(USER, fn)).toEqual({ allowed: false });
+
+    expect(fn).not.toHaveBeenCalled();
+    expect(await spent()).toBe(1000);
+    expect(await totalSpent()).toBe(totalMonthlyCapMicros() - RESERVE_MICROS + 1);
+    expect(log).toHaveBeenCalledWith("[ai-budget]", JSON.stringify({ event: "total_cap_reached" }));
+  });
+
+  it("leaves the total alone when a user is past their own cap", async () => {
+    await setSpent(monthlyCapMicros());
+    await setTotalSpent(1000);
+    expect((await withAiBudget(USER, async () => 1)).allowed).toBe(false);
+    expect(await totalSpent()).toBe(1000);
+  });
+
+  it("cannot be overrun by parallel calls from different users", async () => {
+    // Room for exactly 3 reservations in total, with 10 users who each have budget.
+    await setTotalSpent(totalMonthlyCapMicros() - RESERVE_MICROS * 3);
+    let open!: () => void;
+    const gate = new Promise<void>((resolve) => { open = resolve; });
+    const fn = vi.fn(async () => {
+      await gate;
+      reportAnthropicUsage("claude-haiku-4-5", { input_tokens: 1000, output_tokens: 200 });
+    });
+
+    const calls = Array.from({ length: 10 }, (_, i) => withAiBudget(`${USER}_${i}`, fn));
+    await vi.waitFor(() => expect(fn).toHaveBeenCalledTimes(3));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    open();
+    const results = await Promise.all(calls);
+
+    expect(results.filter((r) => r.allowed)).toHaveLength(3);
+    expect(fn).toHaveBeenCalledTimes(3);
+    expect(await totalSpent()).toBe(totalMonthlyCapMicros() - RESERVE_MICROS * 3 + 3 * 2000);
+  });
+
+  it("starts fresh in a new calendar month", async () => {
+    await setTotalSpent(totalMonthlyCapMicros(), "2020-01-01");
+    expect((await withAiBudget(USER, async () => 1)).allowed).toBe(true);
+    expect(await totalSpent("2020-01-01")).toBe(totalMonthlyCapMicros());
+  });
+
+  it("refuses AI and gives the user's reservation back when the total can't be read", async () => {
+    await setSpent(1000);
+    const query = pool.query.bind(pool);
+    vi.spyOn(pool, "query").mockImplementation(((sql: string, params: unknown[]) =>
+      sql.includes("INSERT INTO ai_usage_total_monthly")
+        ? Promise.reject(new Error("db down"))
+        : query(sql, params)) as never);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fn = vi.fn(async () => "draft");
+
+    expect(await withAiBudget(USER, fn)).toEqual({ allowed: false });
+    expect(fn).not.toHaveBeenCalled();
+    expect(await spent()).toBe(1000);
+  });
+
+  it("is not refunded when an account is deleted", async () => {
+    await withAiBudget(USER, async () => {
+      reportAnthropicUsage("claude-haiku-4-5", { input_tokens: 1000, output_tokens: 200 });
+    });
+    await request(app).delete("/api/account").set(authHeaders(USER));
+    expect(await spent()).toBeNull();
+    expect(await totalSpent()).toBe(2000);
   });
 });
 

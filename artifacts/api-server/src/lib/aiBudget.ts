@@ -1,20 +1,26 @@
 import { pool } from "../db";
 import { runMetered } from "./aiUsage";
 
-// The hard monthly AI spend cap per user, across every AI feature. Past the cap
-// each feature uses its non-AI fallback, so a user never sees an error.
+// The hard monthly AI spend caps: one per user and one for all users together,
+// across every AI feature. Past either cap each feature uses its non-AI
+// fallback, so a user never sees an error.
 //
 // A call first reserves more than one call can cost, in a single atomic SQL
-// statement, so parallel requests and several API instances can't overrun the
+// statement, so parallel requests and several API instances can't overrun a
 // cap. When it finishes, the reservation is replaced by what it really cost. A
 // call that never got a provider response (timeout, provider error) costs 0.
 //
 // If the table can't be read, AI is refused: an outage here must not become
 // uncapped spending, and the fallbacks keep the app working.
 //
-// Config: AI_USER_MONTHLY_CAP_USD (optional, default 0.25).
+// Deleting an account removes its per-user row but not its share of the total,
+// because that money was still spent.
+//
+// Config: AI_USER_MONTHLY_CAP_USD (optional, default 0.25) and
+// AI_TOTAL_MONTHLY_CAP_USD (optional, default 40; 0 turns AI off for everyone).
 
 const DEFAULT_CAP_USD = 0.25;
+const DEFAULT_TOTAL_CAP_USD = 40;
 const MICROS_PER_USD = 1_000_000;
 
 /** Covers a full-size call at the highest listed price: 8,000 characters of OCR
@@ -23,12 +29,18 @@ const MICROS_PER_USD = 1_000_000;
  *  most and the next one is refused. */
 export const RESERVE_MICROS = 12_000;
 
-export function monthlyCapMicros(): number {
-  const parsed = Number(process.env["AI_USER_MONTHLY_CAP_USD"]);
-  const usd = process.env["AI_USER_MONTHLY_CAP_USD"]?.trim() && Number.isFinite(parsed) && parsed >= 0
-    ? parsed
-    : DEFAULT_CAP_USD;
+function capMicros(envVar: string, defaultUsd: number): number {
+  const parsed = Number(process.env[envVar]);
+  const usd = process.env[envVar]?.trim() && Number.isFinite(parsed) && parsed >= 0 ? parsed : defaultUsd;
   return Math.round(usd * MICROS_PER_USD);
+}
+
+export function monthlyCapMicros(): number {
+  return capMicros("AI_USER_MONTHLY_CAP_USD", DEFAULT_CAP_USD);
+}
+
+export function totalMonthlyCapMicros(): number {
+  return capMicros("AI_TOTAL_MONTHLY_CAP_USD", DEFAULT_TOTAL_CAP_USD);
 }
 
 /** First day of the calendar month, in UTC. */
@@ -51,9 +63,41 @@ async function reserve(userId: string, month: string): Promise<boolean> {
   return (rowCount ?? 0) > 0;
 }
 
+async function reserveTotal(month: string): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    `INSERT INTO ai_usage_total_monthly (month, spent_micros, calls)
+     SELECT $1::date, $2::bigint, 1 WHERE $2::bigint <= $3::bigint
+     ON CONFLICT (month) DO UPDATE
+       SET spent_micros = ai_usage_total_monthly.spent_micros + EXCLUDED.spent_micros,
+           calls = ai_usage_total_monthly.calls + 1,
+           updated_at = now()
+       WHERE ai_usage_total_monthly.spent_micros + EXCLUDED.spent_micros <= $3::bigint
+     RETURNING month`,
+    [month, RESERVE_MICROS, totalMonthlyCapMicros()],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+/** Gives back a per-user reservation for a call that won't run. */
+async function releaseUser(userId: string, month: string): Promise<void> {
+  await pool
+    .query(
+      `UPDATE ai_usage_monthly
+          SET spent_micros = GREATEST(0, spent_micros - $3::bigint),
+              calls = GREATEST(0, calls - 1),
+              updated_at = now()
+        WHERE user_id = $1 AND month = $2::date`,
+      [userId, month, RESERVE_MICROS],
+    )
+    .catch((err: unknown) => {
+      // The reservation stands, which over-counts: the safe way.
+      console.error("[ai-budget] release failed:", err instanceof Error ? err.message : String(err));
+    });
+}
+
 export type BudgetedResult<T> = { allowed: true; value: T } | { allowed: false };
 
-/** Runs one AI call if the user has budget left this month. `{ allowed: false }`
+/** Runs one AI call if the user and the total both have budget left this month. `{ allowed: false }`
  *  means the call did not run and the caller should use its non-AI fallback. */
 export async function withAiBudget<T>(userId: string, fn: () => Promise<T>): Promise<BudgetedResult<T>> {
   const month = monthKey();
@@ -70,6 +114,22 @@ export async function withAiBudget<T>(userId: string, fn: () => Promise<T>): Pro
     return { allowed: false };
   }
 
+  // After the per-user check, so a user past their own cap never touches the
+  // one row every AI call shares.
+  let reservedTotal = false;
+  try {
+    reservedTotal = await reserveTotal(month);
+  } catch (err) {
+    console.error("[ai-budget] total reserve failed; AI refused:", err instanceof Error ? err.message : String(err));
+    await releaseUser(userId, month);
+    return { allowed: false };
+  }
+  if (!reservedTotal) {
+    console.log("[ai-budget]", JSON.stringify({ event: "total_cap_reached" }));
+    await releaseUser(userId, month);
+    return { allowed: false };
+  }
+
   let micros = 0;
   try {
     const metered = await runMetered(fn);
@@ -79,9 +139,14 @@ export async function withAiBudget<T>(userId: string, fn: () => Promise<T>): Pro
     // On failure here the reservation stands, which over-counts: the safe way.
     await pool
       .query(
-        `UPDATE ai_usage_monthly
+        `WITH per_user AS (
+           UPDATE ai_usage_monthly
+              SET spent_micros = GREATEST(0, spent_micros + $3::bigint), updated_at = now()
+            WHERE user_id = $1 AND month = $2::date
+         )
+         UPDATE ai_usage_total_monthly
             SET spent_micros = GREATEST(0, spent_micros + $3::bigint), updated_at = now()
-          WHERE user_id = $1 AND month = $2::date`,
+          WHERE month = $2::date`,
         [userId, month, micros - RESERVE_MICROS],
       )
       .catch((err: unknown) => {

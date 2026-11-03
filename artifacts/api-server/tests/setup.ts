@@ -68,7 +68,7 @@ return schemaReady;
 beforeEach(async () => {
 await ensureSchema();
 await pool.query(
-"TRUNCATE contacts, user_settings, push_subscriptions, apns_tokens, fcm_tokens, feedback, network_health_snapshots, entitlements, revenuecat_events, ai_usage_monthly, account_usage_daily RESTART IDENTITY CASCADE",
+"TRUNCATE contacts, user_settings, push_subscriptions, apns_tokens, fcm_tokens, feedback, network_health_snapshots, entitlements, revenuecat_events, ai_usage_monthly, ai_usage_total_monthly, account_usage_daily RESTART IDENTITY CASCADE",
 );
 });
 
