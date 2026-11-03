@@ -1,7 +1,9 @@
 import { Router, type Request, type Response } from "express";
-import rateLimit from "express-rate-limit";
-import { requireAuth } from "../middlewares/auth";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import { requireAuth, type AuthedRequest } from "../middlewares/auth";
+import { withAiBudget } from "../lib/aiBudget";
 import { requireSubscription } from "../middlewares/subscription";
+import { takeParse } from "../lib/usageLimits";
 import {
   isCardAiParseEnabled,
   activeCardProvider,
@@ -17,6 +19,7 @@ const cardParseLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req: Request) => (req as AuthedRequest).userId ?? ipKeyGenerator(req.ip ?? "unknown"),
 });
 
 // POST /api/parse-card-text — OCR TEXT ONLY (never the image). Best-effort:
@@ -34,9 +37,19 @@ router.post("/parse-card-text", requireAuth, requireSubscription, cardParseLimit
     return;
   }
 
+  if (!(await takeParse((req as AuthedRequest).userId))) {
+    res.json({ ok: false, reason: "daily_cap" });
+    return;
+  }
+
   const provider = activeCardProvider();
   const t0 = Date.now();
-  const result = await parseCardText(text); // best-effort, never throws
+  const budgeted = await withAiBudget((req as AuthedRequest).userId, () => parseCardText(text)); // best-effort, never throws
+  if (!budgeted.allowed) {
+    res.json({ ok: false, reason: "ai_monthly_cap" });
+    return;
+  }
+  const result = budgeted.value;
   const ms = Date.now() - t0;
 
   // METADATA ONLY — never the OCR text or the parsed fields.

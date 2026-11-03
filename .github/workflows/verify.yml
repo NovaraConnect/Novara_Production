@@ -11,6 +11,20 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      # The API suite runs against a real Postgres (tests/setup.ts loads the schema).
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: novara_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,6 +55,14 @@ jobs:
 
       - name: Backend/API typecheck (api-server)
         run: pnpm --filter @workspace/api-server run typecheck
+
+      - name: API tests
+        run: pnpm --filter @workspace/api-server run test
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/novara_test
+
+      - name: Web tests
+        run: pnpm --filter @workspace/project-novara run test
 
       - name: Production build
         run: pnpm run build

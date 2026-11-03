@@ -4,6 +4,8 @@ import { requireAuth, type AuthedRequest } from "../middlewares/auth";
 import type { Request, Response } from "express";
 import { logger } from "../lib/logger";
 import { recalculateContactsForUser } from "../lib/recalculate";
+import { takeRescore } from "../lib/usageLimits";
+import { isSubscriptionRequired, proStatusFor } from "../lib/entitlements";
 
 const router = Router();
 
@@ -13,6 +15,30 @@ const DOWNGRADE_MONTHS: (number | null)[] = [9, 12, 18, null];
 function toArrayLiteral(arr: string[]): string {
   if (!arr.length) return "{}";
   return `{${arr.map(t => `"${String(t).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(",")}}`;
+}
+
+type CareerProfileRow = { career_statement?: string; goal_tags?: string[]; career_goals?: string[] } | undefined;
+
+/** Compares saved career profiles. A user with no row yet has an empty profile. */
+function careerProfileKey(row: CareerProfileRow): string {
+  return JSON.stringify([row?.career_statement ?? "", row?.goal_tags ?? [], row?.career_goals ?? []]);
+}
+
+/**
+ * Saving settings stays open to lapsed users, so AI needs its own check here:
+ * only an active subscription or trial (once one is required), within the
+ * daily limit. Otherwise contacts get the deterministic score.
+ */
+async function mayRescoreWithAi(userId: string): Promise<boolean> {
+  if (isSubscriptionRequired()) {
+    try {
+      if (!(await proStatusFor(userId)).pro) return false;
+    } catch (err) {
+      logger.error({ err }, "subscription check failed; re-scoring without AI");
+      return false;
+    }
+  }
+  return takeRescore(userId);
 }
 
 // GET /api/settings
@@ -69,6 +95,11 @@ router.put("/settings", requireAuth, async (req: Request, res: Response) => {
   const careerGoalsParam = careerGoals ? toArrayLiteral(careerGoals) : null;
 
   try {
+    const { rows: [before] } = await pool.query(
+      "SELECT career_statement, goal_tags, career_goals FROM user_settings WHERE user_id = $1",
+      [userId],
+    );
+
     const { rows: [row] } = await pool.query(
       `INSERT INTO user_settings (user_id, auto_downgrade_after_months, career_statement, goal_tags, has_seen_tutorial, career_goals)
          VALUES ($1, $2::int, COALESCE($3, ''), COALESCE($4::text[], '{}'::text[]), COALESCE($5, FALSE), COALESCE($6::text[], '{}'::text[]))
@@ -91,15 +122,16 @@ router.put("/settings", requireAuth, async (req: Request, res: Response) => {
       ],
     );
 
-    const careerProfileChanged =
-      careerGoals !== undefined || goalTags !== undefined || careerStatement !== undefined;
+    // Compared by value: the app re-sends the whole profile on save, and each
+    // re-score is one AI call per contact.
+    const careerProfileChanged = careerProfileKey(before) !== careerProfileKey(row);
 
     // Recalculate synchronously so the client knows when it's actually safe to
     // refetch, and so failures are visible rather than swallowed.
     let recalculation = null;
     if (careerProfileChanged) {
       try {
-        recalculation = await recalculateContactsForUser(userId);
+        recalculation = await recalculateContactsForUser(userId, { allowAi: await mayRescoreWithAi(userId) });
       } catch (recalcErr) {
         logger.error({ err: recalcErr, userId }, "Career-goal recalculation failed");
         res.json({

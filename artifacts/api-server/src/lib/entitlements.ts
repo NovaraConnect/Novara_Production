@@ -30,6 +30,9 @@ import { logger } from "./logger";
 /** Free ceiling used while a subscription is not yet required. Pro removes it. */
 export const FREE_TIER_LIMIT = 6;
 
+/** The most contacts any account may hold, Pro included. */
+export const MAX_CONTACTS_PER_ACCOUNT = 500;
+
 /** RevenueCat entitlement identifier that grants Novara Pro. */
 export const NOVARA_PRO_ENTITLEMENT = "novara_pro";
 
@@ -158,18 +161,25 @@ export async function proStatusFor(userId: string): Promise<ProStatus> {
 }
 
 /**
- * The most contacts this user may hold. Infinity for Pro (trial included).
+ * The most contacts this user may hold. The account ceiling for Pro (trial included).
  * Otherwise zero while a subscription is required, or the Free ceiling before
  * that. Callers compare counts against this; they must not hard-code a number.
  */
 export async function contactLimitFor(userId: string): Promise<number> {
   const status = await proStatusFor(userId);
-  if (status.pro) return Infinity;
+  if (status.pro) return MAX_CONTACTS_PER_ACCOUNT;
   return isSubscriptionRequired() ? 0 : FREE_TIER_LIMIT;
 }
 
 /** The 403 body for an add or import refused by contactLimitFor(). */
-export function limitReachedBody(): { error: string; message: string; code: string } {
+export function limitReachedBody(limit?: number): { error: string; message: string; code: string } {
+  if (limit === MAX_CONTACTS_PER_ACCOUNT) {
+    return {
+      error: "Contact limit reached",
+      message: `Novara holds up to ${MAX_CONTACTS_PER_ACCOUNT} contacts per account.`,
+      code: "ACCOUNT_CONTACT_LIMIT",
+    };
+  }
   if (isSubscriptionRequired()) {
     return {
       error: "Subscription required",
@@ -179,7 +189,7 @@ export function limitReachedBody(): { error: string; message: string; code: stri
   }
   return {
     error: "Contact limit reached",
-    message: `Novara Free includes up to ${FREE_TIER_LIMIT} contacts. Novara Pro removes the limit.`,
+    message: `Novara Free includes up to ${FREE_TIER_LIMIT} contacts. Novara Pro raises the limit.`,
     code: "CONTACT_LIMIT_REACHED",
   };
 }

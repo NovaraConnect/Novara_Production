@@ -41,6 +41,8 @@ created_at timestamptz NOT NULL DEFAULT now(),
 updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE INDEX IF NOT EXISTS contacts_user_id_idx ON contacts (user_id);
+
 CREATE TABLE IF NOT EXISTS user_settings (
 user_id text PRIMARY KEY,
 auto_downgrade_after_months integer NULL DEFAULT NULL,
@@ -135,6 +137,23 @@ ON entitlements (user_id) WHERE source = 'apple_iap';
 CREATE UNIQUE INDEX IF NOT EXISTS entitlements_google_play_one_row
 ON entitlements (user_id) WHERE source = 'google_play';
 CREATE INDEX IF NOT EXISTS entitlements_user_idx ON entitlements (user_id);
+
+CREATE TABLE IF NOT EXISTS ai_usage_monthly (
+user_id text NOT NULL,
+month date NOT NULL,
+spent_micros bigint NOT NULL DEFAULT 0,
+calls integer NOT NULL DEFAULT 0,
+updated_at timestamptz NOT NULL DEFAULT now(),
+PRIMARY KEY (user_id, month)
+);
+
+CREATE TABLE IF NOT EXISTS account_usage_daily (
+user_id text NOT NULL,
+day date NOT NULL,
+bucket text NOT NULL,
+count integer NOT NULL DEFAULT 0,
+PRIMARY KEY (user_id, day, bucket)
+);
 
 CREATE TABLE IF NOT EXISTS revenuecat_events (
 event_id text PRIMARY KEY,

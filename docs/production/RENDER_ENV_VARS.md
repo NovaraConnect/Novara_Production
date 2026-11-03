@@ -16,6 +16,8 @@ here are placeholders — real values live only in Render.
 | `FRONTEND_URL` | `https://app.novaraconnect.group` | No | Exact origin, no trailing slash. Drives CORS + Clerk authorizedParties. |
 | `ANDROID_FRONTEND_URL` | `https://android.novaraconnect.group` | No | Optional. The Android app's own copy of the web app (static site `novara-android-web`, from `feat/android`). Added to CORS + Clerk authorizedParties; unset leaves both exactly as `FRONTEND_URL` alone. |
 | `GNEWS_API_KEY` | production key | **Yes** | Consider a separate/paid key (100/day free cap). |
+| `GNEWS_MIN_INTERVAL_MS` | (unset) | No | Optional. Least time between GNews calls; defaults to 1100. Lower it only if the plan allows more per second. |
+| `ACCOUNT_REQUESTS_PER_MINUTE` | (unset) | No | Optional. API requests per signed-in account per minute; defaults to 120. |
 | `VAPID_PUBLIC_KEY` | new prod key | No | Generate a NEW keypair. |
 | `VAPID_PRIVATE_KEY` | new prod key | **Yes** | |
 | `VAPID_SUBJECT` | `mailto:hello@novaraconnect.group` | No | |
@@ -69,12 +71,13 @@ template draft, so the feature always works.
 
 | Variable | Value | Notes |
 |---|---|---|
+| `AI_USER_MONTHLY_CAP_USD` | `0.25` | Optional. Per-user monthly AI spend cap across all AI features (default 0.25). Apply migration 0014 first. |
 | `SUGGESTED_MESSAGE_AI` | `off` | Optional kill switch for the AI draft (template only). |
 | `SUGGESTED_MESSAGE_PROVIDER` | `anthropic` \| `gemini` | Optional override of the inherited provider. |
 | `SUGGESTED_MESSAGE_ANTHROPIC_MODEL` | `claude-haiku-4-5` | Optional model override. |
 
-> **Cost:** AI drafts only for active subscriptions/trials, capped at 5 per contact and 40 per
-> user per day (then the template). At Haiku pricing a draft is about $0.002.
+> **Cost:** AI drafts only for active subscriptions/trials, capped at 3 per contact and 10 per
+> account per day (then the template). At Haiku pricing a draft is about $0.002.
 >
 > ⚠️ **Privacy:** the prompt includes the user's notes about the contact (first name only — never
 > last name, email or phone). The same rule applies: **no Gemini free tier**.

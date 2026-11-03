@@ -29,6 +29,7 @@
 //   GEMINI_MODEL, LINKEDIN_AI_ANTHROPIC_MODEL  optional model overrides
 // ============================================================================
 import { extractJson } from "./cardAiParse";
+import { reportAnthropicUsage, reportGeminiUsage, type GeminiUsageMetadata } from "./aiUsage";
 
 export type LinkedInProvider = "anthropic" | "gemini";
 
@@ -149,7 +150,9 @@ async function completeGemini(system: string, user: string, signal: AbortSignal)
   if (!res.ok) return null;
   const data = (await res.json()) as {
     candidates?: { content?: { parts?: { text?: string }[] } }[];
+    usageMetadata?: GeminiUsageMetadata;
   };
+  reportGeminiUsage(model, data.usageMetadata);
   const parts = data.candidates?.[0]?.content?.parts ?? [];
   const text = parts.map((p) => p.text ?? "").join("");
   return text || null;
@@ -165,6 +168,7 @@ async function completeAnthropic(system: string, user: string, signal: AbortSign
     { model, max_tokens: 400, temperature: 0, system, messages: [{ role: "user", content: user }] },
     { signal },
   );
+  reportAnthropicUsage(model, msg.usage);
   let text = "";
   for (const block of msg.content) if (block.type === "text") text += block.text;
   return text || null;
