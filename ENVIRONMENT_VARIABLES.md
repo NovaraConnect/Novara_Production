@@ -29,6 +29,7 @@ code when a variable is absent, verified by reading the relevant source, not ass
 | `RESEND_FROM_EMAIL` | No | No | `lib/email.ts`, `.env.example` | Defaults to Resend's shared sandbox sender (`onboarding@resend.dev`), which only delivers to the email address that owns the Resend account. Verify a domain in Resend and set this for reliable delivery to any `FEEDBACK_TO_EMAIL`. |
 | `LOG_LEVEL` | No | No | `.env.example`, `logger.ts` (pino) | Defaults to pino's own default level if unset. |
 | `AI_USER_MONTHLY_CAP_USD` | No | No | `lib/aiBudget.ts` | Defaults to `0.25`. Maximum AI spend per user per calendar month across all AI features; past it each feature uses its non-AI fallback. Requires migration 0014: without the table, AI is refused. |
+| `AI_TOTAL_MONTHLY_CAP_USD` | No | No | `lib/aiBudget.ts` | Defaults to `40`. Maximum AI spend across all users per calendar month, across all AI features; past it every user gets the non-AI fallbacks until the next month (UTC). `0` turns AI off for everyone. Apply migration 0017 first. |
 | `SUGGESTED_MESSAGE_AI` | No | No | `lib/suggestedMessage.ts` | On by default whenever a provider is configured; set `off` to serve only the template draft. |
 | `SUGGESTED_MESSAGE_PROVIDER` | No | No | `lib/suggestedMessage.ts` | Overrides the provider; otherwise inherits `CARD_AI_PROVIDER`, then `LINKEDIN_AI_PROVIDER`. With none set, suggested messages use the deterministic template. |
 | `SUGGESTED_MESSAGE_ANTHROPIC_MODEL` | No | No | `lib/suggestedMessage.ts` | Defaults to `claude-haiku-4-5`. Gemini uses `GEMINI_MODEL`. |
