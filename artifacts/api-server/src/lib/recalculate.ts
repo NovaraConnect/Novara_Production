@@ -14,7 +14,7 @@
 // ============================================================================
 
 import { pool } from "../db";
-import { analyzeContactWithAI, isAiEnrichEnabled, type UserGoals } from "./enrich";
+import { analyzeContactForUser, isAiEnrichEnabled, type UserGoals } from "./enrich";
 import { logger } from "./logger";
 import {
   computeSuggestedPriority,
@@ -54,6 +54,7 @@ interface ContactRow {
 /** The suggested priority + (possibly enriched) industry/function for one
  *  contact: AI-judged match when available, deterministic fallback otherwise. */
 async function scoreContact(
+  userId: string,
   c: ContactRow,
   profile: UserProfessionalProfile,
   goals: UserGoals,
@@ -63,7 +64,8 @@ async function scoreContact(
   const function0 = c.function ?? null;
 
   if (aiOn) {
-    const analysis = await analyzeContactWithAI(
+    const analysis = await analyzeContactForUser(
+      userId,
       goals,
       { company: c.company, role: c.role, industry: industry0, function: function0, notes: c.notes, interests: c.interests ?? [] },
       (detail) => logger.warn({ detail, contactId: c.id }, "AI match (recalc) failed; using deterministic score"),
@@ -173,7 +175,7 @@ export async function recalculateContactsForUser(
             priority = normalizePriority(c.current_priority);
             report.priorityOverridesSkipped++;
           } else {
-            const scored = await scoreContact(c, profile, goals, aiOn);
+            const scored = await scoreContact(userId, c, profile, goals, aiOn);
             priority = scored.priority;
             industry = scored.industry;
             contactFunction = scored.function;

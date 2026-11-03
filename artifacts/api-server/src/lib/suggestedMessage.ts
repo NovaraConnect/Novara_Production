@@ -45,6 +45,7 @@
 //   GEMINI_MODEL, SUGGESTED_MESSAGE_ANTHROPIC_MODEL  optional model overrides
 // ============================================================================
 import { extractJson } from "./cardAiParse";
+import { reportAnthropicUsage, reportGeminiUsage, type GeminiUsageMetadata } from "./aiUsage";
 
 export type MessageProvider = "anthropic" | "gemini";
 
@@ -458,7 +459,9 @@ async function completeGemini(system: string, user: string, signal: AbortSignal)
   if (!res.ok) return null;
   const data = (await res.json()) as {
     candidates?: { content?: { parts?: { text?: string }[] } }[];
+    usageMetadata?: GeminiUsageMetadata;
   };
+  reportGeminiUsage(model, data.usageMetadata);
   const parts = data.candidates?.[0]?.content?.parts ?? [];
   const text = parts.map((p) => p.text ?? "").join("");
   return text || null;
@@ -474,6 +477,7 @@ async function completeAnthropic(system: string, user: string, signal: AbortSign
     { model, max_tokens: 300, temperature: 0.7, system, messages: [{ role: "user", content: user }] },
     { signal },
   );
+  reportAnthropicUsage(model, msg.usage);
   let text = "";
   for (const block of msg.content) if (block.type === "text") text += block.text;
   return text || null;
@@ -528,7 +532,7 @@ export async function suggestMessage(
 }
 
 /** Why a draft came from the template, for the log. */
-export type TemplateReason = "ai_off" | "not_subscribed" | "daily_cap" | "ai_failed";
+export type TemplateReason = "ai_off" | "not_subscribed" | "daily_cap" | "monthly_cap" | "ai_failed";
 
 /** Log payload — METADATA ONLY. Never the prompt, notes, subject, or message. */
 export function suggestedMessageLogFields(

@@ -45,6 +45,7 @@ const USER_TABLES = [
   "user_settings",
   "entitlements",
   "revenuecat_events",
+  "ai_usage_monthly",
 ] as const;
 
 /** Tables whose per-user column is not `user_id`. */

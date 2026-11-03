@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import rateLimit from "express-rate-limit";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, type AuthedRequest } from "../middlewares/auth";
+import { withAiBudget } from "../lib/aiBudget";
 import { requireSubscription } from "../middlewares/subscription";
 import {
   isLinkedInAiParseEnabled,
@@ -38,7 +39,12 @@ router.post("/parse-linkedin-text", requireAuth, requireSubscription, linkedinPa
 
   const provider = activeLinkedInProvider();
   const t0 = Date.now();
-  const result = await parseLinkedInText(text); // best-effort, never throws
+  const budgeted = await withAiBudget((req as AuthedRequest).userId, () => parseLinkedInText(text)); // best-effort, never throws
+  if (!budgeted.allowed) {
+    res.json({ ok: false, reason: "ai_monthly_cap" });
+    return;
+  }
+  const result = budgeted.value;
   const ms = Date.now() - t0;
 
   // METADATA ONLY — never the OCR text or the parsed fields (name, company,

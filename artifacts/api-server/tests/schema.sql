@@ -138,6 +138,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS entitlements_google_play_one_row
 ON entitlements (user_id) WHERE source = 'google_play';
 CREATE INDEX IF NOT EXISTS entitlements_user_idx ON entitlements (user_id);
 
+CREATE TABLE IF NOT EXISTS ai_usage_monthly (
+user_id text NOT NULL,
+month date NOT NULL,
+spent_micros bigint NOT NULL DEFAULT 0,
+calls integer NOT NULL DEFAULT 0,
+updated_at timestamptz NOT NULL DEFAULT now(),
+PRIMARY KEY (user_id, month)
+);
+
 CREATE TABLE IF NOT EXISTS revenuecat_events (
 event_id text PRIMARY KEY,
 event_type text NOT NULL,
