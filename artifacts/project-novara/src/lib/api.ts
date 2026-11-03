@@ -82,6 +82,7 @@ export async function createContact(
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as { code?: string; message?: string };
     if (body.code === "CONTACT_LIMIT_REACHED") throw new Error("Contact limit reached");
+    if (body.code === "ACCOUNT_CONTACT_LIMIT") throw new Error(body.message ?? "Contact limit reached");
     if (body.code === "SUBSCRIPTION_REQUIRED") throw new Error("Subscription required");
     throw new Error("Failed to create contact");
   }

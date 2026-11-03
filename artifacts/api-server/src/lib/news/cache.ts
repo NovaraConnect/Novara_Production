@@ -64,7 +64,7 @@ export interface CachedCompanyNews {
 export type NewsLookupOutcome =
   | { kind: "hit"; value: CachedCompanyNews }
   | { kind: "stale"; value: CachedCompanyNews; reason: string }
-  | { kind: "empty"; reason: "config_missing" | "timeout" | "fetch_failed" };
+  | { kind: "empty"; reason: "config_missing" | "timeout" | "fetch_failed" | "daily_cap" };
 
 // ---------------------------------------------------------------------------
 // Table presence
@@ -295,6 +295,8 @@ function fetchOnce(companyKey: string, displayName: string): Promise<RankableArt
 export async function getCompanyArticles(
   companyKey: string,
   displayName: string,
+  /** Asked only when the provider would be called. Cached news needs no permission. */
+  mayFetch: () => Promise<boolean> = async () => true,
 ): Promise<NewsLookupOutcome> {
   const provider = activeNewsProvider();
 
@@ -326,6 +328,22 @@ export async function getCompanyArticles(
   // rather than dressing it up as stale data.
   if (!provider.isConfigured()) {
     return { kind: "empty", reason: "config_missing" };
+  }
+
+  if (!(await mayFetch())) {
+    if (row && now - row.fetched_at.getTime() < STALE_GRACE_MS) {
+      return {
+        kind: "stale",
+        value: {
+          articles: row.articles,
+          fetchedAt: row.fetched_at.getTime(),
+          stale: true,
+          cached: true,
+        },
+        reason: "daily_cap",
+      };
+    }
+    return { kind: "empty", reason: "daily_cap" };
   }
 
   try {

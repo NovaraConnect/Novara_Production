@@ -1,8 +1,9 @@
 import { Router, type Request, type Response } from "express";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { requireAuth, type AuthedRequest } from "../middlewares/auth";
 import { withAiBudget } from "../lib/aiBudget";
 import { requireSubscription } from "../middlewares/subscription";
+import { takeParse } from "../lib/usageLimits";
 import {
   isLinkedInAiParseEnabled,
   activeLinkedInProvider,
@@ -18,6 +19,7 @@ const linkedinParseLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req: Request) => (req as AuthedRequest).userId ?? ipKeyGenerator(req.ip ?? "unknown"),
 });
 
 // POST /api/parse-linkedin-text — OCR TEXT ONLY (never the screenshot). The
@@ -34,6 +36,11 @@ router.post("/parse-linkedin-text", requireAuth, requireSubscription, linkedinPa
 
   if (!isLinkedInAiParseEnabled()) {
     res.json({ ok: false, reason: "ai_disabled" });
+    return;
+  }
+
+  if (!(await takeParse((req as AuthedRequest).userId))) {
+    res.json({ ok: false, reason: "daily_cap" });
     return;
   }
 

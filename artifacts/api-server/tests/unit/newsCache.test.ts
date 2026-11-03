@@ -235,4 +235,20 @@ describe("provider pacing", () => {
     expect(searchCompanyNews).toHaveBeenCalledTimes(2);
     delete process.env["GNEWS_MIN_INTERVAL_MS"];
   });
+
+  it("doesn't ask permission for cached news, and serves empty when refused", async () => {
+    tableExists(true);
+    searchCompanyNews.mockResolvedValue([ARTICLE]);
+    const refuse = vi.fn(async () => false);
+
+    const out = await getCompanyArticles("fresh", "Fresh", refuse);
+    expect(out).toEqual({ kind: "empty", reason: "daily_cap" });
+    expect(searchCompanyNews).not.toHaveBeenCalled();
+
+    const allow = vi.fn(async () => true);
+    await getCompanyArticles("fresh", "Fresh", allow);
+    expect(allow).toHaveBeenCalledTimes(1);
+    await getCompanyArticles("fresh", "Fresh", refuse);
+    expect(refuse).toHaveBeenCalledTimes(1);
+  });
 });

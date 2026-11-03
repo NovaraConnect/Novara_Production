@@ -147,6 +147,14 @@ updated_at timestamptz NOT NULL DEFAULT now(),
 PRIMARY KEY (user_id, month)
 );
 
+CREATE TABLE IF NOT EXISTS account_usage_daily (
+user_id text NOT NULL,
+day date NOT NULL,
+bucket text NOT NULL,
+count integer NOT NULL DEFAULT 0,
+PRIMARY KEY (user_id, day, bucket)
+);
+
 CREATE TABLE IF NOT EXISTS revenuecat_events (
 event_id text PRIMARY KEY,
 event_type text NOT NULL,

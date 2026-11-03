@@ -14,6 +14,8 @@ process.env.NODE_ENV ??= "test";
 process.env.CLERK_PUBLISHABLE_KEY ??= "pk_test_ci_placeholder";
 process.env.CLERK_SECRET_KEY ??= "sk_test_ci_placeholder";
 process.env.FRONTEND_URL ??= "http://localhost:5173";
+// The suites send many requests as one user; accountLimits.test.ts lowers this.
+process.env.ACCOUNT_REQUESTS_PER_MINUTE ??= "1000000";
 // VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY are intentionally left unset so the
 // notification cron scheduler no-ops instead of registering a real timer
 // that would keep the test process alive (see lib/scheduler.ts).
@@ -66,7 +68,7 @@ return schemaReady;
 beforeEach(async () => {
 await ensureSchema();
 await pool.query(
-"TRUNCATE contacts, user_settings, push_subscriptions, apns_tokens, fcm_tokens, feedback, network_health_snapshots, entitlements, revenuecat_events, ai_usage_monthly RESTART IDENTITY CASCADE",
+"TRUNCATE contacts, user_settings, push_subscriptions, apns_tokens, fcm_tokens, feedback, network_health_snapshots, entitlements, revenuecat_events, ai_usage_monthly, account_usage_daily RESTART IDENTITY CASCADE",
 );
 });
 

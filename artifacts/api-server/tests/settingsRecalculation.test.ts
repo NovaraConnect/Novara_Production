@@ -1,17 +1,16 @@
 // Saving career goals re-scores contacts, and each re-score is one AI call per
 // contact, so it must not run for an unchanged profile, a lapsed user, or past
-// the hourly budget.
+// the daily limit.
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import request from "supertest";
 import { app, authHeaders } from "./testApp";
 import { pool } from "../src/db";
-import { RecalcAiBudget } from "../src/lib/recalculate";
 
 const analyze = vi.hoisted(() => vi.fn());
 
 vi.mock("../src/lib/enrich", async () => {
   const actual = await vi.importActual<typeof import("../src/lib/enrich")>("../src/lib/enrich");
-  return { ...actual, isAiEnrichEnabled: () => true, analyzeContactWithAI: analyze };
+  return { ...actual, isAiEnrichEnabled: () => true, analyzeContactForUser: (_u: string, ...rest: unknown[]) => analyze(...rest) };
 });
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -56,18 +55,18 @@ describe("career profile saves", () => {
     expect(analyze).toHaveBeenCalledTimes(1);
   });
 
-  it("falls back to the deterministic score past the hourly budget, and still saves", async () => {
+  it("falls back to the deterministic score past the daily limit, and still saves", async () => {
     const user = uniqueUser();
     await seedContact(user);
 
-    for (let i = 0; i < 5; i++) await save(user, `Goal ${i}`);
-    expect(analyze).toHaveBeenCalledTimes(5);
+    for (let i = 0; i < 2; i++) await save(user, `Goal ${i}`);
+    expect(analyze).toHaveBeenCalledTimes(2);
 
     const over = await save(user, "One more goal");
     expect(over.status).toBe(200);
     expect(over.body.careerStatement).toBe("One more goal");
     expect(over.body.recalculation).toMatchObject({ ok: true, examined: 1 });
-    expect(analyze).toHaveBeenCalledTimes(5);
+    expect(analyze).toHaveBeenCalledTimes(2);
   });
 
   describe("once a subscription is required", () => {
@@ -114,17 +113,5 @@ describe("account deletion", () => {
 
     const { rows } = await pool.query("SELECT COUNT(*)::int AS n FROM network_health_snapshots WHERE user_id = $1", [user]);
     expect(rows[0].n).toBe(0);
-  });
-});
-
-describe("RecalcAiBudget", () => {
-  it("allows the hourly maximum per user, then resets the next hour", () => {
-    const budget = new RecalcAiBudget(2);
-    const t = 10 * 3_600_000;
-    expect(budget.take("a", t)).toBe(true);
-    expect(budget.take("a", t)).toBe(true);
-    expect(budget.take("a", t)).toBe(false);
-    expect(budget.take("b", t)).toBe(true);
-    expect(budget.take("a", t + 3_600_000)).toBe(true);
   });
 });

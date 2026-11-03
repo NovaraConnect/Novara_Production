@@ -1,12 +1,12 @@
 import { Router, type Request, type Response } from "express";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { pool, toDateStr } from "../db";
 import { requireAuth, type AuthedRequest } from "../middlewares/auth";
 import { requireSubscription } from "../middlewares/subscription";
 import { proStatusFor } from "../lib/entitlements";
 import { withAiBudget } from "../lib/aiBudget";
+import { takeDraft } from "../lib/usageLimits";
 import {
-  DraftBudget,
   activeMessageProvider,
   isSuggestedMessageAiEnabled,
   suggestMessage,
@@ -18,16 +18,14 @@ import {
 const router = Router();
 
 // Auth-gated AND rate-limited so Regenerate can't turn this into an open LLM
-// proxy. The real spend ceiling is the daily DraftBudget below.
+// proxy. The real ceilings are the daily and monthly limits below.
 const suggestedMessageLimiter = rateLimit({
   windowMs: 60_000,
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req: Request) => (req as AuthedRequest).userId ?? ipKeyGenerator(req.ip ?? "unknown"),
 });
-
-// 5 AI drafts per contact and 40 per user per day; past that, the template.
-const budget = new DraftBudget(5, 40);
 
 // POST /api/contacts/:id/suggested-message  { headline? }
 // Always answers with one draft — { subject, message, source } — that works
@@ -63,7 +61,7 @@ router.post(
       let reason: TemplateReason | null = null;
       if (!isSuggestedMessageAiEnabled()) reason = "ai_off";
       else if (!(await proStatusFor(userId)).pro) reason = "not_subscribed";
-      else if (!budget.take(userId, id)) reason = "daily_cap";
+      else if (!(await takeDraft(userId, id))) reason = "daily_cap";
 
       const input: SuggestionInput = {
         firstName: contact.first_name,
@@ -82,7 +80,7 @@ router.post(
       };
 
       const t0 = Date.now();
-      // The monthly cap covers every AI feature; DraftBudget above stops one
+      // The monthly cap covers every AI feature; the daily limit above stops one
       // user's Regenerate burst from using it all up in an afternoon.
       const budgeted = reason === null
         ? await withAiBudget(userId, () => suggestMessage(input, true))

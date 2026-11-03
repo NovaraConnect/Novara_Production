@@ -16,6 +16,7 @@ import { analyzeContactForUser } from "../lib/enrich";
 import { logger } from "../lib/logger";
 import { computeNextFollowUp, downgradeMonthsFrom, resolveContactDates, utcDateString } from "../lib/followUpDates";
 import { contactLimitFor, limitReachedBody } from "../lib/entitlements";
+import { DAILY_LIMITS, MAX_CONTACT_PHOTOS, MAX_IMPORT_BATCH, takeDaily, takeRescore } from "../lib/usageLimits";
 
 // Who may add contacts (Free ceiling, or Pro / trial once a subscription is
 // required) is enforced on BOTH create paths (POST /contacts and
@@ -87,6 +88,17 @@ router.put("/contacts/:id/photo", requireAuth, requireSubscription, async (req: 
       res.status(503).json({ error: "Contact photos aren't available yet" });
       return;
     }
+    const { rows: [photoCount] } = await pool.query(
+      "SELECT COUNT(*) AS count FROM contacts WHERE user_id = $1 AND photo IS NOT NULL AND id <> $2",
+      [userId, req.params.id],
+    );
+    if (parseInt(photoCount.count, 10) >= MAX_CONTACT_PHOTOS) {
+      res.status(403).json({
+        error: `You can add photos to up to ${MAX_CONTACT_PHOTOS} contacts.`,
+        code: "PHOTO_LIMIT_REACHED",
+      });
+      return;
+    }
     const { rows } = await pool.query(
       "UPDATE contacts SET photo = $1, updated_at = now() WHERE id = $2 AND user_id = $3 RETURNING *",
       [photo, req.params.id, userId],
@@ -131,7 +143,7 @@ router.delete("/contacts/:id/photo", requireAuth, async (req: Request, res: Resp
 router.post("/contacts/recalculate", requireAuth, requireSubscription, recalculateLimiter, async (req: Request, res: Response) => {
   const userId = (req as AuthedRequest).userId;
   try {
-    const report = await recalculateContactsForUser(userId);
+    const report = await recalculateContactsForUser(userId, { allowAi: await takeRescore(userId) });
     res.json({ ok: true, ...report });
   } catch (err) {
     logger.error({ err }, "recalculate failed");
@@ -225,7 +237,7 @@ router.post("/contacts", requireAuth, async (req: Request, res: Response) => {
     );
     const limit = await contactLimitFor(userId);
     if (parseInt(countRow.count, 10) >= limit) {
-      res.status(403).json(limitReachedBody());
+      res.status(403).json(limitReachedBody(limit));
       return;
     }
 
@@ -634,12 +646,20 @@ router.post("/contacts/import", requireAuth, async (req: Request, res: Response)
   const alreadyStored = parseInt(limitRow.count, 10);
   const limit = await contactLimitFor(userId);
   if (alreadyStored >= limit) {
-    res.status(403).json(limitReachedBody());
+    res.status(403).json(limitReachedBody(limit));
+    return;
+  }
+  // No database error here should block someone from their own contacts.
+  if (!(await takeDaily(userId, "import", DAILY_LIMITS.imports, { onFailure: true }))) {
+    res.status(429).json({
+      error: `You can import up to ${DAILY_LIMITS.imports} times a day. Please try again tomorrow.`,
+      code: "IMPORT_LIMIT_REACHED",
+    });
     return;
   }
   // Partial imports are allowed: take what fits and report the remainder,
   // rather than rejecting a whole batch because its tail overflows.
-  const capacity = limit - alreadyStored;
+  const capacity = Math.min(limit - alreadyStored, MAX_IMPORT_BATCH);
 
   const { rows: [settingsRow] } = await pool.query(
     "SELECT career_goals, career_statement, goal_tags FROM user_settings WHERE user_id = $1",

@@ -1,8 +1,9 @@
 import { Router, type Request, type Response } from "express";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { requireAuth, type AuthedRequest } from "../middlewares/auth";
 import { withAiBudget } from "../lib/aiBudget";
 import { requireSubscription } from "../middlewares/subscription";
+import { takeParse } from "../lib/usageLimits";
 import {
   isCardAiParseEnabled,
   activeCardProvider,
@@ -18,6 +19,7 @@ const cardParseLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req: Request) => (req as AuthedRequest).userId ?? ipKeyGenerator(req.ip ?? "unknown"),
 });
 
 // POST /api/parse-card-text — OCR TEXT ONLY (never the image). Best-effort:
@@ -32,6 +34,11 @@ router.post("/parse-card-text", requireAuth, requireSubscription, cardParseLimit
 
   if (!isCardAiParseEnabled()) {
     res.json({ ok: false, reason: "ai_disabled" });
+    return;
+  }
+
+  if (!(await takeParse((req as AuthedRequest).userId))) {
+    res.json({ ok: false, reason: "daily_cap" });
     return;
   }
 

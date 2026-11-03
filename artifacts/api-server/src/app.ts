@@ -3,7 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import pinoHttp from "pino-http";
-import { clerkMiddleware } from "@clerk/express";
+import { clerkMiddleware, getAuth } from "@clerk/express";
 import { publishableKeyFromHost } from "@clerk/shared/keys";
 import {
   CLERK_PROXY_PATH,
@@ -76,16 +76,15 @@ app.use(
 app.use(express.json({ limit: "300kb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// General rate limit for the whole API surface. This is a first line of
-// defense while the unauthenticated proxy endpoints (news, LinkedIn import)
-// remain the most exposed to abuse.
+// First line of defense, per IP address. High enough for a campus sharing one
+// address: the per-account limit further down is what holds signed-in users.
 //
 // The RevenueCat webhook is exempt: RevenueCat delivers subscription events in
 // bursts, and a 429 would only make it retry. It authenticates itself with a
 // shared secret instead (routes/revenuecat.ts).
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 300,
+  limit: 3000,
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => req.path === "/webhooks/revenuecat",
@@ -98,6 +97,28 @@ app.use(
     authorizedParties: FRONTEND_ORIGINS,
   }),
   );
+
+function signedInUser(req: Request): string | null {
+  try {
+    return getAuth(req)?.userId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Per account, once Clerk has identified the caller. In memory, so each API
+// instance counts separately; a database write on every request would cost more
+// than the abuse it stops. The expensive actions are counted in Postgres instead.
+const accountLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: () => Number(process.env.ACCOUNT_REQUESTS_PER_MINUTE) || 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => !signedInUser(req),
+  keyGenerator: (req) => signedInUser(req) as string,
+  message: { error: "Too many requests. Please slow down.", code: "ACCOUNT_RATE_LIMIT" },
+});
+app.use("/api", accountLimiter);
 
 app.use("/api", router);
 

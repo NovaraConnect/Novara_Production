@@ -3,7 +3,8 @@ import { pool } from "../db";
 import { requireAuth, type AuthedRequest } from "../middlewares/auth";
 import type { Request, Response } from "express";
 import { logger } from "../lib/logger";
-import { RecalcAiBudget, recalculateContactsForUser } from "../lib/recalculate";
+import { recalculateContactsForUser } from "../lib/recalculate";
+import { takeRescore } from "../lib/usageLimits";
 import { isSubscriptionRequired, proStatusFor } from "../lib/entitlements";
 
 const router = Router();
@@ -23,12 +24,10 @@ function careerProfileKey(row: CareerProfileRow): string {
   return JSON.stringify([row?.career_statement ?? "", row?.goal_tags ?? [], row?.career_goals ?? []]);
 }
 
-const recalcAiBudget = new RecalcAiBudget();
-
 /**
  * Saving settings stays open to lapsed users, so AI needs its own check here:
  * only an active subscription or trial (once one is required), within the
- * hourly budget. Otherwise contacts get the deterministic score.
+ * daily limit. Otherwise contacts get the deterministic score.
  */
 async function mayRescoreWithAi(userId: string): Promise<boolean> {
   if (isSubscriptionRequired()) {
@@ -39,7 +38,7 @@ async function mayRescoreWithAi(userId: string): Promise<boolean> {
       return false;
     }
   }
-  return recalcAiBudget.take(userId);
+  return takeRescore(userId);
 }
 
 // GET /api/settings
