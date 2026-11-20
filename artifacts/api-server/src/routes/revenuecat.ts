@@ -332,6 +332,23 @@ router.post(REVENUECAT_WEBHOOK_PATH, async (req: Request, res: Response) => {
   try {
     const outcome = await applyEvent(event as RevenueCatEvent);
     logger.info({ eventType: event.type, outcome }, "RevenueCat event processed");
+    if (outcome === "ignored") {
+      // The fields that decide whether an event grants anything, so an ignored
+      // grant can be explained from the logs alone.
+      logger.info(
+        {
+          eventType: event.type,
+          appUserId: event.app_user_id,
+          entitlementIds: event.entitlement_ids ?? null,
+          expirationAtMs: event.expiration_at_ms ?? null,
+          eventTimestampMs: event.event_timestamp_ms,
+          store: event.store ?? null,
+          productId: event.product_id ?? null,
+          periodType: event.period_type ?? null,
+        },
+        "RevenueCat event ignored",
+      );
+    }
     res.status(200).json({ outcome });
   } catch (err) {
     // 500 makes RevenueCat retry, which is what we want for a transient failure.
