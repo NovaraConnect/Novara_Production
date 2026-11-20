@@ -84,6 +84,7 @@ const GRANTING = new Set([
   "SUBSCRIPTION_EXTENDED", // Apple pushed the expiry back
   "REFUND_REVERSED",
   "TEMPORARY_ENTITLEMENT_GRANT", // short grant during an App Store outage
+  "NON_RENEWING_PURCHASE", // also what a Grant from the RevenueCat dashboard sends (store PROMOTIONAL)
 ]);
 
 /** cancel_reason RevenueCat sends with CANCELLATION when Apple refunded the period. */

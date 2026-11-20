@@ -145,6 +145,25 @@ describe("RevenueCat webhook", () => {
     expect(res.body.outcome).toBe("ignored");
   });
 
+  it("a Grant from the RevenueCat dashboard (NON_RENEWING_PURCHASE) gives Pro until its end date", async () => {
+    const until = Date.now() + 200 * 365 * DAY;
+    const res = await deliver(
+      makeEvent({
+        type: "NON_RENEWING_PURCHASE",
+        store: "PROMOTIONAL",
+        period_type: "PROMOTIONAL",
+        product_id: "rc_promo_novara_pro_lifetime",
+        expiration_at_ms: until,
+      }),
+    );
+    expect(res.body.outcome).toBe("applied");
+    const me = await request(app).get("/api/entitlements/me").set(authHeaders(USER));
+    expect(me.body.pro).toBe(true);
+    expect(me.body.state).toBe("active");
+    expect(new Date(me.body.expiresAt).getTime()).toBe(until);
+    expect(me.body.willRenew).toBeNull();
+  });
+
   it("import is unlimited for Pro", async () => {
     await deliver(makeEvent());
     const res = await request(app).post("/api/contacts/import").set(authHeaders(USER))
@@ -357,5 +376,7 @@ describe("pure helpers", () => {
     expect(entitlementChangeFor({ ...base, type: "CANCELLATION" } as never)?.willRenew).toBe(false);
     expect(entitlementChangeFor({ ...base, type: "EXPIRATION" } as never)?.willRenew).toBe(false);
     expect(entitlementChangeFor({ ...base, type: "BILLING_ISSUE" } as never)?.willRenew).toBeNull();
+    expect(entitlementChangeFor({ ...base, type: "NON_RENEWING_PURCHASE" } as never)?.active).toBe(true);
+    expect(entitlementChangeFor({ ...base, type: "NON_RENEWING_PURCHASE" } as never)?.willRenew).toBeNull();
   });
 });
