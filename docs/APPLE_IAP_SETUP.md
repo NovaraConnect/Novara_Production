@@ -139,6 +139,11 @@ this repository, in Info.plist, or in the app.
 Order matters. The API reads the `entitlements` table on every contact
 creation, so the migration must exist before the API that uses it is deployed.
 
+The same applies to Google Play: apply `0012_entitlements_google_play.sql` before
+deploying the API that writes `google_play` rows. App Store purchases keep
+`apple_iap` and are unaffected if the order slips; a Play webhook would fail and
+RevenueCat would retry it until the migration exists.
+
 1. **Apply migrations `0004_apple_iap_entitlements.sql`, `0007_entitlements_period_type.sql` and `0009_entitlements_will_renew.sql` to production** (hand-applied, each in a transaction, in that order). The down files reverse them (0007 first). Verified on an empty database: both apply, re-apply, and reverse cleanly. `feat/visual-refresh`'s 0005 and 0006 touch other tables and can go before or after.
 2. **Deploy the API** with `REVENUECAT_WEBHOOK_AUTH` set and both `IAP_PAYWALL_ENABLED` and `IAP_SUBSCRIPTION_REQUIRED` **unset**. Free users are unchanged (6 contacts).
 3. **Configure the RevenueCat webhook** (section 4, step 7) and send the test event.

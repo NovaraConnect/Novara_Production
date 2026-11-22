@@ -37,12 +37,16 @@ const router: IRouter = Router();
  */
 const USER_TABLES = [
   "contacts",
+  "account_usage_daily",
+  "network_health_snapshots",
   "push_subscriptions",
   "apns_tokens",
+  "fcm_tokens",
   "feedback",
   "user_settings",
   "entitlements",
   "revenuecat_events",
+  "ai_usage_monthly",
 ] as const;
 
 /** Tables whose per-user column is not `user_id`. */
@@ -53,7 +57,8 @@ const USER_COLUMN: Record<string, string> = {
 /**
  * Narrows the list to the tables this deployment actually has.
  *
- * `apns_tokens` is created by migration 0002 and can legitimately be absent —
+ * `apns_tokens` and `fcm_tokens` are created by migrations 0002 and 0013 and can
+ * legitimately be absent —
  * the notifications routes already guard against that. Checking first matters
  * because in Postgres a failed statement aborts the whole transaction, so
  * "try the delete and catch the error" would silently take the other tables'

@@ -12,7 +12,6 @@ import {
   daysUntilBirthday,
   isFirstReachOut,
   usesProfileDetail,
-  DraftBudget,
   MAX_MESSAGE_LENGTH,
   type SuggestionInput,
 } from "../../src/lib/suggestedMessage";
@@ -307,20 +306,6 @@ describe("suggestMessageWith — AI or fallback", () => {
   it("tolerates code fences around the JSON", async () => {
     const r = await suggestMessageWith(BASE, async () => "```json\n" + GOOD + "\n```", TODAY);
     expect(r.source).toBe("ai");
-  });
-});
-
-describe("DraftBudget — daily cost cap", () => {
-  it("caps AI drafts per contact and per user, and resets the next day", () => {
-    const b = new DraftBudget(2, 3);
-    const day1 = new Date("2026-10-29T10:00:00Z");
-    expect(b.take("u1", "c1", day1)).toBe(true);
-    expect(b.take("u1", "c1", day1)).toBe(true);
-    expect(b.take("u1", "c1", day1)).toBe(false); // contact cap
-    expect(b.take("u1", "c2", day1)).toBe(true);
-    expect(b.take("u1", "c3", day1)).toBe(false); // user cap
-    expect(b.take("u2", "c1", day1)).toBe(true); // other users unaffected
-    expect(b.take("u1", "c1", new Date("2026-10-30T00:01:00Z"))).toBe(true);
   });
 });
 

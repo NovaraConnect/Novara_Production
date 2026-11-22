@@ -3,10 +3,22 @@ import { pool } from "../db";
 import { requireAuth, type AuthedRequest } from "../middlewares/auth";
 import { sendPush, VAPID_PUBLIC_KEY, type StoredSubscription } from "../lib/push";
 import { sendApns, isApnsConfigured, isApnsEnvironment, type ApnsEnvironment } from "../lib/apns";
+import { sendFcm, isFcmConfigured } from "../lib/fcm";
 import { chooseTransports } from "../lib/pushRouting";
 import type { Request, Response } from "express";
 
 const router = Router();
+
+/** How many Android tokens the user has. Zero, without touching fcm_tokens, when
+ *  FCM is unconfigured: migration 0013 may not have created the table. */
+async function fcmTokenCount(userId: string): Promise<number> {
+  if (!isFcmConfigured()) return 0;
+  const { rows } = await pool.query<{ n: string }>(
+    "SELECT COUNT(*) AS n FROM fcm_tokens WHERE user_id = $1",
+    [userId],
+  );
+  return Number(rows[0]?.n ?? 0);
+}
 
 // GET /api/notifications/vapid-public-key — no auth, needed before permission prompt
 router.get("/notifications/vapid-public-key", (_req: Request, res: Response) => {
@@ -265,7 +277,87 @@ router.delete("/notifications/apns-token", requireAuth, async (req: Request, res
          (SELECT COUNT(*) FROM apns_tokens        WHERE user_id = $1) AS apns`,
       [userId],
     );
-    if (Number(counts.web) === 0 && Number(counts.apns) === 0) {
+    if (Number(counts.web) === 0 && Number(counts.apns) === 0 && (await fcmTokenCount(userId)) === 0) {
+      await pool.query(
+        "UPDATE user_settings SET push_enabled = FALSE, updated_at = NOW() WHERE user_id = $1",
+        [userId],
+      );
+    }
+
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Failed to remove device token" });
+  }
+});
+
+// POST /api/notifications/fcm-token — native Android app registers its device token
+router.post("/notifications/fcm-token", requireAuth, async (req: Request, res: Response) => {
+  const userId = (req as AuthedRequest).userId;
+  const { token } = req.body as { token?: string };
+
+  if (!isFcmConfigured()) {
+    // Also keeps us off fcm_tokens, which migration 0013 may not have created.
+    res.status(503).json({ error: "Native push notifications are not configured" });
+    return;
+  }
+
+  if (!token || typeof token !== "string") {
+    res.status(400).json({ error: "Missing device token" });
+    return;
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO fcm_tokens (user_id, device_token)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id, device_token) DO NOTHING`,
+      [userId, token],
+    );
+
+    await pool.query(
+      `INSERT INTO user_settings (user_id, push_enabled)
+       VALUES ($1, TRUE)
+       ON CONFLICT (user_id) DO UPDATE SET push_enabled = TRUE, updated_at = NOW()`,
+      [userId],
+    );
+
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Failed to save device token" });
+  }
+});
+
+// DELETE /api/notifications/fcm-token
+router.delete("/notifications/fcm-token", requireAuth, async (req: Request, res: Response) => {
+  const userId = (req as AuthedRequest).userId;
+  const { token } = req.body as { token?: string };
+
+  if (!isFcmConfigured()) {
+    // Nothing can have been registered, so this is a no-op success.
+    res.json({ ok: true });
+    return;
+  }
+
+  try {
+    if (token) {
+      await pool.query(
+        "DELETE FROM fcm_tokens WHERE user_id = $1 AND device_token = $2",
+        [userId, token],
+      );
+    } else {
+      await pool.query("DELETE FROM fcm_tokens WHERE user_id = $1", [userId]);
+    }
+
+    // Only clear the global flag if the user has no remaining device at all.
+    const { rows: webRows } = await pool.query<{ n: string }>(
+      "SELECT COUNT(*) AS n FROM push_subscriptions WHERE user_id = $1",
+      [userId],
+    );
+    const { rows: apnsRows } = isApnsConfigured()
+      ? await pool.query<{ n: string }>("SELECT COUNT(*) AS n FROM apns_tokens WHERE user_id = $1", [userId])
+      : { rows: [] as { n: string }[] };
+    const others = Number(webRows[0]?.n ?? 0) + Number(apnsRows[0]?.n ?? 0);
+    if (others === 0 && (await fcmTokenCount(userId)) === 0) {
       await pool.query(
         "UPDATE user_settings SET push_enabled = FALSE, updated_at = NOW() WHERE user_id = $1",
         [userId],
@@ -303,11 +395,20 @@ router.post("/notifications/test", requireAuth, async (req: Request, res: Respon
           )
         ).rows
       : [];
+    const fcmTokens = isFcmConfigured()
+      ? (
+          await pool.query<{ device_token: string }>(
+            "SELECT device_token FROM fcm_tokens WHERE user_id = $1",
+            [userId],
+          )
+        ).rows
+      : [];
 
-    // Prefer native so a user with both the PWA and the iOS app installed is
+    // Prefer native so a user with both the PWA and a store app installed is
     // not notified twice. See lib/pushRouting.ts.
     const transports = chooseTransports({
       apnsTokenCount: apnsTokens.length,
+      fcmTokenCount: fcmTokens.length,
       webSubscriptionCount: webSubs.length,
     });
 
@@ -326,6 +427,18 @@ router.post("/notifications/test", requireAuth, async (req: Request, res: Respon
         else {
           await pool
             .query("DELETE FROM apns_tokens WHERE device_token = $1", [row.device_token])
+            .catch(() => {});
+        }
+      }
+    }
+
+    if (transports.includes("fcm")) {
+      for (const row of fcmTokens) {
+        const result = await sendFcm(row.device_token, payload);
+        if (result === "ok") sent++;
+        else {
+          await pool
+            .query("DELETE FROM fcm_tokens WHERE device_token = $1", [row.device_token])
             .catch(() => {});
         }
       }

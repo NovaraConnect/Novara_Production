@@ -18,6 +18,8 @@
 // ============================================================================
 
 import { normalizePriority, type PriorityLevel } from "./priority";
+import { reportAnthropicUsage, reportGeminiUsage, type GeminiUsageMetadata } from "./aiUsage";
+import { withAiBudget } from "./aiBudget";
 
 const SYSTEM_PROMPT =
   "You are the matching engine for a professional networking CRM. Given a " +
@@ -106,6 +108,22 @@ function hasGoalSignal(goals: UserGoals): boolean {
  * signal, or the provider call fails/times out — callers then fall back to the
  * deterministic matcher. Never throws.
  */
+/** analyzeContactWithAI within the user's monthly AI budget. null past the cap,
+ *  which callers already treat as "use the deterministic score". Checks first
+ *  whether a call would happen at all, so a skipped one reserves nothing. */
+export async function analyzeContactForUser(
+  userId: string,
+  goals: UserGoals,
+  contact: AnalyzedContact,
+  onError?: (message: string) => void,
+): Promise<ContactAnalysis | null> {
+  if (!isAiEnrichEnabled() || !hasGoalSignal(goals) || !String(contact.company ?? "").trim()) {
+    return null;
+  }
+  const budgeted = await withAiBudget(userId, () => analyzeContactWithAI(goals, contact, onError));
+  return budgeted.allowed ? budgeted.value : null;
+}
+
 export async function analyzeContactWithAI(
   goals: UserGoals,
   contact: AnalyzedContact,
@@ -193,7 +211,9 @@ async function completeViaGemini(userText: string): Promise<string | null> {
   }
   const data = (await res.json()) as {
     candidates?: { content?: { parts?: { text?: string }[] } }[];
+    usageMetadata?: GeminiUsageMetadata;
   };
+  reportGeminiUsage(model, data.usageMetadata);
   return data.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
 }
 
@@ -223,6 +243,7 @@ async function completeViaAnthropic(userText: string): Promise<string | null> {
     },
     messages: [{ role: "user", content: userText }],
   });
+  reportAnthropicUsage(ANTHROPIC_MODEL, message.usage);
   for (const block of message.content) {
     if (block.type === "text") return block.text;
   }

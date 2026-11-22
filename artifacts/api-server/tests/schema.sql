@@ -41,6 +41,8 @@ created_at timestamptz NOT NULL DEFAULT now(),
 updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE INDEX IF NOT EXISTS contacts_user_id_idx ON contacts (user_id);
+
 CREATE TABLE IF NOT EXISTS user_settings (
 user_id text PRIMARY KEY,
 auto_downgrade_after_months integer NULL DEFAULT NULL,
@@ -64,6 +66,15 @@ id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 user_id text NOT NULL,
 device_token text NOT NULL,
 environment text NOT NULL DEFAULT 'production',
+created_at timestamptz NOT NULL DEFAULT now(),
+UNIQUE (user_id, device_token)
+);
+
+-- Mirrors migrations/0013_fcm_tokens.sql.
+CREATE TABLE IF NOT EXISTS fcm_tokens (
+id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+user_id text NOT NULL,
+device_token text NOT NULL,
 created_at timestamptz NOT NULL DEFAULT now(),
 UNIQUE (user_id, device_token)
 );
@@ -107,7 +118,7 @@ PRIMARY KEY (user_id, snapshot_date)
 CREATE TABLE IF NOT EXISTS entitlements (
 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 user_id text NOT NULL,
-source text NOT NULL CHECK (source IN ('apple_iap', 'university', 'stripe')),
+source text NOT NULL CHECK (source IN ('apple_iap', 'google_play', 'university', 'stripe')),
 provider_ref text NULL,
 product_id text NULL,
 status text NOT NULL CHECK (status IN ('active', 'inactive')),
@@ -122,7 +133,34 @@ updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS entitlements_apple_one_row
 ON entitlements (user_id) WHERE source = 'apple_iap';
+-- From migrations/0012_entitlements_google_play.sql.
+CREATE UNIQUE INDEX IF NOT EXISTS entitlements_google_play_one_row
+ON entitlements (user_id) WHERE source = 'google_play';
 CREATE INDEX IF NOT EXISTS entitlements_user_idx ON entitlements (user_id);
+
+CREATE TABLE IF NOT EXISTS ai_usage_monthly (
+user_id text NOT NULL,
+month date NOT NULL,
+spent_micros bigint NOT NULL DEFAULT 0,
+calls integer NOT NULL DEFAULT 0,
+updated_at timestamptz NOT NULL DEFAULT now(),
+PRIMARY KEY (user_id, month)
+);
+
+CREATE TABLE IF NOT EXISTS ai_usage_total_monthly (
+month date PRIMARY KEY,
+spent_micros bigint NOT NULL DEFAULT 0,
+calls integer NOT NULL DEFAULT 0,
+updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS account_usage_daily (
+user_id text NOT NULL,
+day date NOT NULL,
+bucket text NOT NULL,
+count integer NOT NULL DEFAULT 0,
+PRIMARY KEY (user_id, day, bucket)
+);
 
 CREATE TABLE IF NOT EXISTS revenuecat_events (
 event_id text PRIMARY KEY,

@@ -23,11 +23,12 @@
 // its localStorage cache continue to work untouched.
 // ============================================================================
 import { Router } from "express";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, type AuthedRequest } from "../middlewares/auth";
 import { requireSubscription } from "../middlewares/subscription";
 import { selectHeadlines, type NewsHeadline } from "../lib/newsRanking";
 import { companyCacheKey, displayCompanyName } from "../lib/news/companyKey";
 import { getCompanyArticles } from "../lib/news/cache";
+import { DAILY_LIMITS, takeDaily } from "../lib/usageLimits";
 
 const router = Router();
 
@@ -60,7 +61,10 @@ router.get("/company-news", requireAuth, requireSubscription, async (req, res) =
     return;
   }
 
-  const outcome = await getCompanyArticles(key, company);
+  const userId = (req as AuthedRequest).userId;
+  const outcome = await getCompanyArticles(key, company, () =>
+    takeDaily(userId, "news", DAILY_LIMITS.newsFetches),
+  );
 
   if (outcome.kind === "empty") {
     res.json({
@@ -72,6 +76,8 @@ router.get("/company-news", requireAuth, requireSubscription, async (req, res) =
       detail:
         outcome.reason === "config_missing"
           ? "Company news is not configured."
+          : outcome.reason === "daily_cap"
+            ? "You've reached today's limit for new company news."
           : outcome.reason === "timeout"
             ? "The news provider timed out."
             : "The news provider could not be reached.",

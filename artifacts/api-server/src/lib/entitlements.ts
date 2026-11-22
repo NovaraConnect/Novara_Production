@@ -30,6 +30,9 @@ import { logger } from "./logger";
 /** Free ceiling used while a subscription is not yet required. Pro removes it. */
 export const FREE_TIER_LIMIT = 6;
 
+/** The most contacts any account may hold, Pro included. */
+export const MAX_CONTACTS_PER_ACCOUNT = 500;
+
 /** RevenueCat entitlement identifier that grants Novara Pro. */
 export const NOVARA_PRO_ENTITLEMENT = "novara_pro";
 
@@ -44,11 +47,14 @@ export type SubscriptionState = "trial" | "active" | "expired" | "none";
 
 export type BillingPeriod = "monthly" | "annual";
 
+/** The store a subscription was bought through. */
+export type StoreSource = "apple_iap" | "google_play";
+
 export interface ProStatus {
   /** True during a trial or a paid period. This is what unlocks adding contacts. */
   pro: boolean;
   /** Where the access comes from. Null when not Pro. */
-  source: "apple_iap" | null;
+  source: StoreSource | null;
   /** ISO timestamp of the current period end (the trial end during a trial), or null when not Pro. */
   expiresAt: string | null;
   state: SubscriptionState;
@@ -88,17 +94,24 @@ export function isSubscriptionRequired(): boolean {
   return isPaywallEnabled() && flagOn(process.env["IAP_SUBSCRIPTION_REQUIRED"]);
 }
 
-/** Monthly or annual, from the App Store product ID (…pro.monthly / …pro.annual). */
+/**
+ * Monthly or annual, from the store's product ID. The App Store's end in the
+ * plan (…pro.monthly / …pro.annual). Google Play's, as RevenueCat reports them,
+ * are the subscription and its base plan joined by a colon (…pro:monthly /
+ * …pro:annual): the Android app sells the same two plans through the same
+ * RevenueCat project and novara_pro entitlement.
+ */
 export function billingPeriodFor(productId: string | null): BillingPeriod | null {
   if (!productId) return null;
-  if (productId.endsWith(".annual")) return "annual";
-  if (productId.endsWith(".monthly")) return "monthly";
+  if (productId.endsWith(".annual") || productId.endsWith(":annual")) return "annual";
+  if (productId.endsWith(".monthly") || productId.endsWith(":monthly")) return "monthly";
   return null;
 }
 
 /** The user's Novara Pro status right now. */
 export async function proStatusFor(userId: string): Promise<ProStatus> {
   let rows: {
+    source: StoreSource;
     status: string;
     expires_at: Date | null;
     product_id: string | null;
@@ -107,10 +120,13 @@ export async function proStatusFor(userId: string): Promise<ProStatus> {
   }[];
   try {
     ({ rows } = await pool.query(
-      `SELECT status, expires_at, product_id, period_type, will_renew
+      // Someone subscribed through both stores has two rows: the one that
+      // currently grants access wins, then the one that expires last.
+      `SELECT source, status, expires_at, product_id, period_type, will_renew
          FROM entitlements
         WHERE user_id = $1
-          AND source = 'apple_iap'
+          AND source IN ('apple_iap', 'google_play')
+        ORDER BY (status = 'active' AND expires_at > now()) DESC, expires_at DESC NULLS LAST
         LIMIT 1`,
       [userId],
     ));
@@ -136,7 +152,7 @@ export async function proStatusFor(userId: string): Promise<ProStatus> {
   }
   return {
     pro: true,
-    source: "apple_iap",
+    source: row.source,
     expiresAt: expiresAt.toISOString(),
     state: row.period_type === "TRIAL" ? "trial" : "active",
     billingPeriod,
@@ -145,28 +161,35 @@ export async function proStatusFor(userId: string): Promise<ProStatus> {
 }
 
 /**
- * The most contacts this user may hold. Infinity for Pro (trial included).
+ * The most contacts this user may hold. The account ceiling for Pro (trial included).
  * Otherwise zero while a subscription is required, or the Free ceiling before
  * that. Callers compare counts against this; they must not hard-code a number.
  */
 export async function contactLimitFor(userId: string): Promise<number> {
   const status = await proStatusFor(userId);
-  if (status.pro) return Infinity;
+  if (status.pro) return MAX_CONTACTS_PER_ACCOUNT;
   return isSubscriptionRequired() ? 0 : FREE_TIER_LIMIT;
 }
 
 /** The 403 body for an add or import refused by contactLimitFor(). */
-export function limitReachedBody(): { error: string; message: string; code: string } {
+export function limitReachedBody(limit?: number): { error: string; message: string; code: string } {
+  if (limit === MAX_CONTACTS_PER_ACCOUNT) {
+    return {
+      error: "Contact limit reached",
+      message: `Novara holds up to ${MAX_CONTACTS_PER_ACCOUNT} contacts per account.`,
+      code: "ACCOUNT_CONTACT_LIMIT",
+    };
+  }
   if (isSubscriptionRequired()) {
     return {
       error: "Subscription required",
-      message: "Novara needs an active subscription. Start the 7-day free trial in the Novara iPhone app. Your existing contacts are kept.",
+      message: "Novara needs an active subscription. Start the 7-day free trial in the Novara app. Your existing contacts are kept.",
       code: "SUBSCRIPTION_REQUIRED",
     };
   }
   return {
     error: "Contact limit reached",
-    message: `Novara Free includes up to ${FREE_TIER_LIMIT} contacts. Novara Pro removes the limit.`,
+    message: `Novara Free includes up to ${FREE_TIER_LIMIT} contacts. Novara Pro raises the limit.`,
     code: "CONTACT_LIMIT_REACHED",
   };
 }

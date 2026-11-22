@@ -24,9 +24,9 @@
 // deterministic template built from the same fields.
 //
 // COST: one call per draft on the cheapest models already in use (Claude
-// Haiku / Gemini Flash), roughly a fifth of a cent each. DraftBudget caps AI
-// drafts per contact and per user per day; past a cap the template is served,
-// so a user never sees an error and spend stays bounded.
+// Haiku / Gemini Flash), roughly a fifth of a cent each. lib/usageLimits.ts
+// caps AI drafts per contact and per account per day; past a cap the template is
+// served, so a user never sees an error and spend stays bounded.
 //
 // PRIVACY: the prompt carries the contact's FIRST name only (never last name,
 // email, or phone), but it does carry the user's notes about them. This module
@@ -45,6 +45,7 @@
 //   GEMINI_MODEL, SUGGESTED_MESSAGE_ANTHROPIC_MODEL  optional model overrides
 // ============================================================================
 import { extractJson } from "./cardAiParse";
+import { reportAnthropicUsage, reportGeminiUsage, type GeminiUsageMetadata } from "./aiUsage";
 
 export type MessageProvider = "anthropic" | "gemini";
 
@@ -110,38 +111,6 @@ export function activeMessageProvider(): MessageProvider | null {
 
 export function isSuggestedMessageAiEnabled(): boolean {
   return !flagOff(process.env["SUGGESTED_MESSAGE_AI"]) && activeMessageProvider() !== null;
-}
-
-// ── daily cost cap ───────────────────────────────────────────────────────────
-
-/**
- * Per-day AI draft allowance, per contact and per user. In memory: it resets
- * on a deploy or restart, which is fine for a cost ceiling (it can only ever
- * allow one extra day's worth). Exported for tests.
- */
-export class DraftBudget {
-  private day = "";
-  private perUser = new Map<string, number>();
-  private perContact = new Map<string, number>();
-
-  constructor(readonly maxPerContact = 5, readonly maxPerUser = 40) {}
-
-  /** Uses one AI draft if both allowances have room. */
-  take(userId: string, contactId: string, now: Date = new Date()): boolean {
-    const today = now.toISOString().slice(0, 10);
-    if (today !== this.day) {
-      this.day = today;
-      this.perUser.clear();
-      this.perContact.clear();
-    }
-    const contactKey = `${userId}:${contactId}`;
-    const u = this.perUser.get(userId) ?? 0;
-    const c = this.perContact.get(contactKey) ?? 0;
-    if (u >= this.maxPerUser || c >= this.maxPerContact) return false;
-    this.perUser.set(userId, u + 1);
-    this.perContact.set(contactKey, c + 1);
-    return true;
-  }
 }
 
 // ── shared field helpers ─────────────────────────────────────────────────────
@@ -458,7 +427,9 @@ async function completeGemini(system: string, user: string, signal: AbortSignal)
   if (!res.ok) return null;
   const data = (await res.json()) as {
     candidates?: { content?: { parts?: { text?: string }[] } }[];
+    usageMetadata?: GeminiUsageMetadata;
   };
+  reportGeminiUsage(model, data.usageMetadata);
   const parts = data.candidates?.[0]?.content?.parts ?? [];
   const text = parts.map((p) => p.text ?? "").join("");
   return text || null;
@@ -474,6 +445,7 @@ async function completeAnthropic(system: string, user: string, signal: AbortSign
     { model, max_tokens: 300, temperature: 0.7, system, messages: [{ role: "user", content: user }] },
     { signal },
   );
+  reportAnthropicUsage(model, msg.usage);
   let text = "";
   for (const block of msg.content) if (block.type === "text") text += block.text;
   return text || null;
@@ -528,7 +500,7 @@ export async function suggestMessage(
 }
 
 /** Why a draft came from the template, for the log. */
-export type TemplateReason = "ai_off" | "not_subscribed" | "daily_cap" | "ai_failed";
+export type TemplateReason = "ai_off" | "not_subscribed" | "daily_cap" | "monthly_cap" | "ai_failed";
 
 /** Log payload — METADATA ONLY. Never the prompt, notes, subject, or message. */
 export function suggestedMessageLogFields(

@@ -2,6 +2,7 @@ import cron from "node-cron";
 import { pool } from "../db";
 import { sendPush, type StoredSubscription } from "./push";
 import { sendApns, isApnsConfigured, isApnsEnvironment } from "./apns";
+import { sendFcm, isFcmConfigured } from "./fcm";
 import { chooseTransports } from "./pushRouting";
 import { logger } from "./logger";
 
@@ -62,11 +63,21 @@ async function runDailyNotifications(): Promise<void> {
             )
           ).rows
         : [];
+      // Same guard as apns_tokens: migration 0013 may not have run without the key.
+      const fcmRows = isFcmConfigured()
+        ? (
+            await pool.query<{ device_token: string }>(
+              "SELECT device_token FROM fcm_tokens WHERE user_id = $1",
+              [user.user_id],
+            )
+          ).rows
+        : [];
 
-      // Prefer native when the user has the iOS app, so someone running both
-      // the PWA and the App Store build is not notified twice.
+      // Prefer native when the user has the iOS or Android app, so someone
+      // running both the PWA and the store build is not notified twice.
       const transports = chooseTransports({
         apnsTokenCount: apnsRows.length,
+        fcmTokenCount: fcmRows.length,
         webSubscriptionCount: subs.length,
       });
       if (transports.length === 0) continue;
@@ -183,6 +194,17 @@ async function runDailyNotifications(): Promise<void> {
           }
         }
 
+        if (transports.includes("fcm")) {
+          for (const row of fcmRows) {
+            const result = await sendFcm(row.device_token, notif);
+            if (result === "gone") {
+              await pool
+                .query("DELETE FROM fcm_tokens WHERE device_token = $1", [row.device_token])
+                .catch(() => {});
+            }
+          }
+        }
+
         if (transports.includes("web")) {
           for (const sub of subs) {
             const result = await sendPush(sub, notif);
@@ -206,13 +228,13 @@ async function runDailyNotifications(): Promise<void> {
 
 export function startScheduler(): void {
   const webConfigured = Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
-  const nativeConfigured = isApnsConfigured();
+  const nativeConfigured = isApnsConfigured() || isFcmConfigured();
 
   // Previously this required VAPID specifically. With a second transport the
   // gate is "at least one way to reach anyone" — otherwise an APNs-only
   // deployment would start up with the scheduler silently disabled.
   if (!webConfigured && !nativeConfigured) {
-    logger.warn("Neither VAPID nor APNs configured — notification scheduler disabled");
+    logger.warn("None of VAPID, APNs or FCM configured — notification scheduler disabled");
     return;
   }
   cron.schedule("0 9 * * *", runDailyNotifications, { timezone: "UTC" });
