@@ -345,6 +345,11 @@ export default function PrivacyPolicy() {
             tokens and feedback — and then deletes your authentication account.
             The application data is removed in a single transaction, so it goes
             together or not at all. Deletion is immediate and cannot be undone.
+            Step-by-step instructions are on the{" "}
+            <Link href="/delete-account" className="text-primary font-medium hover:underline">
+              account deletion page
+            </Link>
+            .
           </p>
           <p>
             Providers listed above may retain data for a limited period under

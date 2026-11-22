@@ -30,6 +30,7 @@ import AudiencePage from "@/pages/AudiencePage";
 import NotFound from "@/pages/not-found";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import Support from "@/pages/Support";
+import DeleteAccount from "@/pages/DeleteAccount";
 import Welcome from "@/pages/Welcome";
 import SignInPage from "@/pages/SignIn";
 import SignUpPage from "@/pages/SignUp";
@@ -274,6 +275,8 @@ function Router() {
           it without an account. Do not wrap it in ProtectedRoute. */}
       <Route path="/privacy" component={PrivacyPolicy} />
       <Route path="/support" component={Support} />
+      {/* Public for the same reason: Google Play links here for account deletion. */}
+      <Route path="/delete-account" component={DeleteAccount} />
       <Route path="/notifications" component={() => <ProtectedRoute component={Notifications} />} />
       <Route path="/feedback" component={() => <ProtectedRoute component={Feedback} />} />
       {/* The old no-account demo is retired: using Novara means downloading it.
