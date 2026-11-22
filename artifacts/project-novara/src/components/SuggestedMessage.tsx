@@ -1,14 +1,19 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/react";
-import { ChevronDown, Copy, Linkedin, Loader2, Mail, MessageSquare, PenLine, RefreshCw, Send } from "lucide-react";
+import { ChevronDown, Copy, Flag, Linkedin, Loader2, Mail, MessageSquare, PenLine, RefreshCw, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { fetchSuggestedMessage, MAX_MESSAGE_LENGTH } from "@/lib/api";
+import { fetchSuggestedMessage, MAX_MESSAGE_LENGTH, submitFeedback } from "@/lib/api";
+import { draftReport } from "@/lib/draftReport";
 import {
   availableMethods, draftHref, openContactMethod, usablePreferred, type ContactMethod,
 } from "@/lib/contactActions";
@@ -67,6 +72,10 @@ export function SuggestedMessage({
   const [subject, setSubject] = useState("");
   const [source, setSource] = useState<"ai" | "template" | null>(null);
   const [loading, setLoading] = useState(false);
+  // The text exactly as the AI wrote it, which is what a report sends.
+  const [aiDraft, setAiDraft] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const requestId = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -86,6 +95,7 @@ export function SuggestedMessage({
       const result = await fetchSuggestedMessage(getToken, contact.id, { headline });
       if (id !== requestId.current) return;
       setDraft(result.message.slice(0, MAX_MESSAGE_LENGTH));
+      setAiDraft(result.source === "ai" ? result.message : "");
       setSubject(result.subject);
       setSource(result.source);
     } catch (err) {
@@ -98,6 +108,19 @@ export function SuggestedMessage({
   const handleCopy = async () => {
     if (await copyText(draft)) toast.success("Message copied");
     else toast.error("Couldn't copy — select the text and copy it instead.");
+  };
+
+  const handleReport = async () => {
+    setReporting(true);
+    try {
+      await submitFeedback(getToken, draftReport(aiDraft, window.location.pathname));
+      setReportOpen(false);
+      toast.success("Thanks — we'll review this suggestion.");
+    } catch {
+      toast.error("Couldn't send the report. Please try again.");
+    } finally {
+      setReporting(false);
+    }
   };
 
   const handleSend = async (method: ContactMethod) => {
@@ -170,7 +193,23 @@ export function SuggestedMessage({
             )}
           </div>
           <div className="flex items-start justify-between gap-3 mt-2 text-[10px] text-muted-foreground">
-            <p>{source === "ai" ? "AI draft from your notes · check it before sending" : "Draft from this contact's details · edit to make it yours"}</p>
+            <p>
+              {source === "ai" ? "AI draft from your notes · check it before sending" : "Draft from this contact's details · edit to make it yours"}
+              {source === "ai" && aiDraft && (
+                <>
+                  {" · "}
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-0.5 underline underline-offset-2 hover:text-foreground"
+                    onClick={() => setReportOpen(true)}
+                    disabled={loading}
+                    data-testid="button-report-draft"
+                  >
+                    <Flag className="w-2.5 h-2.5" />Report
+                  </button>
+                </>
+              )}
+            </p>
             <p className={cn("shrink-0 tabular-nums", draft.length >= MAX_MESSAGE_LENGTH && "text-cooling")}>
               {draft.length}/{MAX_MESSAGE_LENGTH}
             </p>
@@ -209,6 +248,27 @@ export function SuggestedMessage({
           )}
         </>
       )}
+      <AlertDialog open={reportOpen} onOpenChange={setReportOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Report this suggestion?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tell us if the AI wrote something offensive, harmful or wrong. The text it wrote is sent to Novara so we can
+              review it. Your edits and {contact.firstName}&apos;s details aren&apos;t included.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={reporting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); void handleReport(); }}
+              disabled={reporting}
+              data-testid="button-confirm-report-draft"
+            >
+              {reporting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Report"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
