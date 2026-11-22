@@ -53,4 +53,6 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Contact import only: Novara reads the one contact the user picks. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
 </manifest>

@@ -4,6 +4,7 @@ import { ImportOptionCard, ImportPrimaryButton, InfoRow } from "@/components/Imp
 import { toast } from "sonner";
 import { useContacts } from "@/hooks/useContacts";
 import { findDuplicateContact } from "@/lib/contactDuplicates";
+import { isAndroidShell } from "@/lib/installPrompt";
 import {
   canPickNativeContact,
   pickNativeContact,
@@ -14,7 +15,7 @@ import {
 import type { ScannedContact } from "@/lib/businessCardParse";
 
 /**
- * "Import from Contacts" — the iOS app only.
+ * "Import from Contacts" — the iOS and Android apps.
  *
  * Sits alongside the card scanner and the QR scanner as a fourth way to get
  * someone into Novara without typing, and uses the same contract as the others:
@@ -25,7 +26,10 @@ import type { ScannedContact } from "@/lib/businessCardParse";
  * Privacy: the picker is Apple's own and runs outside Novara's process, so the
  * address book is never read — only the one contact the user taps comes back,
  * and iOS shows no permission prompt for that. See
- * ios/App/App/Native/NovaraContactImport.swift.
+ * ios/App/App/Native/NovaraContactImport.swift. Android's picker does not
+ * hand over the chosen contact's details by itself, so the Android app asks for
+ * contacts permission first and then reads only the picked contact (see
+ * NovaraNativePlugin.java).
  *
  * Renders nothing outside the app, and nothing in an older app build that has
  * the web view but not the picker.
@@ -43,6 +47,7 @@ export function NativeContactImport({
   const [busy, setBusy] = useState(false);
 
   if (!canPickNativeContact()) return null;
+  const androidApp = isAndroidShell();
 
   const apply = (payload: NativeContactPayload) => {
     const { cancelled, ...fields } = payload;
@@ -86,11 +91,13 @@ export function NativeContactImport({
     <ImportOptionCard
       icon={ContactRound}
       title="Import from your contacts"
-      description="Choose someone from your iPhone contacts. Novara only sees the one you select."
+      description={`Choose someone from your ${androidApp ? "phone's" : "iPhone"} contacts. Novara only sees the one you select.`}
       info={
         <>
           <InfoRow icon={Lock} title="Your contacts stay private">
-            Apple's own picker opens. Novara only receives the contact you choose.
+            {androidApp
+              ? "Android asks once to let Novara read your contacts. Novara then reads only the contact you choose."
+              : "Apple's own picker opens. Novara only receives the contact you choose."}
           </InfoRow>
           <InfoRow icon={ShieldCheck} title="Nothing else is read">
             Novara doesn't read, store or sync the rest of your address book.

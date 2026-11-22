@@ -132,6 +132,15 @@ interface NovaraPurchasesPlugin {
   manageSubscriptions(): Promise<void>;
 }
 
+/** The Android app's other native features (android/…/NovaraNativePlugin.java). */
+interface NovaraNativePlugin {
+  pickContact(): Promise<NativeContactPayload>;
+  shareFile(options: { name: string; text: string }): Promise<{ shared: boolean }>;
+  requestReview(): Promise<{ requested: boolean }>;
+  haptic(options: { style: HapticStyle }): Promise<void>;
+  openSettings(): Promise<void>;
+}
+
 /** The Android app's scanner (android/…/NovaraCardScannerPlugin.java). */
 interface NovaraCardScannerPlugin {
   scanCard(): Promise<NativeCardScan>;
@@ -156,20 +165,31 @@ function androidBridge(): NovaraNativeBridge | null {
   const scanner = Capacitor.isPluginAvailable("NovaraCardScanner")
     ? registerPlugin<NovaraCardScannerPlugin>("NovaraCardScanner")
     : null;
+  const native = Capacitor.isPluginAvailable("NovaraNative")
+    ? registerPlugin<NovaraNativePlugin>("NovaraNative")
+    : null;
   android = {
     version: NATIVE_PURCHASE_BRIDGE_VERSION,
     platform: "android",
-    // Navigation and haptics are iOS-shell features; Android keeps the web's own.
+    // Navigation is an iOS-shell feature; Android keeps the web's own.
     navigate: () => undefined,
     replace: () => undefined,
     back: () => undefined,
-    haptic: () => undefined,
+    haptic: (style) => void native?.haptic({ style }).catch(() => undefined),
     getProducts: () => purchases.getProducts(),
     identifyPurchases: (userId) => purchases.identify({ userId }),
     purchase: (productId) => purchases.purchase({ productId }),
     restorePurchases: () => purchases.restorePurchases(),
     manageSubscriptions: () => purchases.manageSubscriptions(),
     ...(scanner ? { scanCard: () => scanner.scanCard() } : {}),
+    ...(native
+      ? {
+          pickContact: () => native.pickContact(),
+          shareFile: async (name: string, text: string) => (await native.shareFile({ name, text })).shared,
+          requestReview: () => native.requestReview(),
+          openSettings: () => void native.openSettings().catch(() => undefined),
+        }
+      : {}),
   };
   return android;
 }

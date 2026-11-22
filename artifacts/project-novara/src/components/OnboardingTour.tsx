@@ -44,6 +44,7 @@ import { createPortal } from "react-dom";
 import { ArrowRight, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { canPickNativeContact } from "@/lib/nativeBridge";
+import { isAndroidShell } from "@/lib/installPrompt";
 import {
   MOCK_HEIGHT, MOCK_WIDTH, type MockScreen,
   HealthScreen, GoalsScreen, FollowUpsScreen, ContactNowScreen, StartersScreen,
@@ -100,7 +101,7 @@ function buildSteps(): Step[] {
     {
       title: "Add someone in seconds",
       description: canPickNativeContact()
-        ? "Type them in, or import from your iPhone contacts \u2014 photo included \u2014 a business card, a LinkedIn screenshot or a QR code."
+        ? `Type them in, or import from your ${isAndroidShell() ? "phone's" : "iPhone"} contacts \u2014 photo included \u2014 a business card, a LinkedIn screenshot or a QR code.`
         : "Type them in, or scan a business card, a LinkedIn screenshot or a QR code, right there at the event.",
       screen: AddScreen,
     },
