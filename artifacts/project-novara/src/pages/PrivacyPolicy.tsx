@@ -22,7 +22,7 @@ import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
 
 /** The date the text below was last materially changed. */
-const LAST_UPDATED = "29 October 2026";
+const LAST_UPDATED = "21 November 2026";
 
 /** Where privacy questions go. Also Novara's VAPID subject address. */
 const CONTACT_EMAIL = "contact@novaraconnect.group";
@@ -104,8 +104,8 @@ export default function PrivacyPolicy() {
             </strong>{" "}
             For each person you save, Novara stores what you enter: first and
             last name, company, job title, email address, phone number, LinkedIn
-            URL, where you met, their birthday (month and day), your private
-            notes, interests, and the
+            URL, where you met, their birthday (month and day), a photo if you
+            import one with the contact, your private notes, interests, and the
             scheduling fields Novara uses to time reminders (importance,
             priority, follow-up cadence, and the dates of first contact, last
             interaction and next follow-up).
@@ -126,32 +126,46 @@ export default function PrivacyPolicy() {
 
         <Section title="Device permissions">
           <p>
-            Novara asks for three iOS permissions. All three are optional, and
-            the app works without them.
+            The iPhone and Android apps ask for the permissions below. All of
+            them are optional, and the app works without them.
           </p>
           <Bullets
             items={[
               <>
                 <strong className="text-foreground">Contacts.</strong> When you
-                import someone from your address book, Novara opens Apple's
-                system contact picker. That picker runs outside the app: Novara
-                cannot see your address book, and receives only the single
-                person you choose. Nothing else is read, and nothing is uploaded
-                except the fields that person's card contains, which then become
-                an ordinary Novara contact.
+                import someone from your address book, Novara opens your phone's
+                own contact picker and uses only the single person you choose.
+                On iPhone, Apple's picker runs outside the app, so Novara cannot
+                see your address book and needs no permission. On Android, the
+                picker does not pass on a contact's details by itself, so
+                Android first asks you to allow Novara to read your contacts;
+                Novara then reads only the person you pick. In both cases
+                nothing else is read, and nothing is uploaded except the fields
+                that person's card contains, which then become an ordinary
+                Novara contact.
               </>,
               <>
                 <strong className="text-foreground">Camera.</strong> Used to
                 scan a business card. The photograph is never uploaded. Text
                 recognition happens on your device — using Apple's Vision
-                framework in the app, or in your browser on the web — and only
-                the recognised text leaves the device.
+                framework on iPhone, Google's document scanner and text
+                recognition (part of Google Play services) on Android, or your
+                browser on the web — and only the recognised text leaves the
+                device. On Android, Google Play services may collect limited
+                diagnostic information about these features under Google's own
+                privacy policy; it does not receive the image or its text from
+                Novara.
               </>,
               <>
                 <strong className="text-foreground">Photos.</strong> Used only
                 when you pick an existing image to scan instead of taking a new
                 one. The image is processed on your device in the same way and
                 is not uploaded.
+              </>,
+              <>
+                <strong className="text-foreground">Notifications.</strong>{" "}
+                Used for the reminders described below, only after you turn
+                them on.
               </>,
             ]}
           />
@@ -160,10 +174,12 @@ export default function PrivacyPolicy() {
         <Section title="Notifications">
           <p>
             If you turn on reminders, Novara stores a push token for your device
-            so Apple can deliver them. Notifications contain the reminder itself
+            so they can be delivered. Notifications contain the reminder itself
             — for example which contact is due — and are sent through Apple's
-            Push Notification service. You can turn them off at any time in
-            Settings, which stops the reminders.
+            Push Notification service on iPhone, Firebase Cloud Messaging
+            (Google) on Android, or your browser's push service on the web. You
+            can turn them off at any time in Settings, which stops the
+            reminders.
           </p>
         </Section>
 
@@ -212,6 +228,19 @@ export default function PrivacyPolicy() {
             These providers process the text on our behalf under their own terms
             and privacy policies. Novara does not use your data to train AI
             models, and does not permit it to be used for that purpose.
+          </p>
+        </Section>
+
+        <Section title="Subscriptions">
+          <p>
+            Novara Pro is bought through the App Store on iPhone or Google Play
+            on Android. Apple or Google handles the payment, and Novara never
+            receives your card or bank details. Novara uses RevenueCat to check
+            whether your subscription is active: RevenueCat receives your
+            Novara account identifier and the purchase details the store
+            provides, such as the plan, its dates and the store&apos;s
+            transaction reference. You manage or cancel your subscription in
+            your App Store or Google Play account.
           </p>
         </Section>
 
@@ -268,7 +297,16 @@ export default function PrivacyPolicy() {
               </>,
               <>
                 <strong className="text-foreground">Apple</strong> — push
-                notification delivery
+                notification delivery and App Store payments on iPhone
+              </>,
+              <>
+                <strong className="text-foreground">Google</strong> — push
+                notification delivery (Firebase Cloud Messaging), on-device card
+                scanning and Google Play payments on Android
+              </>,
+              <>
+                <strong className="text-foreground">RevenueCat</strong> —
+                checking subscription status
               </>,
               <>
                 <strong className="text-foreground">Resend</strong> — delivering
@@ -288,7 +326,7 @@ export default function PrivacyPolicy() {
               "We do not sell your personal data.",
               "We do not show advertising in Novara.",
               "We do not track you across other companies' apps or websites.",
-              "We do not read your address book. Contact import goes through Apple's own picker, one person at a time.",
+              "We do not read your address book. Contact import goes through your phone's own picker, and Novara reads only the one person you choose.",
               "We do not upload photographs taken or chosen for card scanning.",
             ]}
           />
